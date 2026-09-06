@@ -1,0 +1,24 @@
+{
+  "generatedAt": null,
+  "source": "placeholder",
+  "items": [
+    {
+      "name": "Set up Notion roadmap database",
+      "status": "In Progress",
+      "category": "Website",
+      "description": "See NOTION_SETUP.md — once connected, this placeholder data is replaced automatically at build time."
+    },
+    {
+      "name": "Example roadmap item",
+      "status": "Not Started",
+      "category": "Modpack",
+      "description": "Placeholder item — real content will come from Notion."
+    },
+    {
+      "name": "Website scaffold",
+      "status": "Done",
+      "category": "Website",
+      "description": "Initial site structure, pages, and deploy pipeline."
+    }
+  ]
+}

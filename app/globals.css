@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-chrome-light: #e0f2fe;
+  --color-chrome: #7dd3fc;
+  --color-chrome-dark: #0369a1;
+}
+
+body {
+  background-color: #ffffff;
+  color: #0f172a;
+}
