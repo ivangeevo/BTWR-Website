@@ -9,11 +9,11 @@ const config: Config = {
     extend: {
       colors: {
         chrome: {
-          light: "#e0f2fe",
-          DEFAULT: "#7dd3fc",
-          dark: "#0369a1",
+          light: "#e0f1fb",
+          DEFAULT: "#1e97d7",
+          dark: "#135e86",
         },
-        frost: "#f0f9ff",
+        frost: "#f3f9fc",
         glow: "#22d3ee",
       },
       fontFamily: {

@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --color-chrome-light: #e0f2fe;
-  --color-chrome: #7dd3fc;
-  --color-chrome-dark: #0369a1;
-  --color-frost: #f0f9ff;
+  --color-chrome-light: #e0f1fb;
+  --color-chrome: #1e97d7;
+  --color-chrome-dark: #135e86;
+  --color-frost: #f3f9fc;
   --color-glow: #22d3ee;
 }
 
@@ -110,6 +110,97 @@ h3 {
 .btn-glow:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px -6px rgba(34, 211, 238, 0.45);
+}
+
+/* Snowfall — falling frost particles, used behind the Home hero. */
+@keyframes snowfall {
+  0% {
+    top: -5%;
+    opacity: 0;
+    transform: translateX(0);
+  }
+  10% {
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateX(14px);
+  }
+  90% {
+    opacity: 0.85;
+  }
+  100% {
+    top: 105%;
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+.snow-dot {
+  position: absolute;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    var(--color-frost) 0%,
+    rgba(240, 249, 255, 0.4) 60%,
+    transparent 100%
+  );
+  animation: snowfall linear infinite;
+  will-change: top, opacity, transform;
+}
+
+/* Cursor dust — millstone-grit motes that kick up and scatter as the
+   cursor moves anywhere on the site, referencing BTW's mechanical/grinding
+   side rather than a generic glow. Fixed full-viewport overlay, rendered
+   once in the root layout so it works on every page. */
+.dust-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.dust-mote {
+  position: absolute;
+  border-radius: 2px;
+  background: linear-gradient(135deg, var(--color-frost), var(--color-glow));
+  box-shadow: 0 0 4px rgba(34, 211, 238, 0.6);
+  animation: dust-scatter 700ms ease-out forwards;
+}
+
+@keyframes dust-scatter {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(0.3) rotate(120deg);
+    opacity: 0;
+  }
+}
+
+/* Hero title gradient sweep. */
+@keyframes title-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.title-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-frost) 20%,
+    #ffffff 50%,
+    var(--color-frost) 80%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: title-shimmer 6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

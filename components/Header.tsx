@@ -26,11 +26,11 @@ export default function Header() {
           onClick={() => setOpen(false)}
         >
           <Image
-            src="/logo.svg"
+            src="/logos/btwr-logo-square.png"
             alt={`${siteName} logo`}
             width={40}
             height={40}
-            className="rounded"
+            className="rounded-xl"
           />
           <span className="font-heading text-lg font-bold tracking-wide text-chrome-dark">
             {siteName}
