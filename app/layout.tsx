@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Rajdhani } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import CursorDust from "@/components/CursorDust";
 import Header from "@/components/Header";
@@ -45,6 +46,11 @@ export default function RootLayout({
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
+        <Script
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          strategy="afterInteractive"
+          data-cf-beacon='{"token": "0996000452d747de908248771da9392c"}'
+        />
       </body>
     </html>
   );
