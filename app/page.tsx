@@ -1,5 +1,6 @@
 import Link from "next/link";
 import CountUp from "@/components/CountUp";
+import HeroSlideshow from "@/components/HeroSlideshow";
 import Reveal from "@/components/Reveal";
 import Snowfall from "@/components/Snowfall";
 import modsData from "@/data/mods.json";
@@ -25,10 +26,7 @@ export default function Home() {
   return (
     <>
       <div className="relative isolate flex min-h-[85vh] items-center justify-center overflow-hidden bg-chrome-dark px-6 text-center">
-        <div
-          className="absolute inset-0 -z-20 bg-cover bg-center"
-          style={{ backgroundImage: "url(/hero1.webp)" }}
-        />
+        <HeroSlideshow />
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-chrome-dark/70 via-chrome-dark/50 to-chrome-dark/90" />
         <Snowfall />
 

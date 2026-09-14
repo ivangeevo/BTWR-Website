@@ -132,10 +132,12 @@ h3 {
   will-change: top, opacity, transform;
 }
 
-/* Cursor dust — millstone-grit motes that kick up and scatter as the
-   cursor moves anywhere on the site, referencing BTW's mechanical/grinding
-   side rather than a generic glow. Fixed full-viewport overlay, rendered
-   once in the root layout so it works on every page. */
+/* Cursor gear trail — small gear.png icons kick off and scatter as the
+   cursor moves anywhere on the site, referencing BTW's mechanical side
+   rather than a generic glow. The icon itself spins through 16 discrete
+   steps (22.5deg each) the way a BTW gearbox block steps through its
+   active-spin texture, instead of a smooth rotation. Fixed full-viewport
+   overlay, rendered once in the root layout so it works on every page. */
 .dust-layer {
   position: fixed;
   inset: 0;
@@ -144,22 +146,39 @@ h3 {
   overflow: hidden;
 }
 
-.dust-mote {
+.gear-mote {
   position: absolute;
-  border-radius: 2px;
-  background: linear-gradient(135deg, var(--color-frost), var(--color-glow));
-  box-shadow: 0 0 4px rgba(34, 211, 238, 0.6);
-  animation: dust-scatter 700ms ease-out forwards;
+  animation: gear-scatter 900ms ease-out forwards;
 }
 
-@keyframes dust-scatter {
+.gear-mote-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-image: url("/gear.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  animation: gear-spin 1600ms steps(16, end) infinite;
+}
+
+@keyframes gear-scatter {
   0% {
-    transform: translate(0, 0) scale(1) rotate(0deg);
+    transform: translate(0, 0) scale(1);
     opacity: 0.9;
   }
   100% {
-    transform: translate(var(--dx), var(--dy)) scale(0.3) rotate(120deg);
+    transform: translate(var(--dx), var(--dy)) scale(0.3);
     opacity: 0;
+  }
+}
+
+@keyframes gear-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
 

@@ -156,7 +156,7 @@ export default function ModsPage() {
           .
         </p>
         <p className="mt-1 text-slate-600 dark:text-slate-400">
-          &ldquo;Current&rdquo; is the version pinned in the pack;
+          &ldquo;Current&rdquo; is the version used in the pack;
           &ldquo;Newest&rdquo; is the latest available on Modrinth.
         </p>
         <div className="mt-3 inline-block rounded-full bg-chrome-light px-4 py-1.5 text-sm font-semibold text-chrome-dark dark:bg-slate-800 dark:text-chrome">

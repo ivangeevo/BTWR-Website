@@ -2,14 +2,15 @@
 
 import { useEffect, useRef } from "react";
 
-// Millstone-dust cursor trail — small angular motes kick up and scatter as
-// the cursor moves, like grit off a grinding stone. Rendered once in the
-// root layout as a fixed full-viewport overlay, so it follows the cursor
-// on every page, not just one section. Spawn-throttled and capped so it
-// stays cheap regardless of how fast the mouse moves.
+// Gear cursor trail — small gear.png icons kick off and scatter as the
+// cursor moves, spinning through 16 discrete frames the way BTW's
+// gearbox blocks step through their active-spin texture. Rendered once
+// in the root layout as a fixed full-viewport overlay, so it follows the
+// cursor on every page, not just one section. Spawn-throttled and capped
+// so it stays cheap regardless of how fast the mouse moves.
 const SPAWN_INTERVAL_MS = 45;
 const MAX_PARTICLES = 24;
-const PARTICLE_LIFETIME_MS = 700;
+const PARTICLE_LIFETIME_MS = 900;
 
 export default function CursorDust() {
   const layerRef = useRef<HTMLDivElement>(null);
@@ -27,13 +28,13 @@ export default function CursorDust() {
 
     function spawn(x: number, y: number) {
       const mote = document.createElement("span");
-      mote.className = "dust-mote";
+      mote.className = "gear-mote";
 
       const angle = Math.random() * Math.PI * 2;
       const distance = 14 + Math.random() * 22;
       const dx = Math.cos(angle) * distance;
       const dy = Math.sin(angle) * distance + 10;
-      const size = 2 + Math.random() * 3;
+      const size = 12 + Math.random() * 6;
 
       mote.style.left = `${x}px`;
       mote.style.top = `${y}px`;
@@ -41,6 +42,10 @@ export default function CursorDust() {
       mote.style.height = `${size}px`;
       mote.style.setProperty("--dx", `${dx}px`);
       mote.style.setProperty("--dy", `${dy}px`);
+
+      const icon = document.createElement("span");
+      icon.className = "gear-mote-icon";
+      mote.appendChild(icon);
 
       layer!.appendChild(mote);
       active.push(mote);
