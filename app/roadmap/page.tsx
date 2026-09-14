@@ -1,6 +1,15 @@
+import type { Metadata } from "next";
 import Reveal from "@/components/Reveal";
 import roadmapData from "@/data/roadmap.json";
 import { enableRoadmap } from "@/lib/site-config";
+
+export const metadata: Metadata = {
+  title: "Roadmap",
+  description:
+    "Track what's done, in progress, and planned for the BTW: Remastered modpack.",
+  alternates: { canonical: "/roadmap" },
+  robots: enableRoadmap ? undefined : { index: false, follow: true },
+};
 
 type RoadmapItem = {
   name: string;

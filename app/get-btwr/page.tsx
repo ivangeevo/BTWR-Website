@@ -1,5 +1,13 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Reveal from "@/components/Reveal";
+
+export const metadata: Metadata = {
+  title: "Get BTWR!",
+  description:
+    "Step-by-step instructions to install the BTW: Remastered modpack through the Modrinth App.",
+  alternates: { canonical: "/get-btwr" },
+};
 
 const installSteps = [
   {

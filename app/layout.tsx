@@ -5,7 +5,7 @@ import "./globals.css";
 import CursorDust from "@/components/CursorDust";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { siteDescription, siteName } from "@/lib/site-config";
+import { siteDescription, siteName, siteUrl } from "@/lib/site-config";
 
 const rajdhani = Rajdhani({
   subsets: ["latin"],
@@ -15,8 +15,33 @@ const rajdhani = Rajdhani({
 });
 
 export const metadata: Metadata = {
-  title: siteName,
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: siteName,
+    template: `%s | ${siteName}`,
+  },
   description: siteDescription,
+  alternates: {
+    canonical: "/",
+  },
+  icons: {
+    icon: "/logos/btwr-logo.png",
+    apple: "/logos/btwr-logo.png",
+  },
+  openGraph: {
+    title: siteName,
+    description: siteDescription,
+    url: siteUrl,
+    siteName,
+    images: [{ url: "/logos/btwr-logo.png", width: 96, height: 96 }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: siteName,
+    description: siteDescription,
+    images: ["/logos/btwr-logo.png"],
+  },
 };
 
 // Sets data-theme before React hydrates, so the page never flashes the

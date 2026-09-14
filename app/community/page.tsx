@@ -1,6 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Reveal from "@/components/Reveal";
 import { discordInviteUrl, githubRepoUrl } from "@/lib/site-config";
+
+export const metadata: Metadata = {
+  title: "Community",
+  description:
+    "Chat with other BTW: Remastered players, follow updates, and get involved on Discord and GitHub.",
+  alternates: { canonical: "/community" },
+};
 
 function LinkCard({
   title,
