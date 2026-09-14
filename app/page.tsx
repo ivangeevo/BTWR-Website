@@ -5,7 +5,11 @@ import Reveal from "@/components/Reveal";
 import Snowfall from "@/components/Snowfall";
 import modsData from "@/data/mods.json";
 import roadmapData from "@/data/roadmap.json";
-import { siteDescription, siteName, siteTagline } from "@/lib/site-config";
+import {
+  enableRoadmap,
+  siteDescription,
+  siteName,
+} from "@/lib/site-config";
 
 type RoadmapItem = { status: string };
 
@@ -34,7 +38,6 @@ export default function Home() {
           <h1 className="title-shimmer font-heading text-6xl font-extrabold tracking-wide sm:text-7xl">
             {siteName}
           </h1>
-          <p className="mt-3 text-xl font-medium text-frost">{siteTagline}</p>
           <p className="mx-auto mt-6 max-w-xl text-white/90">
             {siteDescription}
           </p>
@@ -53,11 +56,22 @@ export default function Home() {
               Join the Community
             </Link>
           </div>
+
+          <div className="mt-4 flex justify-center">
+            <Link
+              href="/get-btwr"
+              className="btn-glow btn-gradient rounded-lg px-8 py-3 font-semibold text-white"
+            >
+              Get BTWR!
+            </Link>
+          </div>
         </div>
       </div>
 
       <Reveal className="mx-auto max-w-4xl px-6 py-16">
-        <div className="grid grid-cols-2 gap-6 text-center sm:grid-cols-4">
+        <div
+          className={`grid grid-cols-2 gap-6 text-center ${enableRoadmap ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}
+        >
           <div>
             <p className="font-heading text-4xl font-bold text-chrome-dark dark:text-chrome">
               <CountUp target={totalMods} />
@@ -82,31 +96,37 @@ export default function Home() {
               Misc mods
             </p>
           </div>
-          <div>
-            <p className="font-heading text-4xl font-bold text-chrome-dark dark:text-chrome">
-              <CountUp target={roadmapPercent} suffix="%" />
-            </p>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              Roadmap complete
-            </p>
-          </div>
+          {enableRoadmap && (
+            <div>
+              <p className="font-heading text-4xl font-bold text-chrome-dark dark:text-chrome">
+                <CountUp target={roadmapPercent} suffix="%" />
+              </p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                Roadmap complete
+              </p>
+            </div>
+          )}
         </div>
       </Reveal>
 
       <Reveal className="mx-auto max-w-5xl px-6 pb-24">
-        <div className="grid gap-6 sm:grid-cols-3">
-          <Link
-            href="/roadmap"
-            className="card-glow block rounded-xl border border-slate-200 p-6 dark:border-slate-700"
-          >
-            <h2 className="font-heading text-xl font-bold text-chrome-dark dark:text-chrome">
-              Roadmap
-            </h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              {roadmapPercent}% complete — see what&apos;s done, in progress,
-              and planned.
-            </p>
-          </Link>
+        <div
+          className={`grid gap-6 ${enableRoadmap ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}
+        >
+          {enableRoadmap && (
+            <Link
+              href="/roadmap"
+              className="card-glow block rounded-xl border border-slate-200 p-6 dark:border-slate-700"
+            >
+              <h2 className="font-heading text-xl font-bold text-chrome-dark dark:text-chrome">
+                Roadmap
+              </h2>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                {roadmapPercent}% complete — see what&apos;s done, in
+                progress, and planned.
+              </p>
+            </Link>
+          )}
           <Link
             href="/mods"
             className="card-glow block rounded-xl border border-slate-200 p-6 dark:border-slate-700"
@@ -126,7 +146,18 @@ export default function Home() {
               Community
             </h2>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Discord, GitHub, and how to install the pack.
+              Discord, GitHub, and how to get involved.
+            </p>
+          </Link>
+          <Link
+            href="/get-btwr"
+            className="card-glow block rounded-xl border border-slate-200 p-6 dark:border-slate-700"
+          >
+            <h2 className="font-heading text-xl font-bold text-chrome-dark dark:text-chrome">
+              Get BTWR!
+            </h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Step-by-step instructions to install the modpack.
             </p>
           </Link>
         </div>

@@ -1,5 +1,6 @@
 import Reveal from "@/components/Reveal";
 import roadmapData from "@/data/roadmap.json";
+import { enableRoadmap } from "@/lib/site-config";
 
 type RoadmapItem = {
   name: string;
@@ -19,6 +20,19 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function RoadmapPage() {
+  if (!enableRoadmap) {
+    return (
+      <div className="mx-auto max-w-3xl px-6 py-24 text-center">
+        <h1 className="font-heading text-3xl font-extrabold tracking-wide text-chrome-dark dark:text-chrome">
+          Roadmap
+        </h1>
+        <p className="mt-4 text-slate-600 dark:text-slate-400">
+          The roadmap page is still being put together. Check back soon.
+        </p>
+      </div>
+    );
+  }
+
   const items = roadmapData.items as RoadmapItem[];
   const groups = statusOrder
     .map((status) => ({

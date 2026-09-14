@@ -4,7 +4,7 @@ import "./globals.css";
 import CursorDust from "@/components/CursorDust";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { siteName, siteTagline } from "@/lib/site-config";
+import { siteDescription, siteName } from "@/lib/site-config";
 
 const rajdhani = Rajdhani({
   subsets: ["latin"],
@@ -14,8 +14,8 @@ const rajdhani = Rajdhani({
 });
 
 export const metadata: Metadata = {
-  title: `${siteName} — ${siteTagline}`,
-  description: siteTagline,
+  title: siteName,
+  description: siteDescription,
 };
 
 // Sets data-theme before React hydrates, so the page never flashes the

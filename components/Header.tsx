@@ -5,14 +5,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
-import { siteName } from "@/lib/site-config";
+import { enableRoadmap, siteName } from "@/lib/site-config";
 
 const navLinks = [
   { href: "/", label: "Home" },
-  { href: "/roadmap", label: "Roadmap" },
+  { href: "/roadmap", label: "Roadmap", hidden: !enableRoadmap },
   { href: "/mods", label: "Mods" },
   { href: "/community", label: "Community" },
-];
+].filter((link) => !link.hidden);
+
+const getBtwrLink = { href: "/get-btwr", label: "Get BTWR!" };
 
 export default function Header() {
   const pathname = usePathname();
@@ -63,6 +65,12 @@ export default function Header() {
               </Link>
             );
           })}
+          <Link
+            href={getBtwrLink.href}
+            className="btn-glow btn-gradient rounded-md px-4 py-1.5 text-sm font-semibold text-white"
+          >
+            {getBtwrLink.label}
+          </Link>
         </nav>
 
         <button
@@ -111,6 +119,13 @@ export default function Header() {
               </Link>
             );
           })}
+          <Link
+            href={getBtwrLink.href}
+            onClick={() => setOpen(false)}
+            className="btn-gradient mt-1 rounded-md px-3 py-2 text-center text-sm font-semibold text-white"
+          >
+            {getBtwrLink.label}
+          </Link>
         </nav>
       )}
     </header>
