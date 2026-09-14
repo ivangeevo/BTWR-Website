@@ -13,6 +13,11 @@ const config: Config = {
           DEFAULT: "#7dd3fc",
           dark: "#0369a1",
         },
+        frost: "#f0f9ff",
+        glow: "#22d3ee",
+      },
+      fontFamily: {
+        heading: ["var(--font-heading)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
     },
   },

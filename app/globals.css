@@ -6,9 +6,119 @@
   --color-chrome-light: #e0f2fe;
   --color-chrome: #7dd3fc;
   --color-chrome-dark: #0369a1;
+  --color-frost: #f0f9ff;
+  --color-glow: #22d3ee;
 }
 
 body {
   background-color: #ffffff;
   color: #0f172a;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+/* Frost shimmer — small glinting dots, used behind hero/header blocks. */
+@keyframes shimmer-pulse {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+}
+
+.shimmer-dot {
+  position: absolute;
+  border-radius: 9999px;
+  background: radial-gradient(circle, var(--color-frost) 0%, transparent 70%);
+  animation: shimmer-pulse 4s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+
+/* Ambient glow — a single soft blurred circle, abstract (not illustrative). */
+@keyframes ambient-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.08);
+  }
+}
+
+.ambient-glow {
+  position: absolute;
+  border-radius: 9999px;
+  background: radial-gradient(circle, var(--color-chrome) 0%, transparent 70%);
+  filter: blur(48px);
+  animation: ambient-pulse 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Circuit-line hover trace — a thin light sweeps across the top edge on hover. */
+.card-glow {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+
+.card-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-glow), transparent);
+  background-size: 200% 100%;
+  background-position: -200% 0;
+  transition: background-position 600ms ease;
+  pointer-events: none;
+}
+
+.card-glow:hover {
+  border-color: var(--color-glow);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.15),
+    0 4px 16px -4px rgba(34, 211, 238, 0.35);
+  transform: translateY(-2px);
+}
+
+.card-glow:hover::before {
+  background-position: 200% 0;
+}
+
+/* Button/link hover lift, used alongside Tailwind's own color utilities. */
+.btn-glow {
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease,
+    background-color 200ms ease;
+}
+
+.btn-glow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -6px rgba(34, 211, 238, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

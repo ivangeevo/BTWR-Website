@@ -1,4 +1,9 @@
+"use client";
+
 import Image from "next/image";
+import { useMemo, useState } from "react";
+import FrostShimmer from "@/components/FrostShimmer";
+import Reveal from "@/components/Reveal";
 import modsData from "@/data/mods.json";
 
 type Mod = {
@@ -28,7 +33,7 @@ function formatDate(iso: string | null) {
 
 function ModCard({ mod }: { mod: Mod }) {
   return (
-    <li className="rounded-lg border border-slate-200 p-4">
+    <li className="card-glow rounded-lg border border-slate-200 p-4">
       <div className="flex items-start gap-3">
         {mod.iconUrl ? (
           <Image
@@ -101,44 +106,75 @@ function ModCard({ mod }: { mod: Mod }) {
 function ModSection({ title, mods }: { title: string; mods: Mod[] }) {
   if (mods.length === 0) return null;
   return (
-    <section className="mt-10">
-      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-      <ul className="mt-4 space-y-3">
-        {mods.map((mod) => (
-          <ModCard key={mod.projectId} mod={mod} />
-        ))}
-      </ul>
-    </section>
+    <Reveal className="mt-10">
+      <section>
+        <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+        <ul className="mt-4 space-y-3">
+          {mods.map((mod) => (
+            <ModCard key={mod.projectId} mod={mod} />
+          ))}
+        </ul>
+      </section>
+    </Reveal>
   );
 }
 
 export default function ModsPage() {
-  const mods = modsData.mods as Mod[];
+  const allMods = modsData.mods as Mod[];
+  const [query, setQuery] = useState("");
+
+  const mods = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return allMods;
+    return allMods.filter((mod) => mod.name.toLowerCase().includes(q));
+  }, [allMods, query]);
+
   const core = mods.filter((m) => m.category === "core");
   const misc = mods.filter((m) => m.category === "misc");
   const uncategorized = mods.filter((m) => m.category === "uncategorized");
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
-      <h1 className="text-3xl font-extrabold text-chrome-dark">Mods List</h1>
-      <p className="mt-2 text-slate-600">
-        Pulled automatically from{" "}
-        <a
-          href="https://modrinth.com/modpack/btw-remastered/versions"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-chrome-dark underline"
-        >
-          BTWR&apos;s Modrinth listing
-        </a>{" "}
-        (pack version {modsData.packVersion}). &ldquo;Current&rdquo; is the
-        version pinned in the pack; &ldquo;Newest&rdquo; is the latest
-        available on Modrinth.
-      </p>
+      <div className="relative overflow-hidden rounded-xl">
+        <FrostShimmer />
+        <h1 className="font-heading text-3xl font-extrabold tracking-wide text-chrome-dark">
+          Mods List
+        </h1>
+        <p className="mt-2 text-slate-600">
+          Pulled automatically from{" "}
+          <a
+            href="https://modrinth.com/modpack/btw-remastered/versions"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-chrome-dark underline"
+          >
+            BTWR&apos;s Modrinth listing
+          </a>{" "}
+          (pack version {modsData.packVersion}). &ldquo;Current&rdquo; is the
+          version pinned in the pack; &ldquo;Newest&rdquo; is the latest
+          available on Modrinth.
+        </p>
+      </div>
 
-      <ModSection title="Core Mods" mods={core} />
-      <ModSection title="Miscellaneous" mods={misc} />
-      <ModSection title="Needs Categorization" mods={uncategorized} />
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={`Search ${allMods.length} mods...`}
+        className="mt-6 w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-glow focus:outline-none focus:ring-1 focus:ring-glow"
+      />
+
+      {mods.length === 0 ? (
+        <p className="mt-10 text-center text-slate-500">
+          No mods match &ldquo;{query}&rdquo;.
+        </p>
+      ) : (
+        <>
+          <ModSection title="Core Mods" mods={core} />
+          <ModSection title="Miscellaneous" mods={misc} />
+          <ModSection title="Needs Categorization" mods={uncategorized} />
+        </>
+      )}
     </div>
   );
 }

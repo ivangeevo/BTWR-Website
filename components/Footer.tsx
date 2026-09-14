@@ -19,7 +19,7 @@ function FooterLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-sm text-chrome-dark hover:underline"
+      className="text-sm text-chrome-dark transition-colors hover:text-glow"
     >
       {label}
     </a>
@@ -28,7 +28,7 @@ function FooterLink({
 
 export default function Footer() {
   return (
-    <footer className="bg-chrome-light border-t border-chrome">
+    <footer className="border-t border-chrome bg-chrome-light">
       <div className="mx-auto flex max-w-5xl flex-col items-center gap-2 px-6 py-6 text-center">
         <div className="flex gap-6">
           <FooterLink href={discordInviteUrl} label="Discord" />
