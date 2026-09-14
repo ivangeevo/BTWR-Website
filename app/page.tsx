@@ -61,28 +61,36 @@ export default function Home() {
       <Reveal className="mx-auto max-w-4xl px-6 py-16">
         <div className="grid grid-cols-2 gap-6 text-center sm:grid-cols-4">
           <div>
-            <p className="font-heading text-4xl font-bold text-chrome-dark">
+            <p className="font-heading text-4xl font-bold text-chrome-dark dark:text-chrome">
               <CountUp target={totalMods} />
             </p>
-            <p className="mt-1 text-sm text-slate-600">Mods included</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Mods included
+            </p>
           </div>
           <div>
-            <p className="font-heading text-4xl font-bold text-chrome-dark">
+            <p className="font-heading text-4xl font-bold text-chrome-dark dark:text-chrome">
               <CountUp target={coreMods} />
             </p>
-            <p className="mt-1 text-sm text-slate-600">Core mods</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Core mods
+            </p>
           </div>
           <div>
-            <p className="font-heading text-4xl font-bold text-chrome-dark">
+            <p className="font-heading text-4xl font-bold text-chrome-dark dark:text-chrome">
               <CountUp target={miscMods} />
             </p>
-            <p className="mt-1 text-sm text-slate-600">Misc mods</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Misc mods
+            </p>
           </div>
           <div>
-            <p className="font-heading text-4xl font-bold text-chrome-dark">
+            <p className="font-heading text-4xl font-bold text-chrome-dark dark:text-chrome">
               <CountUp target={roadmapPercent} suffix="%" />
             </p>
-            <p className="mt-1 text-sm text-slate-600">Roadmap complete</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Roadmap complete
+            </p>
           </div>
         </div>
       </Reveal>
@@ -91,35 +99,35 @@ export default function Home() {
         <div className="grid gap-6 sm:grid-cols-3">
           <Link
             href="/roadmap"
-            className="card-glow block rounded-xl border border-slate-200 p-6"
+            className="card-glow block rounded-xl border border-slate-200 p-6 dark:border-slate-700"
           >
-            <h2 className="font-heading text-xl font-bold text-chrome-dark">
+            <h2 className="font-heading text-xl font-bold text-chrome-dark dark:text-chrome">
               Roadmap
             </h2>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
               {roadmapPercent}% complete — see what&apos;s done, in progress,
               and planned.
             </p>
           </Link>
           <Link
             href="/mods"
-            className="card-glow block rounded-xl border border-slate-200 p-6"
+            className="card-glow block rounded-xl border border-slate-200 p-6 dark:border-slate-700"
           >
-            <h2 className="font-heading text-xl font-bold text-chrome-dark">
+            <h2 className="font-heading text-xl font-bold text-chrome-dark dark:text-chrome">
               Mods
             </h2>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
               {totalMods} mods, {outdatedMods} with updates available.
             </p>
           </Link>
           <Link
             href="/community"
-            className="card-glow block rounded-xl border border-slate-200 p-6"
+            className="card-glow block rounded-xl border border-slate-200 p-6 dark:border-slate-700"
           >
-            <h2 className="font-heading text-xl font-bold text-chrome-dark">
+            <h2 className="font-heading text-xl font-bold text-chrome-dark dark:text-chrome">
               Community
             </h2>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
               Discord, GitHub, and how to install the pack.
             </p>
           </Link>

@@ -15,32 +15,16 @@ body {
   color: #0f172a;
 }
 
+[data-theme="dark"] body {
+  background-color: #0a1420;
+  color: #e2e8f0;
+}
+
 h1,
 h2,
 h3 {
   font-family: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
   letter-spacing: 0.01em;
-}
-
-/* Frost shimmer — small glinting dots, used behind hero/header blocks. */
-@keyframes shimmer-pulse {
-  0%,
-  100% {
-    opacity: 0;
-    transform: scale(0.7);
-  }
-  50% {
-    opacity: 0.85;
-    transform: scale(1);
-  }
-}
-
-.shimmer-dot {
-  position: absolute;
-  border-radius: 9999px;
-  background: radial-gradient(circle, var(--color-frost) 0%, transparent 70%);
-  animation: shimmer-pulse 4s ease-in-out infinite;
-  will-change: opacity, transform;
 }
 
 /* Ambient glow — a single soft blurred circle, abstract (not illustrative). */
@@ -201,6 +185,104 @@ h3 {
   background-clip: text;
   color: transparent;
   animation: title-shimmer 6s ease-in-out infinite;
+}
+
+/* Theme toggle — sun/moon icon swap with a short spin/rock flourish on
+   click, ported from an existing (unreleased) HTML/CSS/JS design. */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  padding: 0.3rem;
+  line-height: 0;
+  cursor: pointer;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+.theme-toggle:hover {
+  background-color: rgba(128, 128, 128, 0.15);
+}
+
+.theme-toggle-icon {
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-sun,
+.icon-moon-wrap {
+  transform-origin: center;
+  transition: opacity 0.4s ease, transform 0.5s ease;
+}
+
+.icon-sun circle {
+  fill: currentColor;
+  stroke: none;
+}
+
+.icon-moon {
+  fill: currentColor;
+  stroke: none;
+}
+
+.icon-moon-wrap {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.icon-sun {
+  opacity: 0;
+  transform: scale(0.4);
+}
+
+[data-theme="dark"] .icon-sun {
+  opacity: 1;
+  transform: scale(1);
+}
+
+[data-theme="dark"] .icon-moon-wrap {
+  opacity: 0;
+  transform: scale(0.4);
+}
+
+.theme-toggle.spin .icon-sun-spin {
+  transform-origin: center;
+  animation: theme-toggle-spin 0.5s ease;
+}
+
+.theme-toggle.spin .icon-moon {
+  transform-origin: center;
+  animation: theme-toggle-moon-rock 0.6s ease;
+}
+
+@keyframes theme-toggle-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(180deg);
+  }
+}
+
+@keyframes theme-toggle-moon-rock {
+  0% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-18deg);
+  }
+  60% {
+    transform: rotate(8deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
