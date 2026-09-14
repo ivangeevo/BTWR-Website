@@ -132,56 +132,6 @@ h3 {
   will-change: top, opacity, transform;
 }
 
-/* Cursor gear trail — small gear.png icons kick off and scatter as the
-   cursor moves anywhere on the site, referencing BTW's mechanical side
-   rather than a generic glow. The icon itself spins through 16 discrete
-   steps (22.5deg each) the way a BTW gearbox block steps through its
-   active-spin texture, instead of a smooth rotation. Fixed full-viewport
-   overlay, rendered once in the root layout so it works on every page. */
-.dust-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.gear-mote {
-  position: absolute;
-  animation: gear-scatter 900ms ease-out forwards;
-}
-
-.gear-mote-icon {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background-image: url("/gear.png");
-  background-size: contain;
-  background-repeat: no-repeat;
-  image-rendering: pixelated;
-  animation: gear-spin 1600ms steps(16, end) infinite;
-}
-
-@keyframes gear-scatter {
-  0% {
-    transform: translate(0, 0) scale(1);
-    opacity: 0.9;
-  }
-  100% {
-    transform: translate(var(--dx), var(--dy)) scale(0.3);
-    opacity: 0;
-  }
-}
-
-@keyframes gear-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* Hero title gradient sweep. */
 @keyframes title-shimmer {
   0% {

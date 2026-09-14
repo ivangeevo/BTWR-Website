@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Rajdhani } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-import CursorDust from "@/components/CursorDust";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { siteDescription, siteName, siteUrl } from "@/lib/site-config";
@@ -67,7 +66,6 @@ export default function RootLayout({
     <html lang="en" className={rajdhani.variable} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
-        <CursorDust />
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
