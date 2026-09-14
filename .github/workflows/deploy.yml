@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch: {}
+  schedule:
+    # Daily rebuild so the mods page's "outdated" badges (current vs.
+    # newest Modrinth version) stay fresh even with no code changes.
+    - cron: "0 6 * * *"
 
 permissions:
   contents: read

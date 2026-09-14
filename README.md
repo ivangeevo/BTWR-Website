@@ -9,6 +9,7 @@ roadmap/progress tracker, mods list, and download/install info.
 - Next.js (App Router, TypeScript, Tailwind CSS), built as a static export
 - Hosted on GitHub Pages
 - Roadmap data pulled from Notion at build time (see [NOTION_SETUP.md](./NOTION_SETUP.md))
+- Mods list pulled from BTWR's [Modrinth pack listing](https://modrinth.com/modpack/btw-remastered/versions) at build time (`scripts/fetch-mods.mjs` → `data/mods.json`); the daily scheduled workflow run keeps "outdated" badges current even without a push
 
 ## Development
 
@@ -41,6 +42,6 @@ one-time repo setup (Pages source + secrets).
 - [ ] Replace `public/logo.svg` with the real BTWR logo
 - [ ] Add the Discord invite link in `lib/site-config.ts`
 - [ ] Add the GitHub repo link in `lib/site-config.ts`
-- [ ] Replace placeholder entries in `data/mods.ts` with the real mod list
+- [ ] Review the Core/QoL split in `data/mod-categories.mjs` — a few entries are best-guess calls (see the comment at the top of that file)
 - [ ] Set up the Notion integration + database (see `NOTION_SETUP.md`)
 - [ ] Add the real modpack download link on the Community page

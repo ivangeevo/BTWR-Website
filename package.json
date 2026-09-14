@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prebuild": "node scripts/fetch-roadmap.mjs",
+    "prebuild": "node scripts/fetch-roadmap.mjs && node scripts/fetch-mods.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@notionhq/client": "^2.2.15",
+    "adm-zip": "^0.6.1",
     "next": "^15.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

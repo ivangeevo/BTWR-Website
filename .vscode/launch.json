@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "vscode-edge-devtools.debug",
+      "request": "launch",
+      "name": "Launch Edge (Integrated)",
+      "url": "http://localhost:3000/",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "dev"
+    },
+    {
+      "type": "msedge",
+      "request": "launch",
+      "name": "Launch Edge",
+      "url": "http://localhost:3000/",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "dev"
+    }
+  ]
+}
