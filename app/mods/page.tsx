@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Reveal from "@/components/Reveal";
 import modsData from "@/data/mods.json";
+import { MISC_SUBCATEGORIES } from "@/data/mod-categories.mjs";
 
 type Mod = {
   projectId: string;
@@ -12,6 +13,7 @@ type Mod = {
   iconUrl: string | null;
   modrinthUrl: string;
   category: "core" | "misc" | "uncategorized";
+  subcategory: string | null;
   disabled: boolean;
   currentVersion: string;
   currentVersionDate: string | null;
@@ -20,6 +22,22 @@ type Mod = {
   newestMatchesTarget: boolean;
   isOutdated: boolean;
 };
+
+// How tall the "peek" preview is before a category has ever been expanded —
+// tall enough to hint at a full card, short enough to make it obvious more
+// is cut off (the blur fade at the bottom reinforces that).
+const PEEK_HEIGHT = 130;
+
+// useLayoutEffect warns when it runs during static-export SSR; fall back to
+// useEffect there since only the browser needs the pre-paint measurement.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+function byMostRecentlyUpdated(a: Mod, b: Mod) {
+  const aTime = a.currentVersionDate ? new Date(a.currentVersionDate).getTime() : -Infinity;
+  const bTime = b.currentVersionDate ? new Date(b.currentVersionDate).getTime() : -Infinity;
+  return bTime - aTime;
+}
 
 function formatDate(iso: string | null) {
   if (!iso) return null;
@@ -105,19 +123,120 @@ function ModCard({ mod }: { mod: Mod }) {
   );
 }
 
-function ModSection({ title, mods }: { title: string; mods: Mod[] }) {
+function groupBySubcategory(mods: Mod[]) {
+  const groups = new Map<string, Mod[]>();
+  for (const mod of mods) {
+    const key = mod.subcategory && MISC_SUBCATEGORIES[mod.subcategory] ? mod.subcategory : "other";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(mod);
+  }
+  const order = [...Object.keys(MISC_SUBCATEGORIES), "other"];
+  return order
+    .filter((key) => groups.has(key))
+    .map((key) => ({
+      label: MISC_SUBCATEGORIES[key] ?? "Other",
+      mods: groups.get(key)!,
+    }));
+}
+
+function ModSection({
+  title,
+  mods,
+  grouped = false,
+}: {
+  title: string;
+  mods: Mod[];
+  grouped?: boolean;
+}) {
+  // Three states: a slightly-open "peek" (first impression only), fully
+  // open, and fully closed. Once a category has been opened at least once,
+  // it stops peeking and just toggles open/closed like a normal dropdown.
+  const [open, setOpen] = useState(false);
+  const [everOpened, setEverOpened] = useState(false);
+  const [naturalHeight, setNaturalHeight] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useIsomorphicLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const recompute = () => setNaturalHeight(el.scrollHeight);
+    recompute();
+    window.addEventListener("resize", recompute);
+    return () => window.removeEventListener("resize", recompute);
+  }, [mods.length]);
+
   if (mods.length === 0) return null;
+
+  // A category with barely any content doesn't need a peek at all — just
+  // show it fully so there's nothing misleadingly "cut off".
+  const fitsWithoutPeek = naturalHeight > 0 && naturalHeight <= PEEK_HEIGHT;
+  const isOpen = open || fitsWithoutPeek;
+  const showPeek = !isOpen && !everOpened;
+  const panelHeight = isOpen ? naturalHeight : showPeek ? PEEK_HEIGHT : 0;
+
+  const panelId = `mod-section-${title.toLowerCase().replace(/\s+/g, "-")}`;
+  const sections = grouped ? groupBySubcategory(mods) : [{ label: null, mods }];
+
   return (
     <Reveal className="mt-10">
-      <section>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-          {title}
-        </h2>
-        <ul className="mt-4 space-y-3">
-          {mods.map((mod) => (
-            <ModCard key={mod.projectId} mod={mod} />
-          ))}
-        </ul>
+      <section className="card-glow rounded-lg border border-slate-200 dark:border-slate-700">
+        <button
+          type="button"
+          onClick={() => {
+            setOpen((v) => !v);
+            setEverOpened(true);
+          }}
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          className="category-header-bounce flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-chrome-light/40 dark:hover:bg-slate-800/60"
+        >
+          <span className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              {title}
+            </h2>
+            <span className="rounded-full bg-chrome-light px-2.5 py-0.5 text-xs font-semibold text-chrome-dark dark:bg-slate-800 dark:text-chrome">
+              {mods.length}
+            </span>
+          </span>
+          <svg
+            className={`h-5 w-5 shrink-0 text-chrome-dark transition-transform duration-300 dark:text-chrome ${
+              isOpen ? "rotate-180" : ""
+            }`}
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M5 7.5l5 5 5-5" />
+          </svg>
+        </button>
+        <div
+          id={panelId}
+          className="category-panel relative overflow-hidden"
+          style={{ maxHeight: `${panelHeight}px` }}
+        >
+          <div ref={contentRef} className="px-4 pb-4 pt-1">
+            {sections.map(({ label, mods: groupMods }) => (
+              <div key={label ?? "flat"} className="mt-3 first:mt-0">
+                {label && (
+                  <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-chrome-dark/70 dark:text-chrome/70">
+                    {label}
+                  </h3>
+                )}
+                <ul className="space-y-3">
+                  {groupMods.map((mod) => (
+                    <ModCard key={mod.projectId} mod={mod} />
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          {showPeek && (
+            <div className="category-peek-fade" aria-hidden="true" />
+          )}
+        </div>
       </section>
     </Reveal>
   );
@@ -133,9 +252,11 @@ export default function ModsPage() {
     return allMods.filter((mod) => mod.name.toLowerCase().includes(q));
   }, [allMods, query]);
 
-  const core = mods.filter((m) => m.category === "core");
-  const misc = mods.filter((m) => m.category === "misc");
-  const uncategorized = mods.filter((m) => m.category === "uncategorized");
+  const core = mods.filter((m) => m.category === "core").sort(byMostRecentlyUpdated);
+  const misc = mods.filter((m) => m.category === "misc").sort(byMostRecentlyUpdated);
+  const uncategorized = mods
+    .filter((m) => m.category === "uncategorized")
+    .sort(byMostRecentlyUpdated);
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
@@ -179,7 +300,7 @@ export default function ModsPage() {
       ) : (
         <>
           <ModSection title="Core Mods" mods={core} />
-          <ModSection title="Miscellaneous" mods={misc} />
+          <ModSection title="Miscellaneous" mods={misc} grouped />
           <ModSection title="Needs Categorization" mods={uncategorized} />
         </>
       )}

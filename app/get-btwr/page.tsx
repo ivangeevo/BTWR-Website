@@ -72,7 +72,7 @@ export default function GetBtwrPage() {
               Modrinth App
             </a>
             , a free launcher that installs the whole modpack — mods,
-            resource packs, and shaders — in a couple of clicks.
+            resource/data packs, etc. — in a couple of clicks.
           </p>
 
           <ol className="mt-8 space-y-10">

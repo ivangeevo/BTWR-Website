@@ -6,8 +6,7 @@ export const siteUrl = "https://btwr.org";
 // Roadmap page/nav link is unfinished — flip to true to bring it back.
 export const enableRoadmap = false;
 
-// TODO: replace with the real Discord invite link once the server exists.
-export const discordInviteUrl: string | null = null;
+export const discordInviteUrl: string | null =
+  "https://discord.com/invite/PxECJTzGfh";
 
-// TODO: replace with the real GitHub repo URL for the modpack.
-export const githubRepoUrl: string | null = null;
+export const githubRepoUrl: string | null = "https://github.com/BTWR-Team";

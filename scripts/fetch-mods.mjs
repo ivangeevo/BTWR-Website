@@ -2,7 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import AdmZip from "adm-zip";
-import { modCategories } from "../data/mod-categories.mjs";
+import { modCategories, MISC_SUBCATEGORIES } from "../data/mod-categories.mjs";
 
 const MODRINTH_API = "https://api.modrinth.com/v2";
 const PACK_SLUG = "btw-remastered";
@@ -126,7 +126,10 @@ async function main() {
     const project = projectsById[entry.projectId];
     const pinned = pinnedVersionsById[entry.pinnedVersionId];
     const { newest, matchesTarget } = newestByProjectId[entry.projectId];
-    const category = modCategories[project.slug] ?? "uncategorized";
+    const mapped = modCategories[project.slug];
+    const category = mapped === undefined ? "uncategorized" : mapped === "core" ? "core" : "misc";
+    const subcategory =
+      category === "misc" && MISC_SUBCATEGORIES[mapped] ? mapped : null;
 
     return {
       projectId: entry.projectId,
@@ -135,6 +138,7 @@ async function main() {
       iconUrl: project.icon_url ?? null,
       modrinthUrl: `https://modrinth.com/mod/${project.slug}`,
       category,
+      subcategory,
       disabled: entry.disabled,
       currentVersion: pinned?.version_number ?? "unknown",
       currentVersionDate: pinned?.date_published ?? null,

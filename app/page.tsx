@@ -29,12 +29,12 @@ export default function Home() {
 
   return (
     <>
-      <div className="relative isolate flex min-h-[85vh] items-center justify-center overflow-hidden bg-chrome-dark px-6 text-center">
+      <div className="relative isolate flex min-h-[76.5vh] items-center justify-center overflow-hidden bg-chrome-dark px-6 text-center">
         <HeroSlideshow />
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-chrome-dark/70 via-chrome-dark/50 to-chrome-dark/90" />
         <Snowfall />
 
-        <div className="relative mx-auto max-w-3xl py-24">
+        <div className="relative mx-auto max-w-3xl py-[5.4rem]">
           <h1 className="title-shimmer font-heading text-6xl font-extrabold tracking-wide sm:text-7xl">
             {siteName}
           </h1>

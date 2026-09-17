@@ -1,70 +1,80 @@
-// Maps each mod's Modrinth slug to a mods-page section: "core" or "misc".
+// Maps each mod's Modrinth slug to a mods-page section.
 // "core" = mods that define BTWR's actual gameplay/survival identity.
-// "misc" = performance, utility, UI, and library/dependency mods (matches
-//          the pack's own use of Sodium/Iris as "quality of life").
+// Anything else is one of the MISC_SUBCATEGORIES keys below — misc mods
+// are performance, utility, UI, and library/dependency mods (matches the
+// pack's own use of Sodium/Iris as "quality of life"), grouped into
+// sub-sections on the mods page.
 //
 // This mapping is inferred from mod names/purpose, not confirmed by hand —
 // double-check these ones in particular, since the name alone doesn't make
-// the category obvious: "block-runner", "im-movens", "melody", "konkrete".
+// the category obvious: "im-movens", "melody", "konkrete".
 // Any mod not listed here falls into a separate "uncategorized" bucket on
 // the site (visibly flagged) instead of being silently guessed.
 //
 // Regenerate data/mods.json (npm run prebuild, or node scripts/fetch-mods.mjs)
 // after editing this file to see the change reflected on the site.
 
-/** @type {Record<string, "core" | "misc">} */
+/** @type {Record<string, string>} */
+export const MISC_SUBCATEGORIES = {
+  performance: "Performance",
+  library: "Library",
+  ui: "UI & Visual",
+  utility: "Utility",
+};
+
+/** @type {Record<string, "core" | keyof typeof MISC_SUBCATEGORIES>} */
 export const modCategories = {
   "animageddon": "core",
-  "bds-better-default-shaders": "misc",
+  "bds-better-default-shaders": "ui",
   "btwr-core": "core",
   "btwr-ds": "core",
   "btwr-shared-library": "core",
   "better-with-time": "core",
   "bwt-hc-tweaks": "core",
   "bind": "core",
-  "block-runner": "misc",
-  "carpet": "misc",
-  "cloth-config": "misc",
-  "collective": "misc",
-  "dataloader": "misc",
-  "dynamic-fps": "misc",
-  "emi": "misc",
-  "entityculling": "misc",
-  "fabric-api": "misc",
-  "fancymenu": "misc",
-  "fastquit": "misc",
-  "ferrite-core": "misc",
-  "forge-config-api-port": "misc",
+  "block-runner": "core",
+  "carpet": "utility",
+  "cloth-config": "library",
+  "collective": "library",
+  "dataloader": "library",
+  "dynamic-fps": "performance",
+  "emi": "ui",
+  "entityculling": "performance",
+  "fabric-api": "library",
+  "fancymenu": "ui",
+  "fastquit": "performance",
+  "ferrite-core": "performance",
+  "forge-config-api-port": "library",
   "granular-hunger": "core",
   "hardcore-fluid-overhaul": "core",
-  "herdspanic": "misc",
-  "iceberg": "misc",
+  "herdspanic": "utility",
+  "iceberg": "library",
   "im-movens": "core",
-  "immediatelyfast": "misc",
+  "immediatelyfast": "performance",
   "in-the-gloom": "core",
-  "iris": "misc",
-  "jade": "misc",
-  "konkrete": "misc",
-  "litematica": "misc",
-  "lithium": "misc",
-  "malilib": "misc",
+  "iris": "ui",
+  "jade": "ui",
+  "konkrete": "library",
+  "litematica": "utility",
+  "lithium": "performance",
+  "malilib": "library",
   "material-beacons": "core",
-  "melody": "misc",
+  "melody": "library",
   "mobs-always-drop": "core",
-  "modmenu": "misc",
-  "moreculling": "misc",
-  "noisium": "misc",
+  "modmenu": "ui",
+  "moreculling": "performance",
+  "noisium": "performance",
   "nomads-rest": "core",
   "piston-packing": "core",
-  "puzzles-lib": "misc",
-  "rrls": "misc",
+  "puzzles-lib": "library",
+  "rrls": "ui",
   "self-sustainable": "core",
-  "sodium": "misc",
+  "sodium": "performance",
   "sturdy-trees": "core",
-  "placeholder-api": "misc",
+  "placeholder-api": "library",
   "tough-environment": "core",
   "true-darkness-refabricated": "core",
   "vegehenna": "core",
-  "yacl": "misc",
-  "owo-lib": "misc",
+  "yacl": "library",
+  "owo-lib": "library",
 };
