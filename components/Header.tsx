@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { enableRoadmap, siteName } from "@/lib/site-config";
 
@@ -19,6 +19,21 @@ const getBtwrLink = { href: "/get-btwr", label: "Get BTWR!" };
 export default function Header() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const logoClicksRef = useRef<number[]>([]);
+
+  // A small easter egg for the homepage hub: click the logo 5x quickly and
+  // it notices. Doesn't touch storage itself — just tells whoever's
+  // listening (see components/hub/AchievementsProvider.tsx).
+  function handleLogoClick() {
+    setOpen(false);
+    const now = Date.now();
+    const recent = [...logoClicksRef.current, now].filter((t) => now - t < 2000);
+    logoClicksRef.current = recent;
+    if (recent.length >= 5) {
+      logoClicksRef.current = [];
+      window.dispatchEvent(new Event("btwr-secret-logo"));
+    }
+  }
 
   return (
     <header className="border-b border-chrome bg-chrome-light dark:bg-slate-900">
@@ -28,7 +43,7 @@ export default function Header() {
           <Link
             href="/"
             className="flex items-center gap-3"
-            onClick={() => setOpen(false)}
+            onClick={handleLogoClick}
           >
             <Image
               src="/logos/btwr-logo-square.png"

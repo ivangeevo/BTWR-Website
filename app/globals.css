@@ -331,6 +331,44 @@ h3 {
   animation-play-state: paused;
 }
 
+/* Homepage hub — advancement-style toasts. Slide/fade in from the right,
+   the reverse on the way out (driven by a `.leaving` class toggled just
+   before removal so the exit animation gets to play). */
+@keyframes hub-toast-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes hub-toast-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+.hub-toast {
+  animation: hub-toast-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: linear-gradient(135deg, var(--color-chrome-dark), #0c3a54);
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.1),
+    0 8px 24px -8px rgba(0, 0, 0, 0.5);
+}
+
+.hub-toast.leaving {
+  animation: hub-toast-out 220ms ease-in forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -5,23 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Reveal from "@/components/Reveal";
 import modsData from "@/data/mods.json";
 import { MISC_SUBCATEGORIES } from "@/data/mod-categories.mjs";
-
-type Mod = {
-  projectId: string;
-  slug: string;
-  name: string;
-  iconUrl: string | null;
-  modrinthUrl: string;
-  category: "core" | "misc" | "uncategorized";
-  subcategory: string | null;
-  disabled: boolean;
-  currentVersion: string;
-  currentVersionDate: string | null;
-  newestVersion: string;
-  newestVersionDate: string | null;
-  newestMatchesTarget: boolean;
-  isOutdated: boolean;
-};
+import type { Mod } from "@/lib/mods";
 
 // How tall the "peek" preview is before a category has ever been expanded —
 // tall enough to hint at a full card, short enough to make it obvious more

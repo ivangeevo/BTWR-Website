@@ -53,6 +53,17 @@ async function main() {
   const packVersion = newestByDate(versions);
   if (!packVersion) throw new Error("No published pack versions found");
 
+  // Real release history for the homepage's "Modpack" patch notes mode —
+  // reuses the version list already fetched above, no extra API call.
+  const packReleases = [...versions]
+    .sort((a, b) => new Date(b.date_published) - new Date(a.date_published))
+    .slice(0, 10)
+    .map((v) => ({
+      versionNumber: v.version_number,
+      datePublished: v.date_published,
+      changelog: v.changelog ?? null,
+    }));
+
   const mrpackFile = packVersion.files.find((f) => f.primary) ?? packVersion.files[0];
   const mrpackRes = await fetch(mrpackFile.url);
   if (!mrpackRes.ok) {
@@ -148,6 +159,7 @@ async function main() {
       isOutdated: Boolean(
         pinned && newest && pinned.id !== newest.id
       ),
+      changelog: pinned?.changelog ?? null,
     };
   });
 
@@ -156,6 +168,7 @@ async function main() {
   const payload = {
     generatedAt: new Date().toISOString(),
     packVersion: packVersion.version_number,
+    packReleases,
     mrpackUrl: mrpackFile.url,
     targetLoader,
     targetGameVersion,

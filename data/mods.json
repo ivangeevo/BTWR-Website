@@ -1,6 +1,13 @@
 {
-  "generatedAt": "2026-09-17T20:19:47.507Z",
+  "generatedAt": "2026-09-17T21:56:31.213Z",
   "packVersion": "1.0.0",
+  "packReleases": [
+    {
+      "versionNumber": "1.0.0",
+      "datePublished": "2026-05-20T11:27:33.595051Z",
+      "changelog": "+ Initial alpha release"
+    }
+  ],
   "mrpackUrl": "https://cdn.modrinth.com/data/g5Sl1xpa/versions/BnOK4LKr/BTWR%20%5BAlpha%5D%201.0.0.mrpack",
   "targetLoader": "fabric",
   "targetGameVersion": "1.21.1",
@@ -19,7 +26,8 @@
       "newestVersion": "0.5.1",
       "newestVersionDate": "2026-09-12T12:57:42.960612Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "+ Added cheval food item from horses!\n+ Added spiders shooting cobwebs at their target. They will drop string only if they haven't already shot their cobweb.\n+ Added new items: Tangled Web & Web Untangling. Tangled Web drops when a spider isn't able to shoot a cobweb block on a solid block and can be crafted into \"Web Untangling\", which is then further used to get a string from\n+ Changed small slimes to also be able to attack entities\n+ Updated the mod to Fabric API 0.116.11, Fabric Loader 0.19.2 & BTWR: Shared Library 0.8.4"
     },
     {
       "projectId": "CqoL8Aty",
@@ -35,7 +43,8 @@
       "newestVersion": "1.0",
       "newestVersionDate": "2025-03-09T11:03:38.748343Z",
       "newestMatchesTarget": false,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": ""
     },
     {
       "projectId": "OWVXhsdV",
@@ -51,7 +60,8 @@
       "newestVersion": "2.0.2",
       "newestVersionDate": "2025-11-30T22:57:02.040030Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "# Release 2.0.2 for MC 1.21.1\n\n### Minor changes\n- Disabled the rotation of obsidian, crying obsidian, and bedrock on the turntable. \nThese blocks don't actually \"rotate\", but this disables observers and buddy blocks \nbeing able to detect the rotation of these blocks \n\n### Bugfixes\n\n- Gave stoked fire the correct luminance value\n- Fixed the invisible detector \"logic\" block not being treated as air in some situations\n- Fixed some deletion logic for the detector logic block.\nShouldn't have impacted gameplay too bad, but it's a fix nonetheless\n- Fixed a crash when wolves try to produce dung inside of a block with no collision\n- Fix turntable issues introduced in 2.0.1 while preserving the block update functionality\n"
     },
     {
       "projectId": "971qBGRz",
@@ -67,7 +77,8 @@
       "newestVersion": "1.5",
       "newestVersionDate": "2026-04-25T16:46:03.457068Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "+ Added new items: Fuse & Blasting Oil\n+ Added the chopping block! It allows increasing head drop rates for mobs/players when one is suffocated in it in front of a saw block\n+ Added chopping blocks and a hand crank generating in Jungle temples. Later on when the Dragon Vessel is added to BWT, it will also generate next to the hand crank\n+ Changed the Dynamite recipe from BWT to require fuse and blasting oil\n+ Changed the vanilla recipe for TNT to require a barrel, fuse and more gunpowder (no sand)\n+ Fixed/removed the old texture for the top part of the hemp to only use the new textures that were added since BWT 2.0\n+ Updated the mod to Fabric API 0.116.11, Fabric Loader 0.19.2 & BTWR: Shared Library 0.8.4"
     },
     {
       "projectId": "fan4THZN",
@@ -83,7 +94,8 @@
       "newestVersion": "1.5.2",
       "newestVersionDate": "2026-03-06T15:54:51.085117Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "+ Changed BTWR: Shared Library to allow higher versions than the current one specified\n+ Updated the mod to BTWR: Shared Library 0.8"
     },
     {
       "projectId": "1VSGxqkt",
@@ -99,7 +111,8 @@
       "newestVersion": "v21.1.2-1.21.1-Fabric",
       "newestVersionDate": "2025-02-20T21:48:41.015215Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "# Changelog\nAll notable changes to this project will be documented in this file.\n\nThe format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),\nand this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n## [v21.1.2-1.21.1] - 2025-02-20\n### Fixed\n- Fix block speeds not properly applying in multiplayer\n\n## [v21.1.1-1.21.1] - 2025-01-25\n### Changed\n- Update bundled NeoForge Data Pack Extensions library to v21.1.1\n\n## [v21.1.0-1.21.1] - 2024-09-10\n- Port to Minecraft 1.21.1\n"
     },
     {
       "projectId": "oQuqDiil",
@@ -115,7 +128,8 @@
       "newestVersion": "0.5",
       "newestVersionDate": "2026-09-11T11:15:24.694652Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "+ Fixed missing spider eye blocks and slab from the creative inventory tab\n+ Fixed creepers dropping creeper oysters even when neutered after killed"
     },
     {
       "projectId": "3xR28cCF",
@@ -131,7 +145,8 @@
       "newestVersion": "0.0.3",
       "newestVersionDate": "2026-05-11T09:57:55.525499Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "+ Updated the following mods in the project:\n> ##### Sturdy Trees - 2.0.1\n> ##### BTWR: Core - 0.4.1\n> ##### Tough Environment - 0.2"
     },
     {
       "projectId": "sXYZ4LGL",
@@ -147,7 +162,8 @@
       "newestVersion": "0.8.5",
       "newestVersionDate": "2026-07-30T09:51:50.270365Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "+ Added a new registry class \"HeadDropRegistry\". It's used for handling default mob head drop pairs of entity type and item (skull/head item), but can also be used by addon makers/modders to add compatibility for their custom mobs to drop custom skull items so they are compatible with BTWR's Head dropping logic which is mainly handled by BTWR: Core, but also for BWT: Hardcore Tweak's chopping block dropping mechanic too\n+ Moved certain registry classes to the .api package\n+ Updated the mod to Fabric API 0.116.11 & Fabric Loader 0.19.2"
     },
     {
       "projectId": "TQTTVgYE",
@@ -163,7 +179,8 @@
       "newestVersion": "1.4.147",
       "newestVersionDate": "2024-09-05T12:58:07.204965Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "What's new in Carpet 1.4.147:\n - support for Minecraft 1.21 and 1.21.1"
     },
     {
       "projectId": "9s6osm5g",
@@ -179,7 +196,8 @@
       "newestVersion": "15.0.140+fabric",
       "newestVersionDate": "2024-09-16T17:17:55.762416Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": ""
     },
     {
       "projectId": "e0M1UDsY",
@@ -195,7 +213,8 @@
       "newestVersion": "1.21.1-8.39-fabric+forge+neo",
       "newestVersionDate": "2026-06-29T16:27:28.583455Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "<p>Added ClientUtilsHelper, which currently allows setting a block render type in Common code.</p><p>The complete changelog with previous versions can be found at: <br>&nbsp; <a href=\"https://serilum.com/mods?changelog=collective\" target=\"_blank\">https://serilum.com/mods?changelog=collective</a></p>"
     },
     {
       "projectId": "gEUERjxK",
@@ -211,7 +230,8 @@
       "newestVersion": "1.1.6+1.21",
       "newestVersionDate": "2024-08-19T10:57:58.236843Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "update to 1.21"
     },
     {
       "projectId": "LQ3K71Q1",
@@ -227,7 +247,8 @@
       "newestVersion": "3.11.4",
       "newestVersionDate": "2026-01-29T18:23:36.624825Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "- Update Ukrainian Translation ([PR 285](https://github.com/juliand665/Dynamic-FPS/issues/285) by @StarmanMine142)\n- Revert a change to the mod initialization process which could hide errors caused elsewhere\n  - Reported by @Danieltl21 in [Issue 284](https://github.com/juliand665/Dynamic-FPS/issues/284)\n- Fix minimal graphics override irreversibly changing some settings ([commit b7316de9b2](https://github.com/juliand665/Dynamic-FPS/commit/b7316de9b2d9a6ed65d23ebbbebeefe4f21a07a9) by @LostLuma)\n  - Reported by @Fabian42 in [Issue 283](https://github.com/juliand665/Dynamic-FPS/issues/283)\n"
     },
     {
       "projectId": "fRiHVvU7",
@@ -243,7 +264,8 @@
       "newestVersion": "1.1.24+1.21.1+fabric",
       "newestVersionDate": "2026-05-13T06:21:13.679362Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "### Additions\n* List ingredients can now be serialized (and can be coerced into other ingredients)\n\n### Tweaks\n* Recipe tree should be more conscious of catalyst ingredients, no longer requesting redundant tag ingredients\n* Empty/full search focus now does not trigger on random inputs\n\n### Fixes\n* Recipe fills no longer break when filling max stack size #915\n"
     },
     {
       "projectId": "NNAgCjsB",
@@ -259,7 +281,8 @@
       "newestVersion": "1.10.5",
       "newestVersionDate": "2026-06-20T14:41:49.364596Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "## What's Changed\r\n* Fix nametag inconsistency causing fps loss in later versions\r\n* Added option to force a culling box on unconfigured display entities. This will increase fps on servers/maps that did not configure their displays, but can cause visual issues for really big displays (Default is off)\r\n* Add new translations for block entity culling by @Texaliuz in https://github.com/tr7zw/EntityCulling/pull/260\r\n\r\n\r\n**Full Changelog**: https://github.com/tr7zw/EntityCulling/compare/1.9.4...1.9.5\n"
     },
     {
       "projectId": "P7dR8mSH",
@@ -275,7 +298,8 @@
       "newestVersion": "0.116.17+1.21.1",
       "newestVersionDate": "2026-09-01T16:40:04.373428Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "- Bump version (modmuss50)\n- [1.21.1] Add RecipeOutputMixin to support FabricRecipeExporter (#5008) (#5315) (modmuss, Liam Broome)\n"
     },
     {
       "projectId": "Wq5SjeWM",
@@ -291,7 +315,8 @@
       "newestVersion": "3.9.12-1.21.1-fabric",
       "newestVersionDate": "2026-08-28T07:16:30.090020Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "CHANGELOG: https://github.com/Keksuccino/FancyMenu/blob/master/changelog.txt"
     },
     {
       "projectId": "x1hIzbuY",
@@ -307,7 +332,8 @@
       "newestVersion": "3.0.0+1.20.6",
       "newestVersionDate": "2024-05-02T13:40:15.413678Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "Now available for Minecraft 1.20.5 & 1.20.6!\n\nEdit: This release works for 1.21 and 1.21.1 too :)"
     },
     {
       "projectId": "uXXizFIs",
@@ -323,7 +349,8 @@
       "newestVersion": "7.0.3-fabric",
       "newestVersionDate": "2026-01-25T12:59:45.629584Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "- Reduce memory usage of data component patches\n- Fix loading slowdown with ModernFix dynamic resources\n"
     },
     {
       "projectId": "ohNO6lps",
@@ -339,7 +366,8 @@
       "newestVersion": "v21.1.6-1.21.1-Fabric",
       "newestVersionDate": "2025-11-12T09:00:18.938356Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "# Changelog\n\nAll notable changes to this project will be documented in this file.\n\nThe format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),\nand this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n## [v21.1.6-1.21.1] - 2025-11-12\n\n### Fixed\n\n- Fix rare `com.electronwill.nightconfig.core.io.ParsingException` when loading the internal mod config\n\n## [v21.1.5-1.21.1] - 2025-11-09\n\n### Fixed\n\n- Sync `ModConfigSpec` from upstream\n\n## [v21.1.4-1.21.1] - 2025-07-22\n\n### Fixed\n\n- Temporary workaround for `com.electronwill.nightconfig.core.io.WritingException: Failed to write (REPLACE_ATOMIC)` in\n  the Night Config library\n\n## [v21.1.3-1.21.1] - 2024-12-11\n\n### Fixed\n\n- Stop `FileWatcher` default instance on dedicated server exit\n\n## [v21.1.2-1.21.1] - 2024-11-14\n\n### Fixed\n\n- Attempt fixing being unable to manually save Forge configs via `ForgeConfigSpec::save`\n\n## [v21.1.1-1.21.1] - 2024-10-01\n\n### Fixed\n\n- Fix dedicated servers being unable to shut down completely\n\n## [v21.1.0-1.21.1] - 2024-08-09\n\n### Changed\n\n- Update to Minecraft 1.21.1\n"
     },
     {
       "projectId": "1RmtIvwG",
@@ -355,7 +383,8 @@
       "newestVersion": "0.7.2+1.21.1",
       "newestVersionDate": "2026-08-11T15:17:05.037926Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "- Fixed a state leak coming from an overlay"
     },
     {
       "projectId": "WnqoqztN",
@@ -371,7 +400,8 @@
       "newestVersion": "1.5",
       "newestVersionDate": "2026-09-12T14:22:20.807664Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "+ Added configuration options support with Mod Menu and Cloth Config API and added the following options:\n\n####  <p>Lava Pickup:\n<p>Allows enabling of whether lava can be picked up with a bucket or harm the player and destroy the bucket(default behavior).\n\n####  <p>Source Fluid Blocks Pickup:\n<p>Allows toggling if picking up a fluid consumes the source block.\n\n####  <p>Waterlogging blocks:\n<p>Toggles if waterlogging blocks is enabled.\n\n####  <p>Dissipating Waterlogged blocks:\n<p>Toggles if waterlogged blocks should dissipate when broken.\n\n####  <p>Dissipating Ice blocks:\n<p>Toggles if ice block's water should dissipate when broken.\n\n####  <p>Persistent Water in the End:\n<p>In BTW water in the end can be placed normally, so you can toggle this if you do not want it.\n\n+ Split client side environment code from the main package\n+ Changed the main and client package directories from \"hardcorefluidoverhaul\" to \"hfo_mod\"\n+ Updated the mod license in the mod to be CC-BY-4.0\n+ Updated the mod to Fabric API 0.116.7 & Fabric Loader 0.17.2\n"
     },
     {
       "projectId": "U64ZYLjC",
@@ -387,7 +417,8 @@
       "newestVersion": "1.1.1+1.21.1",
       "newestVersionDate": "2024-09-10T10:25:35.575389Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "### Added:\n- \n### Fixed:\n- \n### Changed:\n- Updated to mc 1.21.1"
     },
     {
       "projectId": "5faXoLqX",
@@ -403,7 +434,8 @@
       "newestVersion": "1.3.2",
       "newestVersionDate": "2025-04-14T22:15:22.198253Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "- Fixed a debug.log spam issue when installed in conjunction with AzureLib 3.0 and up."
     },
     {
       "projectId": "eR8UhBnT",
@@ -419,7 +451,8 @@
       "newestVersion": "0.8.3",
       "newestVersionDate": "2026-02-19T13:49:17.593333Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "+ Fixed (hopefully) an issue with the game crashing with a message \"Modifier is already applied for this attribute\". You might need to enter a new world first before being able to enter your existing worlds that had the crash\n+ Updated the mod to BTWR: Shared Library 0.7"
     },
     {
       "projectId": "5ZwdcRci",
@@ -435,7 +468,8 @@
       "newestVersion": "1.6.14+1.21.1-fabric",
       "newestVersionDate": "2026-09-13T22:28:12.876Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "* Fixed Iris shadow pass outline buffer clearing to fix memory leaks with mods which render into the wrong buffer\r\n* Fixed villager type and profession layer render order\r\n* Fixed core shader incompatibility detection logic bug\r\n* Added advanced memory leak detector\r\n"
     },
     {
       "projectId": "NeF2TGvX",
@@ -451,7 +485,8 @@
       "newestVersion": "1.4.2",
       "newestVersionDate": "2026-01-19T19:04:49.479228Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "+ Changed the gloom living entity event to be handled through the BTWREvents class from BTWR: Shared Library instead of having it in the mod\n+ Updated the mod to BTWR: Shared Library 0.7"
     },
     {
       "projectId": "YL57xq9U",
@@ -467,7 +502,8 @@
       "newestVersion": "1.8.14-beta.1+1.21.1-fabric",
       "newestVersionDate": "2026-06-13T15:56:42.633700Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "Fixes a crash with some packs"
     },
     {
       "projectId": "nvQzSEkH",
@@ -483,7 +519,8 @@
       "newestVersion": "15.10.6+fabric",
       "newestVersionDate": "2026-08-06T23:59:35.350527Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "## 15.10.5\n\n- [1.21-fabric] disable blend and depth test after rendering overlay is done ([#715](https://github.com/Snownee/Jade/issues/715))\n\n## 15.10.4\n\n- fix: remove destroySpeed check (close [#689](https://github.com/Snownee/Jade/issues/689))\n- fix: do not show \"empty\" on jukebox if there is no server data (close [#695](https://github.com/Snownee/Jade/issues/695))\n\n## 15.10.2\n\n- fix: InvWrapper NPE on trapped chest (close [#633](https://github.com/Snownee/Jade/issues/633))\n\n## 15.10.1\n\n- improve: filter negative-width text\n- fix: showing air\n- fix: stream data ClassCastException\n- fix: Jade cannot be built locally (close [#540](https://github.com/Snownee/Jade/issues/540))\n\n## 15.10.0\n\n- fix: porting mistakes\n- fix: WrappedHierarchyLookup priority\n- Merge pull request [#567](https://github.com/Snownee/Jade/issues/567) from SettingDust/1.21-fabric\n- fix: 5541c19db7b56515d6b776f549596dba7ab12ff5 changes work\n- fix: fix 5541c19db7b56515d6b776f549596dba7ab12ff5 changes since there isn't the config\n- fix: workaround to blame jade addons\n- fix: `StringRenderOutputMixin` work for 0690d94063ec36bb537d289253235dd59c742091\n- feat: filter large bitmap glyphs (close: [#502](https://github.com/Snownee/Jade/issues/502))\n- Make hideModName cache weak reference ([#558](https://github.com/Snownee/Jade/issues/558))\n- fix: Tooltip animation being weird at uncapped frame rates (close [#442](https://github.com/Snownee/Jade/issues/442))\n- fix: Gold harvest level not displayed (close [#548](https://github.com/Snownee/Jade/issues/548))\n\n## 15.9.3\n\n- feat: Display of dropped items doesn't tell you that they're dropped items (close [#530](https://github.com/Snownee/Jade/issues/530))\n- fix: Cannot change the value of the number in the text box in \"Plugin Settings\" (close [#546](https://github.com/Snownee/Jade/issues/546))\n- improve: darker warning color\n"
     },
     {
       "projectId": "J81TRJWm",
@@ -499,7 +536,8 @@
       "newestVersion": "1.9.9-1.21-fabric",
       "newestVersionDate": "2024-06-15T08:08:52.591973Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "\n<br>CHANGELOG: https://github.com/Keksuccino/Konkrete/blob/main/changelog.txt\n\n<br>"
     },
     {
       "projectId": "bEpr0Arc",
@@ -515,7 +553,8 @@
       "newestVersion": "0.19.61",
       "newestVersionDate": "2026-07-06T05:06:29.472102Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "- Sync various lang and fixes from 1.21.4+\n- fix a few items with the `1.20.4 (V6) Export` downgrade process, specifically with `attribute_modifiers`\n- Some various rendering fixes / improvements; such as adding the `renderSchematicEntities` / `renderSchematicTileEntities`, adding deeper Profiler support, and updating the Debug HUD.\n- add support for the `Fallback Blocks` system, in a Disabled state for this version.\n- add the `JadeCompat` Y Shift support from 1.21.4+\n- add the `pasteLayerBehavior` functionality\n- add the `easyPlaceSinglePlayerValidation`\n- add the `defaultSelectionMode`\n- add the `schematicEditReplaceSelection` from TweakFork\n- add a few improvements to the Material List from 1.21.5+, such as adding water buckets / lava buckets for Cauldrons.\n- add the \"ignorable block registry\"\n- add the Cached Tag Manager system from 1.21.8+\n- add the Schematic Pick Block Event handler\n- add the Litematic Transmit system; which aids in uploading \"extra large\" files to Servux for pasting.\n- add detection for `servux` packets for enabling Easy Place V3 (NOTE:  If you have all of Masa's mods installed, this process might not work)\n- Maybe more ?\n- [NEW] add: `enableSchematicOverlayCulling` as a default setting (This should greatly reduce your GPU % usage)\n- [NEW] add the File Ops & `SchematicManager` improvements\n"
     },
     {
       "projectId": "gvQqBUqZ",
@@ -531,7 +570,8 @@
       "newestVersion": "mc1.21.1-0.15.4-fabric",
       "newestVersionDate": "2026-06-27T17:11:51.297165Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "Lithium 0.15.2 for Minecraft 1.21 and 1.21.1 backports an optimization and bug fixes.\n\nMake sure to take a backup of your world before using the mod and please report any bugs and mod compatibility issues at the [issue tracker](https://github.com/CaffeineMC/lithium-fabric/issues). You can check the [description of each optimization](https://github.com/CaffeineMC/lithium/blob/mc1.21.1-0.15.2/lithium-mixin-config.md) and how to disable it when encountering a problem.\n\n## Additions\n- Optimize non POI block searches (Thanks to jcw780)\n\n## Fixes\n- Fix incorrect hopper sleeping with double chests halves read by comparators"
     },
     {
       "projectId": "GcWjdA9I",
@@ -547,7 +587,8 @@
       "newestVersion": "0.21.10",
       "newestVersionDate": "2025-12-25T00:04:56.127921Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "- Resync lang and a few fixes from 1.21.11\n- Change GuiColorEditorHSV to dynamically generate a Texture for the large color selector box\n- add: `ConfigTable` system from 1.21.11\n- add: Data Tag Ops from 1.21.10+ (NBT-like replacement system)\n- add: `CachedTagManager` system from 1.21.8+ (for Replacing the `#malilib:` Tag Data Gen system)\n- add: File Ops Utils for the `WidgetDirectoryNavigation` from 1.21.8+"
     },
     {
       "projectId": "QLLz3XcD",
@@ -563,7 +604,8 @@
       "newestVersion": "1.0.2+1.21.1",
       "newestVersionDate": "2026-04-12T06:20:48.782251Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "## v1.0.2+1.21.1\n- Backport GUI disable logic so it doesn't disable all interactions"
     },
     {
       "projectId": "CVT4pFB2",
@@ -579,7 +621,8 @@
       "newestVersion": "1.0.10-1.21-fabric",
       "newestVersionDate": "2024-06-15T08:11:26.157766Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "\n<br>CHANGELOG: https://github.com/Keksuccino/Melody/blob/main/changelog.txt\n\n<br>"
     },
     {
       "projectId": "pYVzGeNA",
@@ -595,7 +638,8 @@
       "newestVersion": "1.8",
       "newestVersionDate": "2025-05-31T12:52:25.755Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "+ Added the ability for zombie villagers to drop their equipment on death & also preserve their equipment on conversion to a villager\n+ Fixed wrong message on failed to save configuration settings for the mod\n+ Updated the mod to Fabric API 0.116.0 & Fabric Loader 0.16.14\n"
     },
     {
       "projectId": "mOgUt4GM",
@@ -611,7 +655,8 @@
       "newestVersion": "11.0.4",
       "newestVersionDate": "2026-03-25T00:45:03.878787Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "- Fix Mods screen being slow to open the first time\n- Config screen errors no longer show until after a user has tried to open them\n- Fix drag-n-drop not supporting Quilt mods\n- Updated Polish translation\n- Fixed issue with drag-n-drop toast having the same line displayed twice\n- Updated Korean translations\n- Fixed Belarusian translation\n- Fixed issues with parent mods"
     },
     {
       "projectId": "51shyZVL",
@@ -627,7 +672,8 @@
       "newestVersion": "1.0.10",
       "newestVersionDate": "2026-09-07T21:20:46.398247Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "- [#354](https://github.com/FxMorin/MoreCulling/issues/354) compatibility options are now hidden if mod isn't present\r\n- Forgified fabric api compat\r\n- Fix [#358](https://github.com/FxMorin/MoreCulling/issues/358) enhanced block entities sign culling compat\r\n- Fix mangrove roots culling\r\n- Fix [#357](https://github.com/FxMorin/MoreCulling/issues/357) bug in translucency cache"
     },
     {
       "projectId": "KuNKN7d2",
@@ -643,7 +689,8 @@
       "newestVersion": "2.3.0+mc1.21-1.21.1",
       "newestVersionDate": "2024-08-21T17:24:10.781855Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "### Added\n\n- Minecraft 1.21.1 compatibility\n\n### Changed\n\n- Marked [Biospherical Expansion](https://www.curseforge.com/minecraft/mc-mods/biospherical-expansion) as incompatible\n    - Fabric\n    - NeoForge (Minecraft 1.21-1.21.1)\n"
     },
     {
       "projectId": "JFiUcYRJ",
@@ -659,7 +706,8 @@
       "newestVersion": "1.3.1-fabric",
       "newestVersionDate": "2026-07-30T19:33:09.029313Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "+ Added colored bedrolls.\n+ Changed the screen to go fully black when the player goes to sleep.\n+ Changed the recipe for the vanilla bed to be craftable with all different bedrolls. This is for convenience since there are more bedrolls now, and it would just be annoying to have a matching one to craft a same color bed\n+ Updated the mod to Fabric API 0.116.9 & Fabric Loader 0.18.4"
     },
     {
       "projectId": "ccKDOlHs",
@@ -675,7 +723,8 @@
       "newestVersion": "0.13.0-alpha.15+1.21",
       "newestVersionDate": "2026-04-29T10:41:06.572479Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "## Fixes\n- Fixed the optional flattening implementation introduced in the last build\n- Decoding of sequence elements in NBT has been made idempotent"
     },
     {
       "projectId": "imiApfFy",
@@ -691,7 +740,8 @@
       "newestVersion": "0.1",
       "newestVersionDate": "2025-10-29T16:13:35.871196Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "+ Initial release"
     },
     {
       "projectId": "QAGBst4M",
@@ -707,7 +757,8 @@
       "newestVersion": "21.1.60",
       "newestVersionDate": "2026-09-07T10:30:32.337720Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "# Changelog\nAll notable changes to this project will be documented in this file.\n\nThe format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),\nand this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n## [v21.1.39-1.21.1] - 2025-10-23\n\n### Changed\n\n- Add access widener for `CreativeModeInventoryScreen$SlotWrapper`\n\n## [v21.1.38-1.21.1] - 2025-08-11\n### Added\n- Add `PackRepositorySourcesContext::registerBuiltInPack`\n- Support built-in packs in `DataProviderHelper`\n\n## [v21.1.37-1.21.1] - 2025-08-05\n### Fixed\n- Fix `ShieldBlockCallback` being called even when not actively blocking on NeoForge\n\n## [v21.1.36-1.21.1] - 2025-05-04\n### Changed\n- Allow `DataProviderHelper` to support `RegistrySetBuilder`\n\n## [v21.1.35-1.21.1] - 2025-05-04\n### Removed\n- Remove unused breathing and drowning event implementations on Fabric to improve compatibility with Lunar Client\n\n## [v21.1.34-1.21.1] - 2025-04-25\n### Changed\n- Improve compatibility with other mods injecting into the `Gui` class on Fabric\n\n## [v21.1.33-1.21.1] - 2025-03-16\n### Fixed\n- Fix `ModelPart$Vertex` & `ModelPart$Polygon` being inaccessible on NeoForge\n\n## [v21.1.32-1.21.1] - 2025-03-14\n### Changed\n- Add a bunch of safety checks for casting in event invokers\n\n## [v21.1.31-1.21.1] - 2025-03-13\n### Added\n- Add `ModConstructor::onRegisterGameplayContent`\n- Add `ModelLocationHelper` & `ModelTemplateHelper`\n- Add `ResourceKeyHelper`\n- Add `AbstractDatapackRegistriesProvider`\n\n## [v21.1.30-1.21.1] - 2025-03-11\n### Fixed\n- Fix a rare start-up crash when registering generated config translations on NeoForge\n\n## [v21.1.29-1.21.1] - 2025-03-09\n### Fixed\n- Fix CommonAbstractions::hasChannel crashing for invalid players on NeoForge\n\n## [v21.1.28-1.21.1] - 2025-02-25\n### Added\n- Backport new block, item and creative mode tab registration methods to `RegistryManager`\n- Backport `CompostableBlocksContext`\n### Changed\n- Update `FabricEventFactory` to handle faulty return values more leniently\n\n## [v21.1.27-1.21.1] - 2025-01-17\n### Fixed\n- Fix network packets executing with one tick delay on Fabric\n\n## [v21.1.26-1.21.1] - 2025-01-16\n### Changed\n- Allow setting empty lines for `TooltipBuilder` to prevent the tooltip from drawing\n### Fixed\n- Fix unable to set a new widget tooltip using vanilla methods when `TooltipBuilder` has been used for the widget\n\n## [v21.1.25-1.21.1] - 2025-01-10\n### Fixed\n- Avoid unnecessarily high memory usage from holding on to top level model locations after model events have completed\n- Wrap `BlockStateModelLoader` in a `WeakReference` to avoid holding on to it when it is no longer needed\n\n## [v21.1.24-1.21.1] - 2024-12-22\n### Changed\n- Adjust `RangedSliderButton` implementation to no longer require an access widener to help compatibility with the [Cloth Config](https://modrinth.com/mod/cloth-config) mod\n\n## [v21.1.23-1.21.1] - 2024-10-24\n### Changed\n- Support using `AbstractTagAppender` as string list builder\n\n## [v21.1.22-1.21.1] - 2024-10-22\n### Added\n- Add `ChangeEntitySizeCallback`\n- Add `RegistryManager::registerAttribute`\n### Changed\n- Expand `LivingEntityRenderLayersContext` with some additional methods\n\n## [v21.1.21-1.21.1] - 2024-10-10\n### Changed\n- Allow `PlayerSet` to handle a provided client level more leniently\n\n## [v21.1.20-1.21.1] - 2024-10-10\n### Added\n- Add `CommonAbstractions::getPartEntityParent`\n### Fixed\n- Fix removed data attachments failing to synchronize to clients\n\n## [v21.1.19-1.21.1] - 2024-10-05\n### Changed\n- Replace `ClientParticleTypes` with `ClientParticleHelper`\n\n## [v21.1.18-1.21.1] - 2024-10-04\n### Changed\n- Add more helper methods to `GuiGraphicsHelper`\n### Fixed\n- Fix `DynamicPackResources` failing to generate some resources\n\n## [v21.1.17-1.21.1] - 2024-10-01\n### Added\n- Add `ClientAbstractions::hasChannel` & `CommonAbstractions::hasChannel`\n### Changed\n- Network messages are no longer sent to clients & servers that do not understand them\n\n## [v21.1.16-1.21.1] - 2024-09-30\n### Changed\n- `RenderGuiLayerEvents` no longer fire when the hud is hidden via `F1`\n\n## [v21.1.15-1.21.1] - 2024-09-30\n### Changed\n- Slight `RenderGuiEvents` adjustments\n### Fixed\n- Fix some gui layers from other mods failing to render\n\n## [v21.1.14-1.21.1] - 2024-09-29\n### Added\n- Add `RenderGuiEvents`, replacing `RenderGuiCallback`\n\n## [v21.1.13-1.21.1] - 2024-09-29\n### Changed\n- Overhaul `RenderGuiLayerEvents` implementation on Fabric\n\n## [v21.1.12-1.21.1] - 2024-09-29\n### Added\n- Add `NeoForgeCapabilityHelper::registerItemContainer`\n- Add `GuiGraphicsHelper::blitTiledSprite`\n- Add a bunch of helper methods to `ClientAbstractions` for handling `Gui#leftHeight` &amp; `Gui#rightHeight`\n### Changed\n- Minor `ConfigTranslationsManager` improvements\n### Removed\n- Remove `ModLoaderEnvironment::getObjectShareAccess`\n\n## [v21.1.11-1.21.1] - 2024-09-25\n### Added\n- Add `CodecExtras`\n- Add some helper methods to `ItemModelDisplayOverrides`\n- Add enum helpers to `ExtraStreamCodecs`\n- Add some helper methods to `CreativeModeTabConfigurator`\n- Add helper methods to `ShapesHelper` for rotating shapes horizontally\n### Changed\n- Allow for compatibility with Minecraft 1.21 on Fabric if enabled via [dependency overrides](https://fabricmc.net/wiki/tutorial:dependency_overrides)\n- Allow `RegistryManager::registerBlockItem` to take an `Item$Properties` supplier\n### Fixed\n- Fix `RenderHighlightCallback` crashing on NeoForge\n\n## [v21.1.10-1.21.1] - 2024-09-20\n### Changed\n- Allow `ItemModelDisplayOverrides` to accept both `ResourceLocation` as well as `ModelResourceLocation`\n\n## [v21.1.9-1.21.1] - 2024-09-18\n### Added\n- Add `TooltipBuilder::setTooltipLineProcessor`\n\n## [v21.1.8-1.21.1] - 2024-09-18\n### Changed\n- Pass original `ClientTooltipPositioner` to tooltip positioner factory in `TooltipBuilder`\n\n## [v21.1.7-1.21.1] - 2024-09-17\n### Fixed\n- Fix `LivingDropsCallback` failing to capture player drops on Fabric\n- Fix some keybinds failing to trigger properly on Fabric\n\n## [v21.1.6-1.21.1] - 2024-09-17\n### Changed\n- Overhaul `AbstractRegistriesDatapackGenerator` so that generated registry values can be used in other data providers\n\n## [v21.1.5-1.21.1] - 2024-09-16\n### Added\n- Add new data attachment api\n### Changed\n- Revert codec support for capabilities, use attachments for that\n- Rename `PlayerSet::notify` to `PlayerSet::broadcast`\n\n## [v21.1.4-1.21.1] - 2024-09-14\n### Changed\n- Support codecs for capabilities\n- Simplify `ModelLayerFactory` implementation\n\n## [v21.1.3-1.21.1] - 2024-09-13\n### Added\n- Add `ScreenSkipper`\n- Add `GsonCodecHelper`\n- Add `TagFactory`\n\n## [v21.1.2-1.21.1] - 2024-09-12\n### Added\n- Add `RegistryManager::registerTrimMaterial` and `RegistryManager::registerLootTable`\n\n## [v21.1.1-1.21.1] - 2024-09-11\n### Added\n- Add `RegistryManager::registerDataComponentType`\n### Changed\n- Minor updates for `ConfigTranslationsManager`\n- Hide some annoying toast messages in development environments\n### Removed\n- Remove `BlockEntityHelper`\n\n## [v21.1.0-1.21.1] - 2024-09-10\n- Port to Minecraft 1.21.1\n"
     },
     {
       "projectId": "ZP7xHXtw",
@@ -723,7 +774,8 @@
       "newestVersion": "5.0.11+mc1.21.1-fabric",
       "newestVersionDate": "2026-06-18T09:04:05.340309Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "- [7cb4a64](http://github.com/dima-dencep/rrls/commit/7cb4a64844e288d5cfaab365b36ecfd895e8bfea) - Fix #143\n- [f3cec6a](http://github.com/dima-dencep/rrls/commit/f3cec6ae05ee79423149cf7741a75659026f2608) - Update deps"
     },
     {
       "projectId": "LrBIinUY",
@@ -739,7 +791,8 @@
       "newestVersion": "0.7",
       "newestVersionDate": "2026-09-11T11:16:54.711355Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "+ Added LambDynamicLights compatibility for the crude torch items\n+ Changed the bow drill to be craftable with other string items from the Fabric conventional \"strings\" item tag instead of just string\n+ Updated the mod to Fabric Loader 0.116.11, Fabric Loader 0.19.2 & BTWR: Shared Library 0.8.4"
     },
     {
       "projectId": "AANobbMI",
@@ -755,7 +808,8 @@
       "newestVersion": "mc1.21.1-0.8.13-fabric",
       "newestVersionDate": "2026-08-28T20:55:02.424329Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "- Improved compatibility with some NeoForge mods that use the Fabric Rendering API.\n- Improved compatibility with some Fabric mods when they're used on NeoForge with Sinytra Connector.\n- Fixed an incompatibility with _Snow Real Magic!_ and some other mods that would cause holes to appear in the world.\n- Fixed an issue with mods that use animated sprites in the user interface which was causing their sprites to not be animated.\n- Disabled the use of certain developer options in production which were being modified unnecessarily by other mods.\n- Marked PojavLauncher as incompatible due to multiple severe and unresolved issues.\n- Marked BetterEnd as incompatible due to it enabling code when Sodium is present that causes frequent and difficult to understand crashes.\n- Added a warning for when resource packs try to replace the shaders used by Sodium's improved cloud renderer."
     },
     {
       "projectId": "HGk1OI04",
@@ -771,7 +825,8 @@
       "newestVersion": "2.0.1",
       "newestVersionDate": "2026-05-11T08:10:26.162424Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "+ Fixed missing textures for the mangrove and dark oak bark items\n+ Updated the mod to Fabric API 0.116.11, Fabric Loader 0.19.2 & BTWR: Shared Library 0.8.4"
     },
     {
       "projectId": "eXts2L7r",
@@ -787,7 +842,8 @@
       "newestVersion": "2.4.2+1.21",
       "newestVersionDate": "2025-01-27T19:08:23.196696Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "**Full Changelog**: https://github.com/Patbox/TextPlaceholderAPI/compare/2.4.1+1.21...2.4.2+1.21"
     },
     {
       "projectId": "sAUDpGlh",
@@ -803,7 +859,8 @@
       "newestVersion": "0.21",
       "newestVersionDate": "2026-09-12T11:53:49.197738Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "+ The mod is officially in Beta now!\n+ Added new blocks:\n  - Lava Filled Loose Cobblestone\n  - Lava Filled Loose Deepslate\n  - Lava Filled Loose Stone Bricks\n  - Lava Filled Loose Deepslate Bricks\n  - Lava Pillow\n+ Added missing text translations for the names of the placed ore block (copper, iron, gold)\n+ Changed how stone is created from lava. Water must now float on top of the aforementioned lava-filled blocks to create the corresponding stone type (stone and deepslate)\n+ Changed lava to no longer generate cobblestone when water flows on top of it and to instead create a Lava Pillow block.\n+ Changed the mod versioning scheme to [semver](https://semver.org/).\n+ Fixed some pathfinding issues for loose slab and stairs blocks\n+ Updated the mod to Fabric API 0.116.11, Fabric Loader 0.19.2 & BTWR: Shared Library 0.8.4"
     },
     {
       "projectId": "Pf8PJBb5",
@@ -819,7 +876,8 @@
       "newestVersion": "1.2.0",
       "newestVersionDate": "2024-11-12T15:32:54.529483Z",
       "newestMatchesTarget": true,
-      "isOutdated": false
+      "isOutdated": false,
+      "changelog": "- Added option to use different moon phase darkening styles.\r\n    - **Default**: The original style.\r\n    - **Gradual**: Makes the darkening more linear than the original. (Thank you **[minhty-fresh](https://github.com/minhty-fresh)** for the PR)\r\n    - **Better Than Wolves**: Mimics the style of the BTW mod. (Thank you **[ivangeevo](https://github.com/ivangeevo)** for the PR)"
     },
     {
       "projectId": "ZBuCNYpF",
@@ -835,7 +893,8 @@
       "newestVersion": "0.7",
       "newestVersionDate": "2026-08-04T00:17:43.573609Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "+ The mod is now officially in Beta release versioning!\n+ Added weeds! Crops have and farmland can grow weeds around them and need to be cleaned up regularly to not consume your produce. Disabled by default as it's an unfinished system by itself, but you can enable it if you'd like to.\n+ Added EMI support for falling gourd recipes (Melon → mashed melon; Pumpkin → pumpkin seeds)\n+ Added a custom sound event for gourds exploding when falling\n+ Reintroduced falling gourd blocks. They are now also destroyable with arrows and other strong projectiles like tridents/wind charges. They also have proper particles and sound effects playing\n+ Fixed sugar cane roots not being placeable next to waterlogged blocks like slabs or others that would normally consider that space having water\n+ Changed some mixin modifications to use Fabric events instead\n+ Updated the mod to Fabric API 0.116.9, Fabric Loader 0.18.4 & BTWR: Shared Library 0.8.3"
     },
     {
       "projectId": "1eAoo2KR",
@@ -851,7 +910,8 @@
       "newestVersion": "3.8.2+1.21.1-fabric",
       "newestVersionDate": "2026-01-09T16:34:34.781900Z",
       "newestMatchesTarget": true,
-      "isOutdated": true
+      "isOutdated": true,
+      "changelog": "# YetAnotherConfigLib 3.8.1\n\n### 3.8.1 targets\n\n|         | Fabric    | NeoForge     | Forge |\n|---------|-----------|--------------|-------|\n| 1.21.11 | ✅         | ❌ Unreleased | ❌     |\n| 1.21.10 | ✅         | ✅            | ❌     |\n| 1.21.9  | ✅ 1.21.10 | ✅ 1.21.10    | ❌     |\n| 1.21.8  | ✅ 1.21.6  | ✅ 1.21.6     | ❌     |\n| 1.21.7  | ✅ 1.21.6  | ✅ 1.21.6     | ❌     |\n| 1.21.6  | ✅         | ✅            | ❌     |\n| 1.21.5  | ✅         | ✅            | ❌     |\n| 1.21.4  | ✅         | ✅            | ❌     |\n| 1.21.3  | ✅         | ✅            | ❌     |\n| 1.21.2  | ✅ 1.21.3  | ✅ 1.21.3     | ❌     |\n| 1.21.1  | ✅         | ✅            | ❌     |\n| 1.20.6  | ❌         | ❌            | ❌     |\n| 1.20.4  | ❌         | ❌            | ❌     |\n| 1.20.1  | ❌         | ❌            | ❌     |\n\n### Changes\n\n- Add target for 1.21.11 (snapshots, Fabric only)\n- Fix scrolling not working on targets below 1.21.9\n- Fix crash when configuring colour pickers when they do not allow alpha\n- Fix expanding groups not updating properly\n- Fix keyboard navigation focusing on hidden options\n- Fixed InstantStateManager preventing saving (#293, thanks @LopyMine)\n"
     }
   ]
 }
