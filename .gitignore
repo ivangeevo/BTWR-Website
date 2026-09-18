@@ -20,3 +20,7 @@ npm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code — settings.json (shared permissions/commands) is checked in,
+# settings.local.json is per-machine and shouldn't be.
+.claude/settings.local.json

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Rajdhani } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import DayNightSky from "@/components/DayNightSky";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { siteDescription, siteName, siteUrl } from "@/lib/site-config";
@@ -47,11 +48,61 @@ export const metadata: Metadata = {
 // wrong theme on load. Runs as the first thing in <body>; suppressHydrationWarning
 // on <html> silences the (expected) mismatch between server-rendered markup
 // and the attribute this script sets synchronously on the client.
+//
+// Also decides theme from the Outpost's day/night cycle when it's active
+// and the visitor hasn't allowed the theme button to override it — this
+// duplicates the (tiny) math in components/hub/day-night-cycle.ts, since an
+// inline pre-hydration script can't import a TS module; keep both in sync
+// if that logic ever changes. Also sets data-daynight-active so
+// DayNightSky's CSS can reserve its height before React even mounts,
+// avoiding a layout shift when it pops in.
+//
+// Also duplicates the Features tab's day/night gate (admin-config.ts) —
+// an admin can disable the cycle outright or push it behind a later tier,
+// and this needs to agree with that before hydration too, or the boot
+// script would briefly assume the cycle's running when AchievementsProvider
+// (which reads the same admin config) is about to say otherwise.
 const themeBootScript = `
 (function () {
   try {
-    var saved = localStorage.getItem("theme");
-    var theme = saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    var hubRaw = localStorage.getItem("btwr:hub:v1");
+    var hub = hubRaw ? JSON.parse(hubRaw) : null;
+    var adminRaw = localStorage.getItem("btwr:hub:admin:v1");
+    var admin = adminRaw ? JSON.parse(adminRaw) : null;
+    var features = (admin && admin.features) || {};
+    var featuresAllow = features.dayNightCycleEnabled !== false;
+    var tierId = features.dayNightCycleTierId || "tier1";
+    var tiersList = (admin && Array.isArray(admin.tiers) && admin.tiers.length >= 2)
+      ? admin.tiers
+      : [{ id: "tier1", threshold: 0 }, { id: "tier2", threshold: 35 }];
+    var tierThresholdFor = Infinity;
+    for (var i = 0; i < tiersList.length; i++) {
+      if (tiersList[i].id === tierId) { tierThresholdFor = tiersList[i].threshold; break; }
+    }
+    var unlockedCount = (hub && hub.unlocked) ? Object.keys(hub.unlocked).length : 0;
+    var tierAllows = unlockedCount >= tierThresholdFor;
+    var cycleActive = !!(hub && hub.enabled && hub.settings && hub.settings.dayNightCycleEnabled) && featuresAllow && tierAllows;
+    var overrideAllowed = !!(hub && hub.settings && hub.settings.themeOverrideAllowed);
+    document.documentElement.setAttribute("data-daynight-active", String(cycleActive));
+
+    var theme;
+    if (cycleActive && !overrideAllowed) {
+      var cycleRaw = localStorage.getItem("btwr:hub:cycle:v1");
+      var startedAt;
+      if (cycleRaw && typeof JSON.parse(cycleRaw).startedAt === "number") {
+        startedAt = JSON.parse(cycleRaw).startedAt;
+      } else {
+        startedAt = Date.now();
+        localStorage.setItem("btwr:hub:cycle:v1", JSON.stringify({ startedAt: startedAt }));
+      }
+      var elapsed = Math.max(0, Date.now() - startedAt);
+      var segmentMs = 186000; // PHASE_MS (180000) + TWILIGHT_MS (6000) — keep in sync with day-night-cycle.ts
+      var isDay = Math.floor(elapsed / segmentMs) % 2 === 0;
+      theme = isDay ? "light" : "dark";
+    } else {
+      var saved = localStorage.getItem("theme");
+      theme = saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    }
     document.documentElement.setAttribute("data-theme", theme);
   } catch (e) {}
 })();
@@ -66,6 +117,7 @@ export default function RootLayout({
     <html lang="en" className={rajdhani.variable} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+        <DayNightSky />
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />

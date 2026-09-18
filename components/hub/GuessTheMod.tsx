@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Mod } from "@/lib/mods";
 import { useAchievements } from "./AchievementsProvider";
+import { XP_PER_CORRECT_ANSWER } from "./tier2";
 
 const ROUND_SIZE = 5;
 const AUTO_ADVANCE_MS = 1200;
@@ -19,8 +20,16 @@ function shuffle<T>(items: T[]): T[] {
   return arr;
 }
 
-export default function GuessTheMod({ mods }: { mods: Mod[] }) {
-  const { quiz, updateQuiz, unlock } = useAchievements();
+export default function GuessTheMod({
+  mods,
+  variant = "card",
+}: {
+  mods: Mod[];
+  /** "card": self-contained panel (tier-1 grid). "flat": no outer chrome (tier-2 dashboard tab). */
+  variant?: "card" | "flat";
+}) {
+  const { quiz, updateQuiz, unlock, tier2Unlocked, addXp, markQuizPlayedToday, recordModGuessCorrect } =
+    useAchievements();
   const pool = useMemo(() => mods.filter((m) => m.iconUrl && !m.disabled), [mods]);
   const lastPickRef = useRef<string | null>(null);
 
@@ -65,8 +74,16 @@ export default function GuessTheMod({ mods }: { mods: Mod[] }) {
       const isLastQuestion = roundIndex + 1 >= ROUND_SIZE;
       if (isLastQuestion) {
         setRoundComplete(true);
-        updateQuiz((prev) => ({ ...prev, bestScore: Math.max(prev.bestScore, roundCorrect) }));
-        if (roundCorrect === ROUND_SIZE) unlock("quiz-perfect-round");
+        const isPerfect = roundCorrect === ROUND_SIZE;
+        updateQuiz((prev) => ({
+          ...prev,
+          bestScore: Math.max(prev.bestScore, roundCorrect),
+          perfectRounds: prev.perfectRounds + (isPerfect ? 1 : 0),
+        }));
+        if (isPerfect) {
+          unlock("quiz-perfect-round");
+          if (quiz.perfectRounds + 1 >= 3) unlock("perfect-alloy");
+        }
       } else {
         setRoundIndex((i) => i + 1);
         setAnswered(null);
@@ -81,8 +98,11 @@ export default function GuessTheMod({ mods }: { mods: Mod[] }) {
     if (!question || answered) return;
     const correct = mod.projectId === question.correct.projectId;
     setAnswered({ choiceId: mod.projectId, correct });
+    markQuizPlayedToday();
+    unlock("quiz-attempted");
 
     const nextStreak = correct ? quiz.currentStreak + 1 : 0;
+    const nextTotalAnswered = quiz.totalAnswered + 1;
     updateQuiz((prev) => ({
       ...prev,
       currentStreak: nextStreak,
@@ -90,22 +110,28 @@ export default function GuessTheMod({ mods }: { mods: Mod[] }) {
       totalAnswered: prev.totalAnswered + 1,
       totalCorrect: prev.totalCorrect + (correct ? 1 : 0),
     }));
+    if (nextTotalAnswered >= 50) unlock("millstone-grind");
 
     if (correct) {
       setRoundCorrect((c) => c + 1);
       unlock("quiz-first-correct");
       if (nextStreak === 5) unlock("quiz-streak-5");
+      if (nextStreak === 10) unlock("no-compass-needed");
+      recordModGuessCorrect(mod.projectId);
+      if (tier2Unlocked) addXp(XP_PER_CORRECT_ANSWER);
     }
   }
 
   return (
-    <div className="card-glow rounded-xl border border-slate-200 p-5 dark:border-slate-700">
-      <div className="flex items-center justify-between">
-        <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-chrome-dark dark:text-chrome">
-          Guess the Mod
-        </h3>
+    <div className={variant === "card" ? "outpost-panel rounded-xl p-5" : ""}>
+      <div className={`flex items-center ${variant === "card" ? "justify-between" : "justify-end"}`}>
+        {variant === "card" && (
+          <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-[var(--outpost-accent)]">
+            Guess the Mod
+          </h3>
+        )}
         {question && !roundComplete && (
-          <span className="text-xs text-slate-400 dark:text-slate-500">
+          <span className="text-xs text-slate-500">
             {roundIndex + 1} / {ROUND_SIZE}
           </span>
         )}
@@ -113,15 +139,15 @@ export default function GuessTheMod({ mods }: { mods: Mod[] }) {
 
       {!question && (
         <div className="mt-4 flex flex-col items-center gap-3 py-4">
-          <div className="h-20 w-20 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
-          <div className="h-4 w-32 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+          <div className="h-20 w-20 animate-pulse rounded-lg bg-white/10" />
+          <div className="h-4 w-32 animate-pulse rounded bg-white/10" />
         </div>
       )}
 
       {question && !roundComplete && (
         <>
           <div className="mt-4 flex justify-center">
-            <div className="h-20 w-20 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
+            <div className="h-20 w-20 overflow-hidden rounded-lg bg-white/10">
               {question.correct.iconUrl && (
                 <Image
                   src={question.correct.iconUrl}
@@ -153,9 +179,9 @@ export default function GuessTheMod({ mods }: { mods: Mod[] }) {
                   className={`rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors ${
                     showState
                       ? isCorrectChoice
-                        ? "border-emerald-400 bg-emerald-50 text-emerald-800 dark:border-emerald-500 dark:bg-emerald-950 dark:text-emerald-300"
-                        : "border-red-300 bg-red-50 text-red-700 dark:border-red-500 dark:bg-red-950 dark:text-red-300"
-                      : "border-slate-200 hover:border-chrome hover:bg-chrome-light dark:border-slate-700 dark:hover:bg-slate-800"
+                        ? "border-emerald-500 bg-emerald-950/60 text-emerald-300"
+                        : "border-red-500 bg-red-950/60 text-red-300"
+                      : "border-white/15 text-slate-200 hover:border-[var(--outpost-accent)] hover:bg-white/5"
                   }`}
                 >
                   {choice.name}
@@ -168,16 +194,16 @@ export default function GuessTheMod({ mods }: { mods: Mod[] }) {
 
       {roundComplete && (
         <div className="mt-4 flex flex-col items-center gap-3 py-2 text-center">
-          <p className="font-heading text-2xl font-bold text-chrome-dark dark:text-chrome">
+          <p className="font-heading text-2xl font-bold text-[var(--outpost-accent)]">
             {roundCorrect} / {ROUND_SIZE}
           </p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-slate-400">
             Best round: {quiz.bestScore} / {ROUND_SIZE} &middot; Best streak: {quiz.bestStreak}
           </p>
           <button
             type="button"
             onClick={startRound}
-            className="btn-glow rounded-lg bg-chrome-dark px-4 py-2 text-sm font-semibold text-white dark:bg-chrome dark:text-chrome-dark"
+            className="btn-glow btn-gradient rounded-lg px-4 py-2 text-sm font-semibold text-white"
           >
             Play again
           </button>

@@ -36,7 +36,7 @@ export default function Header() {
   }
 
   return (
-    <header className="border-b border-chrome bg-chrome-light dark:bg-slate-900">
+    <header className="border-b-[5px] border-chrome bg-chrome-light dark:bg-slate-900">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
           <ThemeToggle />

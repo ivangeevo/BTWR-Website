@@ -37,7 +37,7 @@ function FooterLink({
 
 export default function Footer() {
   return (
-    <footer className="border-t border-chrome bg-chrome-light dark:bg-slate-900">
+    <footer className="border-t-[5px] border-chrome bg-chrome-light dark:bg-slate-900">
       <div className="mx-auto flex max-w-5xl flex-col items-center gap-2 px-6 py-6 text-center">
         <div className="flex gap-6">
           <FooterLink

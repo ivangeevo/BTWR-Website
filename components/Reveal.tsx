@@ -15,6 +15,14 @@ export default function Reveal({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // threshold-based visibility (e.g. "10% of the element in view") gets
+    // harder to reach the taller an element is — for a short card that's a
+    // few px of scrolling, but for a long, content-heavy section (like the
+    // Outpost, which keeps growing as tier 2 unlocks more of itself) it can
+    // mean scrolling most of the way down the section before it even
+    // reveals. Triggering off the top edge crossing into the viewport
+    // instead keeps the reveal point constant regardless of how tall the
+    // content underneath turns out to be.
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -22,7 +30,7 @@ export default function Reveal({
           observer.disconnect();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0, rootMargin: "0px 0px -10% 0px" }
     );
     observer.observe(el);
     return () => observer.disconnect();

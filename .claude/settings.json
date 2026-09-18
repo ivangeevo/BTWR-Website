@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm ls *)",
+      "Bash(npx --yes playwright --version)",
+      "Bash(npm install *)",
+      "Bash(npx playwright *)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name = 'node.exe'\")"
+    ]
+  }
+}

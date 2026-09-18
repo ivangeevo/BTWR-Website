@@ -15,6 +15,211 @@ body {
   color: #0f172a;
 }
 
+/* Whole-page light/dark crossfade, driven by DayNightSky.tsx around every
+   cycle-triggered theme flip (never during a manual toggle — that keeps its
+   own separate blur/lock feedback on purpose). Every element that recolors
+   off data-theme — Tailwind's `dark:` variants included, since its dark
+   mode strategy is the same [data-theme="dark"] selector (tailwind.config.ts)
+   — eases together instead of the flip being instant on everything but the
+   plain body background. Scoped to a class with a matching timed removal
+   rather than left on permanently, so it doesn't dull hover states the rest
+   of the time.
+   16s duration (not just "however long feels smooth"): DayNightSky.tsx
+   moves the actual data-theme flip 8s EARLIER than the true rise/set
+   instant, so a transition exactly twice that long is still easing when the
+   true instant passes and finishes 8s after it — the flip itself can't be
+   seen starting "early" (a CSS transition only ever animates forward from
+   when the value changes), so arriving early and taking this long is what
+   makes it read as gradual on both sides instead.
+   Needs !important: without it, this lost to plenty of far more specific
+   rules that already declare a (much shorter, e.g. 150ms) `transition` of
+   their own for hover polish — Tailwind's transition-colors utility among
+   them — so the crossfade was technically running but too brief almost
+   everywhere to actually see, reading as instant. The explicit exclusion
+   list below is what keeps that !important from also swallowing the
+   handful of elements with a genuinely FUNCTIONAL (non-color) transition —
+   the day/night sky's own gradient/position/opacity, hover-lift transforms,
+   collapsible max-height, and progress/fill bar widths — which must keep
+   their own timing untouched. */
+html.daynight-theme-transition
+  *:not(
+    .day-night-sky,
+    .day-night-body,
+    .card-glow,
+    .outpost-panel,
+    .btn-glow,
+    .category-panel,
+    .outpost-progress-fill,
+    .tier2-xp-fill,
+    .outpost-hold-button-fill
+  ),
+html.daynight-theme-transition *::before,
+html.daynight-theme-transition *::after {
+  transition: background-color 16000ms ease, color 16000ms ease, border-color 16000ms ease,
+    fill 16000ms ease, stroke 16000ms ease, box-shadow 16000ms ease !important;
+}
+
+/* Registered so the browser can actually TWEEN these values (a color, a
+   percentage) when they're only ever used inside a gradient function's
+   arguments — a plain custom property changing there just swaps to a whole
+   new, un-animatable gradient image each time, which is what made the old
+   approach (recomputing one big `background` string in JS every ~1s tick)
+   look like a slideshow instead of motion. With these registered, DayNightSky
+   .tsx only has to hand over the current values each tick; the actual
+   frame-by-frame interpolation between them happens on the compositor, for
+   free, matching how smooth `left`/`top`/`opacity` transitions already were.
+   Falls back gracefully (an instant per-tick snap, same as before) in any
+   browser without @property support — never a hard failure. */
+@property --sky-top {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: rgb(126, 200, 242);
+}
+@property --sky-bg-blend {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: rgb(255, 255, 255);
+}
+@property --sky-glow {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: rgba(191, 227, 247, 0);
+}
+@property --sky-wash-left {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: rgba(91, 127, 181, 0);
+}
+@property --sky-wash-right {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: rgba(91, 127, 181, 0);
+}
+@property --sky-ray {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: rgba(255, 178, 107, 0);
+}
+@property --sky-body-x {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+@property --sky-body-y {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 88%;
+}
+
+/* Height is 0 until either the pre-hydration boot script (app/layout.tsx)
+   or DayNightSky.tsx itself confirms the cycle is active, so a visitor who
+   has never touched the Outpost sees zero difference and zero shift.
+   The gradient STACK itself is fixed here — DayNightSky.tsx only ever sets
+   the --sky-* custom property VALUES (see above), never the `background`
+   property directly, so this stays a stable target for the transition to
+   animate rather than getting replaced wholesale every tick.
+   Layers, back to front: (1) a soft ray burst centered on the sun/moon's
+   own position — a repeating-conic-gradient is the cheap, standard CSS
+   trick for "light rays," GPU-rasterized with no per-frame JS cost, tinted
+   from the same horizon color as the glow below it and strongest near the
+   horizon, same as real crepuscular rays; (2) the existing horizon glow;
+   (3) the left/right rise/set wash; (4) the base zenith -> page-blend wash. */
+.day-night-sky {
+  position: relative;
+  height: 0;
+  overflow: hidden;
+  --sky-top: rgb(126, 200, 242);
+  --sky-bg-blend: rgb(255, 255, 255);
+  --sky-glow: rgba(191, 227, 247, 0);
+  --sky-wash-left: rgba(91, 127, 181, 0);
+  --sky-wash-right: rgba(91, 127, 181, 0);
+  --sky-ray: rgba(255, 178, 107, 0);
+  --sky-body-x: 0%;
+  --sky-body-y: 88%;
+  background:
+    repeating-conic-gradient(
+      from 0deg at var(--sky-body-x) var(--sky-body-y),
+      var(--sky-ray) 0deg,
+      transparent 7deg,
+      transparent 26deg
+    ),
+    radial-gradient(22% 130% at var(--sky-body-x) 100%, var(--sky-glow) 0%, transparent 70%),
+    linear-gradient(90deg, var(--sky-wash-left) 0%, transparent 45%, transparent 55%, var(--sky-wash-right) 100%),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bg-blend) 100%);
+  transition: height 400ms ease, filter 320ms ease-out, --sky-top 1100ms linear,
+    --sky-bg-blend 1100ms linear, --sky-glow 1100ms linear, --sky-wash-left 1100ms linear,
+    --sky-wash-right 1100ms linear, --sky-ray 1100ms linear, --sky-body-x 1100ms linear,
+    --sky-body-y 1100ms linear;
+}
+
+html[data-daynight-active="true"] .day-night-sky,
+.day-night-sky[data-active="true"] {
+  height: 5.5rem;
+}
+
+/* Stars — fixed, hand-placed positions (see STARS in DayNightSky.tsx), not
+   randomized per render, so they read as a real fixed sky instead of static
+   noise. Visibility is driven by the sky's own current darkness (JS derives
+   it from --sky-top's luminance), so they fade in/out in step with the same
+   gradual dusk/dawn blend as everything else, not on a separate timer.
+   One star (.day-night-star--marker) is deliberately distinct — a bit
+   bigger, steadier — a natural hook for a future clickable Outpost secret;
+   it does nothing yet. */
+.day-night-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 1100ms linear;
+}
+
+.day-night-star {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  height: 2px;
+  border-radius: 9999px;
+  background: #f3f9fc;
+  box-shadow: 0 0 3px 1px rgba(243, 249, 252, 0.7);
+  animation: day-night-twinkle 3.2s ease-in-out infinite;
+}
+
+.day-night-star--marker {
+  width: 3px;
+  height: 3px;
+  background: #fff8e7;
+  box-shadow: 0 0 5px 1.5px rgba(255, 248, 231, 0.85);
+  animation-duration: 4.5s;
+}
+
+@keyframes day-night-twinkle {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.day-night-body {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 1.9rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.6));
+  /* Fades out as it sets and back in as the next body rises (see the
+     twilight gap in day-night-cycle.ts) — slower than the 1s position/top
+     tween so the fade reads as its own beat, not just part of the motion. */
+  transition: left 1000ms linear, top 1000ms linear, opacity 1800ms ease;
+}
+
+.day-night-sky[data-phase="night"] .day-night-body {
+  filter: drop-shadow(0 0 8px rgba(180, 200, 255, 0.55));
+}
+
 [data-theme="dark"] body {
   background-color: #0a1420;
   color: #e2e8f0;
@@ -184,6 +389,7 @@ h3 {
 /* Theme toggle — sun/moon icon swap with a short spin/rock flourish on
    click, ported from an existing (unreleased) HTML/CSS/JS design. */
 .theme-toggle {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -196,6 +402,43 @@ h3 {
 
 .theme-toggle:hover {
   background-color: rgba(128, 128, 128, 0.15);
+}
+
+/* Persistent while the day/night cycle is actually blocking the toggle
+   (see ThemeToggle.tsx's polled `locked` state) — gone entirely the
+   moment it isn't, whether because the cycle's off or overrides are
+   allowed. The pulse plays once on top of it for each blocked click. */
+.theme-toggle-lock {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 9999px;
+  background-color: #1c140c;
+  border: 1px solid rgba(217, 138, 74, 0.6);
+  font-size: 8px;
+  line-height: 1;
+}
+
+.theme-toggle-lock-pulse {
+  animation: theme-toggle-lock-pulse 500ms ease;
+}
+
+@keyframes theme-toggle-lock-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.5);
+  }
+  65% {
+    transform: scale(0.9);
+  }
 }
 
 .theme-toggle-icon {
@@ -276,6 +519,47 @@ h3 {
   }
   100% {
     transform: rotate(0deg);
+  }
+}
+
+/* Blur applied to just the "backside" while a blocked theme-toggle click is
+   "fighting" the day/night cycle — the sky band up top, and the gradient/
+   texture behind the Outpost's cards and menus (.outpost-zone::before/
+   ::after, see above) — never the actual content sitting in front of
+   them, which stays perfectly legible. Fades in on click, fades back out
+   when ThemeToggle removes the class after snapping the theme back. */
+html.daynight-fighting .day-night-sky,
+html.daynight-fighting .outpost-zone::before,
+html.daynight-fighting .outpost-zone::after {
+  filter: blur(6px) saturate(1.4);
+}
+
+.theme-toggle-blocked-toast {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.6rem);
+  z-index: 30;
+  width: 15rem;
+  transform: translateX(-50%);
+  border-radius: 0.65rem;
+  border: 1px solid rgba(217, 138, 74, 0.4);
+  background-color: rgba(20, 16, 12, 0.95);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: theme-toast-in 200ms ease;
+}
+
+@keyframes theme-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
   }
 }
 
@@ -369,6 +653,730 @@ h3 {
   animation: hub-toast-out 220ms ease-in forwards;
 }
 
+/* Homepage hub — "The Outpost" is a deliberately distinct, always-dark
+   "place" on the site (same precedent as the hero not following the
+   light/dark theme toggle), rather than a title strip over ordinary light
+   cards. Tier 1 reads as BTW's early game — hand tools, hemp, the
+   millstone — so its palette is warm and earthen (bronze/amber on dark
+   wood-brown) rather than the site's own cyan/blue brand color. Tier 2
+   (see the .tier2-* rules) is the mid-game "Iron Age" step up from this. */
+.outpost-zone {
+  position: relative;
+  isolation: isolate;
+}
+
+/* The gradient backdrop lives on its own pseudo-element (rather than the
+   section's own background) specifically so it — and only it, not the
+   actual cards/menus in front of it — can be targeted by the
+   theme-toggle "fight back" blur below. Sits behind .outpost-zone::before
+   (the crosshatch texture, z-index 0) via a lower z-index. */
+.outpost-zone::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transition: filter 320ms ease-out;
+  background:
+    radial-gradient(ellipse 60% 50% at 15% -10%, rgba(217, 138, 74, 0.18), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 90% 110%, rgba(217, 138, 74, 0.14), transparent 60%),
+    linear-gradient(180deg, rgba(74, 48, 24, 0.8) 0%, rgba(92, 61, 31, 0.8) 45%, rgba(74, 48, 24, 0.8) 100%);
+}
+
+[data-theme="dark"] .outpost-zone::after {
+  background:
+    radial-gradient(ellipse 60% 50% at 15% -10%, rgba(217, 138, 74, 0.14), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 90% 110%, rgba(217, 138, 74, 0.1), transparent 60%),
+    linear-gradient(180deg, #130d08 0%, #241a10 45%, #130d08 100%);
+}
+
+/* A diagonal crosshatch (woven hemp/basket weave) rather than a rectilinear
+   tech grid — fits "hand tools" instead of "circuitry". */
+.outpost-zone::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.5;
+  transition: filter 320ms ease-out;
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(217, 138, 74, 0.06) 0,
+      rgba(217, 138, 74, 0.06) 1px,
+      transparent 1px,
+      transparent 13px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(217, 138, 74, 0.06) 0,
+      rgba(217, 138, 74, 0.06) 1px,
+      transparent 1px,
+      transparent 13px
+    );
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 15%, black 35%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 15%, black 35%, transparent 100%);
+  pointer-events: none;
+}
+
+.outpost-zone > * {
+  position: relative;
+  z-index: 1;
+}
+
+.outpost-frame {
+  position: relative;
+  /* Defaults for the whole card — header, corners, progress bar, and every
+     shared component (ModOfTheDay, PatchNotes, GuessTheMod,
+     AchievementGallery) read these. Once tier 2 unlocks and a skin is
+     picked, HubSection overrides these three right here via inline style,
+     so the WHOLE outpost card retints, not just the tier-2 module nested
+     inside it — see Tier2Dashboard.tsx for tier 2's own (redundant but
+     harmless) re-declaration scoped to just its own subtree. */
+  --outpost-accent: #d98a4a;
+  --outpost-accent-soft: rgba(217, 138, 74, 0.3);
+  --outpost-accent-dark: #5c3d1f;
+  border: 1px solid var(--outpost-accent-soft);
+  background: rgba(74, 48, 24, 0.4);
+  box-shadow: 0 24px 64px -24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .outpost-frame {
+  background: rgba(28, 19, 11, 0.5);
+  box-shadow: 0 24px 64px -24px rgba(0, 0, 0, 0.6);
+}
+
+.outpost-corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 0 3px var(--outpost-accent-soft));
+  pointer-events: none;
+}
+
+/* Color is baked into each directional shorthand, not inherited from a
+   separate `border-color` on .outpost-corner — a bare `border-top: 3px
+   solid` shorthand always resets its own color component to currentcolor,
+   so a color declared only on the base class gets silently overridden. */
+.outpost-corner-tl {
+  top: -2px;
+  left: -2px;
+  border-top: 3px solid var(--outpost-accent);
+  border-left: 3px solid var(--outpost-accent);
+}
+
+.outpost-corner-tr {
+  top: -2px;
+  right: -2px;
+  border-top: 3px solid var(--outpost-accent);
+  border-right: 3px solid var(--outpost-accent);
+}
+
+.outpost-corner-bl {
+  bottom: -2px;
+  left: -2px;
+  border-bottom: 3px solid var(--outpost-accent);
+  border-left: 3px solid var(--outpost-accent);
+}
+
+.outpost-corner-br {
+  bottom: -2px;
+  right: -2px;
+  border-bottom: 3px solid var(--outpost-accent);
+  border-right: 3px solid var(--outpost-accent);
+}
+
+.outpost-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--outpost-accent);
+  border: 1px solid var(--outpost-accent-soft);
+  border-radius: 9999px;
+  padding: 0.3rem 0.8rem;
+}
+
+.outpost-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--outpost-accent);
+  box-shadow: 0 0 6px 1px var(--outpost-accent-soft);
+  animation: outpost-pulse 2s ease-in-out infinite;
+}
+
+@keyframes outpost-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.outpost-progress-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+}
+
+.outpost-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--outpost-accent-dark), var(--outpost-accent));
+  transition: width 500ms ease;
+}
+
+/* Dark-themed sibling of .card-glow, used for the Outpost's own feature
+   cards — same hover trace, but built for tier 1's fixed warm-dark
+   background instead of the site's light/dark toggle. */
+.outpost-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(180, 140, 100, 0.18);
+  background: rgba(36, 26, 18, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+
+.outpost-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--outpost-accent), transparent);
+  background-size: 200% 100%;
+  background-position: -200% 0;
+  transition: background-position 600ms ease;
+  pointer-events: none;
+}
+
+.outpost-panel:hover {
+  border-color: var(--outpost-accent-soft);
+  box-shadow:
+    0 0 0 1px var(--outpost-accent-soft),
+    0 8px 24px -8px var(--outpost-accent-soft);
+  transform: translateY(-2px);
+}
+
+.outpost-panel:hover::before {
+  background-position: 200% 0;
+}
+
+/* Campfire flame flicker — a subtle scale/brightness wobble per stage, off
+   entirely once the fire's out. Speed and intensity both climb with the
+   stage (Embers barely moves, High is genuinely lively), which does double
+   duty as a second, at-a-glance read of fire strength beyond the icon/label
+   swap alone. Cheap (transform + filter only, no layout), and the global
+   prefers-reduced-motion rule already neutralizes it like every other
+   animation on the page. */
+.campfire-icon {
+  display: inline-block;
+  transform-origin: 50% 85%;
+}
+
+.campfire-icon[data-stage="0"] {
+  animation: none;
+}
+
+.campfire-icon[data-stage="1"] {
+  animation: campfire-flicker 3.2s ease-in-out infinite;
+}
+
+.campfire-icon[data-stage="2"] {
+  animation: campfire-flicker 2.2s ease-in-out infinite;
+}
+
+.campfire-icon[data-stage="3"] {
+  animation: campfire-flicker 1.5s ease-in-out infinite;
+}
+
+.campfire-icon[data-stage="4"] {
+  animation: campfire-flicker 0.9s ease-in-out infinite;
+}
+
+@keyframes campfire-flicker {
+  0%,
+  100% {
+    transform: scale(1) translateY(0);
+    filter: brightness(1);
+  }
+  25% {
+    transform: scale(1.06) translateY(-1px);
+    filter: brightness(1.1);
+  }
+  50% {
+    transform: scale(0.96) translateY(0.5px);
+    filter: brightness(0.94);
+  }
+  75% {
+    transform: scale(1.03) translateY(-0.5px);
+    filter: brightness(1.05);
+  }
+}
+
+/* Entrance transition once the visitor confirms entry through the gate. */
+@keyframes outpost-materialize {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.outpost-materialize {
+  animation: outpost-materialize 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Tier 2 — a deliberately different design language from tier 1's glowing
+   HUD-card look: a flat, neutral-charcoal dashboard shell with a left
+   sidebar (grouped nav) and a content pane, closer to a real admin console
+   than another card. Themed by whichever skin the player has picked
+   (accent color supplied via --tier2-accent/--tier2-accent-soft/
+   --tier2-accent-dark custom properties set inline per skin). */
+/* The two flanking menus — a slim vertical rail of icon buttons hugging
+   each side of the main card grid, expanding into a textured panel (same
+   family as .outpost-panel, just narrower and accent-tinted per the
+   current skin) when a tab is open. Replaces the old single wide
+   sidebar+content dashboard shell, which read as a separate console
+   bolted on below the Outpost rather than part of it. */
+.tier2-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(180, 140, 100, 0.18);
+  background-color: rgba(36, 26, 18, 0.4);
+}
+
+[data-theme="dark"] .tier2-rail {
+  background-color: rgba(15, 11, 7, 0.4);
+}
+
+.tier2-rail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  width: 3.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  padding: 0.5rem 0.3rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+.tier2-rail-item:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.tier2-rail-item-active {
+  color: #fff;
+  background-color: var(--outpost-accent-soft);
+  border-color: var(--outpost-accent);
+}
+
+.tier2-panel {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  width: 19rem;
+  max-width: calc(100vw - 4rem);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(180, 140, 100, 0.18);
+  background-color: rgba(36, 26, 18, 0.55);
+  background-image: radial-gradient(ellipse 140% 100% at 0% 0%, var(--outpost-accent-soft), transparent 70%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 1rem;
+  animation: tier2-panel-in 250ms ease;
+}
+
+[data-theme="dark"] .tier2-panel {
+  background-color: rgba(15, 11, 7, 0.6);
+}
+
+@keyframes tier2-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Directional variants: panel slides outward from its rail (away from the
+   main card grid) rather than a plain vertical fade, to sell the "expands
+   toward the window edge" motion. */
+.tier2-panel-slide-left {
+  animation: tier2-panel-in-left 220ms ease;
+}
+
+.tier2-panel-slide-right {
+  animation: tier2-panel-in-right 220ms ease;
+}
+
+@keyframes tier2-panel-in-left {
+  from {
+    opacity: 0;
+    transform: translate(16px, 4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes tier2-panel-in-right {
+  from {
+    opacity: 0;
+    transform: translate(-16px, 4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+.outpost-settings-nudge {
+  animation: outpost-settings-bounce 550ms ease;
+}
+
+@keyframes outpost-settings-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  25% {
+    transform: translateY(-4px) scale(1.08);
+  }
+  50% {
+    transform: translateY(0) scale(0.96);
+  }
+  75% {
+    transform: translateY(-2px) scale(1.03);
+  }
+}
+
+.outpost-settings-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 20;
+  width: 17rem;
+  max-width: calc(100vw - 2rem);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(180, 140, 100, 0.18);
+  background-color: rgba(36, 26, 18, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 0.85rem 1rem;
+  text-align: left;
+  animation: tier2-panel-in 180ms ease;
+}
+
+[data-theme="dark"] .outpost-settings-dropdown {
+  background-color: rgba(15, 11, 7, 0.9);
+}
+
+.tier2-panel-header {
+  margin-bottom: 0.85rem;
+  border-left: 3px solid var(--outpost-accent);
+  padding-left: 0.6rem;
+}
+
+.tier2-rank-ring {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08), transparent 70%);
+  border: 2px solid var(--tier2-accent, var(--color-glow));
+  box-shadow: 0 0 18px 2px var(--tier2-accent-soft, rgba(34, 211, 238, 0.35));
+}
+
+.tier2-rank-icon {
+  position: absolute;
+  right: -0.35rem;
+  bottom: -0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 9999px;
+  font-size: 0.9rem;
+  line-height: 1;
+  background-color: #241a12;
+  border: 2px solid var(--tier2-accent, var(--color-glow));
+}
+
+.tier2-xp-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+  position: relative;
+}
+
+.tier2-xp-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    var(--tier2-accent-dark, var(--color-chrome-dark)),
+    var(--tier2-accent, var(--color-glow))
+  );
+  transition: width 600ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.tier2-xp-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  animation: tier2-xp-shimmer 2.4s ease-in-out infinite;
+}
+
+@keyframes tier2-xp-shimmer {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -50% 0;
+  }
+}
+
+.tier2-flair-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--tier2-accent-soft, rgba(34, 211, 238, 0.35));
+  font-size: 1rem;
+}
+
+/* One-off "wow" reveal, shown only the moment tier 2 first unlocks in a
+   session (never replayed for returning tier-2 visitors). */
+@keyframes tier2-reveal-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0.2;
+  }
+  16% {
+    opacity: 1;
+  }
+  24% {
+    opacity: 0.4;
+  }
+  32% {
+    opacity: 1;
+  }
+}
+
+@keyframes tier2-reveal-fade {
+  0%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes tier2-reveal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.tier2-reveal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 12, 0.88);
+  animation: tier2-reveal-fade 3.6s ease forwards;
+  pointer-events: none;
+}
+
+.tier2-reveal-banner {
+  text-align: center;
+  animation:
+    tier2-reveal-in 400ms cubic-bezier(0.16, 1, 0.3, 1),
+    tier2-reveal-flicker 1.8s ease-out 1;
+}
+
+.tier2-reveal-tag {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+  color: var(--tier2-accent, var(--color-glow));
+  border: 1px solid var(--tier2-accent, var(--color-glow));
+  border-radius: 9999px;
+  padding: 0.35rem 1rem;
+}
+
+/* Shared by Tree Mining, Hunting, and Mining — a wide button with its own
+   progress fill sliding in from the left, doubling as both the hold/loading
+   indicator and the button itself so there's no separate progress bar to
+   keep in sync. */
+.outpost-hold-button {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background-color: rgba(255, 255, 255, 0.04);
+  padding: 0.65rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.outpost-hold-button:hover:not(:disabled) {
+  border-color: var(--outpost-accent, var(--color-glow));
+}
+
+.outpost-hold-button:disabled {
+  cursor: not-allowed;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.outpost-hold-button-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background-color: var(--outpost-accent, var(--color-glow));
+  opacity: 0.3;
+}
+
+/* Thin full-width bar, sits above the Resources & Tool strip — TierTip.tsx.
+   A single-line strip rather than a card, so it reads as a quiet status
+   line, not another box competing with the actual cards below it. */
+.outpost-tip-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--outpost-accent-soft);
+  background-color: rgba(217, 138, 74, 0.08);
+  padding: 0.5rem 0.85rem;
+}
+
+.outpost-tip-text {
+  min-width: 0;
+  flex: 1;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.75);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: outpost-tip-fade-in 400ms ease;
+}
+
+@keyframes outpost-tip-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.outpost-resource-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.04);
+  padding: 0.2rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+}
+
+.outpost-tool-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--outpost-accent, var(--color-glow));
+  background-color: var(--outpost-accent-soft, rgba(34, 211, 238, 0.2));
+  padding: 0.4rem 0.6rem;
+}
+
+.outpost-crafting-grid {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.outpost-crafting-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background-color: rgba(255, 255, 255, 0.03);
+  font-size: 1.1rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -378,4 +1386,15 @@ h3 {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Explicit per-visitor opt-out (Outpost settings dropdown), independent of
+   the OS-level prefers-reduced-motion above — same effect, scoped to just
+   the Outpost section since that's the busiest part of the page. */
+.outpost-frame[data-reduced-motion="true"] *,
+.outpost-frame[data-reduced-motion="true"] *::before,
+.outpost-frame[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import Reveal from "@/components/Reveal";
 import DiscordIcon from "@/components/icons/DiscordIcon";
 import GithubIcon from "@/components/icons/GithubIcon";
+import OutpostControlPanel from "@/components/hub/OutpostControlPanel";
 import { discordInviteUrl, githubRepoUrl } from "@/lib/site-config";
 
 export const metadata: Metadata = {
@@ -82,6 +83,10 @@ export default function CommunityPage() {
           href={githubRepoUrl}
           icon={<GithubIcon className="h-full w-full" />}
         />
+      </Reveal>
+
+      <Reveal>
+        <OutpostControlPanel />
       </Reveal>
 
       <p className="mt-12 text-sm text-slate-600 dark:text-slate-400">
