@@ -57,31 +57,19 @@ export const metadata: Metadata = {
 // DayNightSky's CSS can reserve its height before React even mounts,
 // avoiding a layout shift when it pops in.
 //
-// Also duplicates the Features tab's day/night gate (admin-config.ts) —
-// an admin can disable the cycle outright or push it behind a later tier,
-// and this needs to agree with that before hydration too, or the boot
-// script would briefly assume the cycle's running when AchievementsProvider
-// (which reads the same admin config) is about to say otherwise.
+// Also duplicates the "Day/Night Cycle" Upgrades-shop gate (purchased ids
+// live in hub.upgrades.purchased) — a visitor who hasn't bought that
+// upgrade yet needs this to agree before hydration too, or the boot script
+// would briefly assume the cycle's running when AchievementsProvider (which
+// reads the same purchased list) is about to say otherwise.
 const themeBootScript = `
 (function () {
   try {
     var hubRaw = localStorage.getItem("btwr:hub:v1");
     var hub = hubRaw ? JSON.parse(hubRaw) : null;
-    var adminRaw = localStorage.getItem("btwr:hub:admin:v1");
-    var admin = adminRaw ? JSON.parse(adminRaw) : null;
-    var features = (admin && admin.features) || {};
-    var featuresAllow = features.dayNightCycleEnabled !== false;
-    var tierId = features.dayNightCycleTierId || "tier1";
-    var tiersList = (admin && Array.isArray(admin.tiers) && admin.tiers.length >= 2)
-      ? admin.tiers
-      : [{ id: "tier1", threshold: 0 }, { id: "tier2", threshold: 35 }];
-    var tierThresholdFor = Infinity;
-    for (var i = 0; i < tiersList.length; i++) {
-      if (tiersList[i].id === tierId) { tierThresholdFor = tiersList[i].threshold; break; }
-    }
-    var unlockedCount = (hub && hub.unlocked) ? Object.keys(hub.unlocked).length : 0;
-    var tierAllows = unlockedCount >= tierThresholdFor;
-    var cycleActive = !!(hub && hub.enabled && hub.settings && hub.settings.dayNightCycleEnabled) && featuresAllow && tierAllows;
+    var purchased = (hub && hub.upgrades && hub.upgrades.purchased) || [];
+    var cycleActive = !!(hub && hub.enabled && hub.settings && hub.settings.dayNightCycleEnabled)
+      && purchased.indexOf("day-night-cycle") !== -1;
     var overrideAllowed = !!(hub && hub.settings && hub.settings.themeOverrideAllowed);
     document.documentElement.setAttribute("data-daynight-active", String(cycleActive));
 

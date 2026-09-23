@@ -31,11 +31,15 @@ import {
   type Tier2State,
 } from "./hub-storage";
 import { currentCampfireStage, type CampfireStage } from "./campfire-stage";
+import { engineLoreRankForInsight, PONDER_JOURNAL_MAX } from "./ponder-content";
+import { PRIORITY_STEPS } from "./priorities-content";
+import { ponderStageFor, type PonderStage } from "./ponder-stage";
 import {
   collectBonus,
   craftCostDiscount,
   defaultLegacyState,
   effectiveCooldownMs,
+  insightPrestigeBonus,
   nextPerkCost,
   pointsForPrestige,
   startingTierIndex,
@@ -43,10 +47,6 @@ import {
   type PerkId,
 } from "./legacy";
 import {
-  ACTIVITY_COOLDOWN_MS,
-  COOK_FOOD_COST,
-  COOK_YIELD,
-  EAT_XP_REWARD,
   nextToolTier,
   rollMiningYield,
   type ResourceId,
@@ -55,22 +55,35 @@ import {
 import {
   currentTierId,
   defaultAdminConfig,
+  isAchievementDefault,
   loadAdminConfig,
   resolvedCollectAmounts,
   resolvedCraftCost,
   resolvedFeatures,
+  resolvedMechanic,
+  resolvedMechanicForTier,
   resolvedModuleTier,
   resolvedResourceMeta,
   resolvedTierTips,
   resolvedTiers,
   resolvedToolOrder,
   resolvedToolTiers,
+  resolvedUpgrade,
+  resolvedUpgrades,
   tierThreshold,
   type AdminConfig,
   type FeaturesConfig,
   type TierDef,
 } from "./admin-config";
-import { DEFAULT_MODULE_TIER, type ModuleId } from "./module-registry";
+import type {
+  AnalyticalEngineMechanic,
+  CampfireMechanic,
+  GatheringMechanic,
+  PrestigeMechanic,
+  UpgradesMechanic,
+} from "./mechanics";
+import { DEFAULT_CARD_ORDER, DEFAULT_MODULE_TIER, type ModuleId } from "./module-registry";
+import type { UpgradeDef, UpgradeId } from "./upgrade-catalog";
 import {
   computeLedgerProgress,
   ledgerEntryTitle,
@@ -101,10 +114,11 @@ type AchievementsContextValue = {
   unlock: (id: AchievementId) => void;
   toasts: ToastInstance[];
   dismissToast: (instanceId: string) => void;
+  dismissAllToasts: () => void;
   quiz: QuizStats;
   updateQuiz: (updater: (prev: QuizStats) => QuizStats) => void;
   visits: HubState["visits"];
-  /** True once all 12 tier-1 achievements are done (community-edition granted). */
+  /** True once unlockedCount reaches the ladder's tier2 threshold — see admin-config.ts's defaultTiers(). */
   tier2Unlocked: boolean;
   tier2: Tier2State;
   xpInfo: ReturnType<typeof xpProgress>;
@@ -123,6 +137,9 @@ type AchievementsContextValue = {
   recordPatchNotesOpen: () => void;
   recordExport: () => void;
   importState: (parsed: unknown) => boolean;
+  ponder: HubState["ponder"];
+  ponderStage: PonderStage;
+  recordPonderSolved: (sentence: string, wasChoice: boolean) => void;
   campfire: HubState["campfire"];
   tendCampfire: () => void;
   /** Only succeeds while the fire is at the Medium stage and there's enough Food — see resources.ts. */
@@ -130,6 +147,8 @@ type AchievementsContextValue = {
   eatCookedFood: () => boolean;
   firstIronTool: HubState["firstIronTool"];
   chooseIronTool: (toolId: string) => void;
+  priorities: HubState["priorities"];
+  togglePriorityStep: (id: string) => void;
   resources: HubState["resources"];
   tools: HubState["tools"];
   activityCooldownUntil: string | null;
@@ -142,6 +161,8 @@ type AchievementsContextValue = {
   isTierUnlocked: (tierId: string) => boolean;
   moduleTierId: (id: ModuleId) => string;
   achievementTierId: (id: AchievementId) => string;
+  /** Whether an achievement is pinned to its tier's "Default" group, ahead of every category — see admin-config.ts's achievementDefault. */
+  achievementIsDefault: (id: AchievementId) => boolean;
   toolTiersList: ReturnType<typeof resolvedToolTiers>;
   craftCostFor: (tierId: string) => Partial<ResourceState>;
   resourceMeta: ReturnType<typeof resolvedResourceMeta>;
@@ -149,6 +170,17 @@ type AchievementsContextValue = {
   tierTips: string[];
   /** Feature toggles + their tier gates — Features tab in /outpost-admin. */
   features: FeaturesConfig;
+  /** Resolved (class defaults + admin overrides) mechanic settings — Modules tab's per-module gear menu in /outpost-admin. */
+  mechanics: {
+    campfire: CampfireMechanic;
+    gathering: GatheringMechanic;
+    prestige: PrestigeMechanic;
+    upgrades: UpgradesMechanic;
+    /** Ponder/The Analytical Engine's ability profile, resolved for whichever tier the visitor has currently reached. */
+    ponder: AnalyticalEngineMechanic;
+  };
+  /** The most advanced tier the visitor has actually reached, by unlocked-achievement count — drives TierRevealNotice. */
+  currentTierId: string;
   settings: HubState["settings"];
   updateSettings: (patch: Partial<HubState["settings"]>) => void;
   legacy: LegacyState;
@@ -156,6 +188,15 @@ type AchievementsContextValue = {
   canPrestige: boolean;
   prestigeOutpost: () => boolean;
   buyLegacyPerk: (id: PerkId) => boolean;
+  /** Skill Points balance + owned upgrade ids + any custom card order — see upgrade-catalog.ts. */
+  upgrades: HubState["upgrades"];
+  /** Resolved (catalog defaults + admin cost/tier overrides) Upgrades-shop entries — Upgrades tab in /outpost-admin. */
+  upgradeCatalog: UpgradeDef[];
+  buyUpgrade: (id: UpgradeId) => boolean;
+  /** Moves a card to a new position in the single main-grid order, persisted — only meaningful once "card-reorder" is owned. */
+  reorderCard: (from: number, to: number) => void;
+  /** Resolved (custom order, else the default) card id order for the main grid. */
+  cardOrder: ModuleId[];
 };
 
 const AchievementsContext = createContext<AchievementsContextValue | null>(null);
@@ -196,6 +237,8 @@ type ExpansionCtx = {
   sessionTabsVisited: Set<Tier2TabId>;
   sessionExported: boolean;
   sessionImported: boolean;
+  /** Achievement-count threshold for the ladder's "tier2" rung — see admin-config.ts's defaultTiers(). */
+  tier2Threshold: number;
 };
 
 const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) => number }[] = [
@@ -302,9 +345,28 @@ const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) 
   { id: "campfire-medium", at: 3, read: (c) => c.state.campfire.stage },
   { id: "campfire-overstoked", at: 4, read: (c) => c.state.campfire.stage },
   { id: "iron-tool-completionist", at: 8, read: (c) => c.state.firstIronTool.triedTools.length },
+  { id: "priorities-completionist", at: PRIORITY_STEPS.length, read: (c) => c.state.priorities.checked.length },
+  // Ponder — see ponder-stage.ts for how these same counters derive its own
+  // Create/Choose/Install/Play stage.
+  { id: "pd-first-sentence", at: 1, read: (c) => c.state.ponder.solvedCount },
+  { id: "pd-fluent", at: 10, read: (c) => c.state.ponder.solvedCount },
+  { id: "pd-first-choice", at: 1, read: (c) => c.state.ponder.choicesMade },
+  { id: "pd-insight-1", at: 1, read: (c) => c.state.ponder.insight },
+  { id: "pd-insight-10", at: 10, read: (c) => c.state.ponder.insight },
+  { id: "pd-insight-50", at: 50, read: (c) => c.state.ponder.insight },
+  { id: "pd-insight-200", at: 200, read: (c) => c.state.ponder.insight },
 ];
 
 const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }[] = [
+  // A flavor achievement now, same as everything else in this table — it
+  // no longer has any special gating power of its own. What actually
+  // reveals Tier 2's content is unlockedCount crossing the ladder's tier2
+  // threshold directly (see the tier2Unlocked derivation below); this just
+  // happens to fire at the same moment.
+  {
+    id: "community-edition",
+    check: (c) => c.unlockedCount >= c.tier2Threshold,
+  },
   {
     id: "hh-hemp-fields",
     check: (c) => ["patch-notes", "quiz"].every((t) => c.state.tier2.tabsVisited.includes(t)),
@@ -362,6 +424,7 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
   { id: "he-round-trip", check: (c) => c.sessionExported && c.sessionImported },
   { id: "he-quiz-marathon", check: (c) => c.sessionAnswered >= 25 },
   { id: "iron-tool-chosen", check: (c) => c.state.firstIronTool.choice !== null },
+  { id: "priorities-started", check: (c) => c.state.priorities.checked.length >= 1 },
   {
     id: "fr-wardrobe-certified",
     check: (c) => c.state.tier2.skinsTried.length >= 4 && c.state.tier2.skinChangeCount >= 20,
@@ -392,6 +455,15 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
       ALL_HAND_AUTHORED_IDS.filter((id) => id !== "fr-founding-settler").every((id) => c.unlockedSet.has(id)),
   },
   { id: "fr-ledger-100", check: (c) => c.ledger.unlockedCount >= 100 },
+  // Ponder — mirrors ponderStageFor's own Stage 3/Stage 4 gates (reaching
+  // tier2 on the ladder, having prestiged at least once) rather than
+  // inventing new thresholds.
+  { id: "pd-automated", check: (c) => c.unlockedCount >= c.tier2Threshold },
+  { id: "pd-oracle", check: (c) => c.state.legacy.level >= 1 || c.state.ponder.solvedCount >= 40 },
+  {
+    id: "pd-old-friend",
+    check: (c) => c.state.legacy.level >= 1 && c.state.ponder.journal.length >= 20,
+  },
 ];
 
 export function AchievementsProvider({ children }: { children: React.ReactNode }) {
@@ -433,15 +505,22 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // buyLegacyPerk/prestigeOutpost, both of which update this ref in lockstep
   // with the state they push.
   const legacyRef = useRef<LegacyState>(defaultLegacyState());
+  // Read synchronously inside unlock() (Skill Point balance bump) and
+  // buyUpgrade/reorderCard (affordability + current card order) — same
+  // reasoning as the other refs.
+  const upgradesRef = useRef<HubState["upgrades"]>({ skillPoints: 0, purchased: [], cardOrder: null });
   // Read synchronously inside unlock() (a [addXp]-only useCallback) to
   // decide whether to push a toast — same reasoning as the other refs.
   const settingsRef = useRef<HubState["settings"]>(defaultState().settings);
+  // Read synchronously by recordPonderSolved (insight award), the idle-gen
+  // tick effect, and prestigeOutpost (Borrowed Insight bonus) — same
+  // reasoning as the other refs.
+  const ponderRef = useRef<HubState["ponder"]>(defaultState().ponder);
   // Admin overrides (tiers/module placement/achievement tiers/tool ladder)
   // load once on mount, same as everything else — the admin panel lives on
   // its own page, so by the time a visitor reaches the homepage again after
   // editing, this is a fresh mount that picks up the new config naturally.
   const [adminConfig, setAdminConfig] = useState<AdminConfig>(defaultAdminConfig());
-  const tiersRef = useRef<TierDef[]>(defaultAdminConfig().tiers);
   const adminConfigRef = useRef<AdminConfig>(defaultAdminConfig());
 
   const addXp = useCallback((amount: number) => {
@@ -483,6 +562,14 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       sessionUnlockCountRef.current += 1;
       const timestamp = new Date().toISOString();
       const def = ACHIEVEMENTS_BY_ID[id];
+      // Skill Points per achievement — the Upgrades shop's passive income
+      // (see mechanics.ts's UpgradesMechanic). Bumped in lockstep with the
+      // ref, same pattern as every other synchronously-read mutator here.
+      const upgradesMechanic = resolvedMechanic<UpgradesMechanic>(adminConfigRef.current, "upgrades");
+      upgradesRef.current = {
+        ...upgradesRef.current,
+        skillPoints: upgradesRef.current.skillPoints + upgradesMechanic.skillPointsPerAchievement,
+      };
 
       setState((prev) => {
         const activityLog = [
@@ -492,6 +579,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         const next = {
           ...prev,
           unlocked: { ...prev.unlocked, [id]: timestamp },
+          upgrades: upgradesRef.current,
           tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
         };
         saveState(next);
@@ -509,14 +597,12 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         ]);
       }
 
-      // Meta / tier-gate checks, evaluated after this unlock is registered.
-      // Each recursive unlock() call is guarded by the same has()-check
-      // above, so this can't loop — a meta-achievement can't satisfy its
-      // own condition by unlocking itself.
-      const tier2Threshold = tiersRef.current.find((t) => t.id === "tier2")?.threshold ?? 35;
-      if (id !== "community-edition" && unlockedRef.current.size >= tier2Threshold) {
-        unlock("community-edition");
-      }
+      // Meta checks, evaluated after this unlock is registered. Each
+      // recursive unlock() call is guarded by the same has()-check above,
+      // so this can't loop — a meta-achievement can't satisfy its own
+      // condition by unlocking itself. (Tier-gate achievements like
+      // "community-edition" aren't special-cased here anymore — they run
+      // through the generic CUSTOM_RULES sweep below like everything else.)
       if (
         id !== "soul-urn" &&
         unlockedRef.current.has("secret-sequence") &&
@@ -541,6 +627,10 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
   const dismissToast = useCallback((instanceId: string) => {
     setToasts((prev) => prev.filter((t) => t.instanceId !== instanceId));
+  }, []);
+
+  const dismissAllToasts = useCallback(() => {
+    setToasts([]);
   }, []);
 
   const updateQuiz = useCallback((updater: (prev: QuizStats) => QuizStats) => {
@@ -694,6 +784,82 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
+  // Covers both a plain Ponder puzzle and a Stage-2 branch choice — the
+  // journal is capped and newest-first, same shape as tier2.activityLog.
+  // Insight is read from the resolved per-tier mechanic (mechanics.ts's
+  // AnalyticalEngineMechanic) rather than a flat constant, so an admin can
+  // tune the Engine's award rate per ability tier.
+  const recordPonderSolved = useCallback((sentence: string, wasChoice: boolean) => {
+    const mechanic = resolvedMechanicForTier<AnalyticalEngineMechanic>(
+      adminConfigRef.current,
+      "ponder",
+      currentTierId(adminConfigRef.current, unlockedRef.current.size)
+    );
+    const insight = ponderRef.current.insight + mechanic.insightPerSolve;
+    const loreRevealedRank = Math.max(ponderRef.current.loreRevealedRank, engineLoreRankForInsight(insight));
+    const journal = [sentence, ...ponderRef.current.journal].slice(0, PONDER_JOURNAL_MAX);
+    const nextPonder: HubState["ponder"] = {
+      solvedCount: ponderRef.current.solvedCount + 1,
+      choicesMade: ponderRef.current.choicesMade + (wasChoice ? 1 : 0),
+      journal,
+      insight,
+      loreRevealedRank,
+      idleGenSince: ponderRef.current.idleGenSince,
+    };
+    ponderRef.current = nextPonder;
+    setState((prev) => {
+      const next: HubState = { ...prev, ponder: nextPonder };
+      saveState(next);
+      return next;
+    });
+  }, []);
+
+  // Idle generation — once the resolved per-tier mechanic's idleInsightPerMin
+  // is > 0, insight accrues from a stored timestamp the same way Campfire
+  // decay and the day/night cycle derive their state (no ticking server).
+  // Whole minutes only, so a half-elapsed minute carries over to the next
+  // tick instead of being lost.
+  const IDLE_GEN_TICK_MS = 30_000;
+  useEffect(() => {
+    if (!mounted) return;
+    const id = window.setInterval(() => {
+      const mechanic = resolvedMechanicForTier<AnalyticalEngineMechanic>(
+        adminConfigRef.current,
+        "ponder",
+        currentTierId(adminConfigRef.current, unlockedRef.current.size)
+      );
+      if (mechanic.idleInsightPerMin <= 0) return;
+
+      if (!ponderRef.current.idleGenSince) {
+        const nextPonder = { ...ponderRef.current, idleGenSince: new Date().toISOString() };
+        ponderRef.current = nextPonder;
+        setState((prev) => {
+          const next = { ...prev, ponder: nextPonder };
+          saveState(next);
+          return next;
+        });
+        return;
+      }
+
+      const elapsedMin = (Date.now() - new Date(ponderRef.current.idleGenSince).getTime()) / 60_000;
+      const wholeMin = Math.floor(elapsedMin);
+      if (wholeMin < 1) return;
+      const insight = ponderRef.current.insight + wholeMin * mechanic.idleInsightPerMin;
+      const loreRevealedRank = Math.max(ponderRef.current.loreRevealedRank, engineLoreRankForInsight(insight));
+      const idleGenSince = new Date(
+        new Date(ponderRef.current.idleGenSince).getTime() + wholeMin * 60_000
+      ).toISOString();
+      const nextPonder = { ...ponderRef.current, insight, loreRevealedRank, idleGenSince };
+      ponderRef.current = nextPonder;
+      setState((prev) => {
+        const next = { ...prev, ponder: nextPonder };
+        saveState(next);
+        return next;
+      });
+    }, IDLE_GEN_TICK_MS);
+    return () => window.clearInterval(id);
+  }, [mounted]);
+
   // Imports apply in place (no page reload) so same-session achievements
   // like "Round Trip" (export then import) stay detectable. importCount
   // carries forward from THIS browser's current count, not whatever the
@@ -726,6 +892,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         visits: { ...base.visits, ...incoming.visits },
         campfire: { ...base.campfire, ...incoming.campfire },
         firstIronTool: { ...base.firstIronTool, ...incoming.firstIronTool },
+        priorities: { ...base.priorities, ...incoming.priorities },
         resources: { ...base.resources, ...incoming.resources },
         tools: { ...base.tools, ...incoming.tools },
         legacy: {
@@ -733,6 +900,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
           ...incoming.legacy,
           perks: { ...base.legacy.perks, ...incoming.legacy?.perks },
         },
+        upgrades: { ...base.upgrades, ...incoming.upgrades },
+        ponder: { ...base.ponder, ...incoming.ponder },
         tier2,
         unlocked: { ...incoming.unlocked },
       };
@@ -741,6 +910,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       toolsRef.current = merged.tools;
       legacyRef.current = merged.legacy;
       campfireRef.current = merged.campfire;
+      upgradesRef.current = merged.upgrades;
+      ponderRef.current = merged.ponder;
       saveState(merged);
       return merged;
     });
@@ -761,7 +932,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // its last raw stored value — so tending after a long absence starts
   // from the ember you'd actually see, not a stale high stage.
   const tendCampfire = useCallback(() => {
-    const displayedStage = currentCampfireStage(campfireRef.current);
+    const campfireMechanic = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire");
+    const displayedStage = currentCampfireStage(campfireRef.current, campfireMechanic.decayMinutes);
     const nextStage = Math.min(4, displayedStage + 1) as CampfireStage;
     const campfire = { stage: nextStage, lastTendedAt: new Date().toISOString() };
     campfireRef.current = campfire;
@@ -777,13 +949,15 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // long-standing flavor text (campfire-stage.ts). Shares the same rest
   // timer as Tree Mining/Hunting/Mining so it can't be spammed back-to-back.
   const completeCooking = useCallback((): boolean => {
-    if (currentCampfireStage(campfireRef.current) !== 3) return false;
-    if ((resourcesRef.current.food ?? 0) < COOK_FOOD_COST) return false;
+    const campfireMechanic = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire");
+    if (currentCampfireStage(campfireRef.current, campfireMechanic.decayMinutes) !== 3) return false;
+    if ((resourcesRef.current.food ?? 0) < campfireMechanic.cookFoodCost) return false;
     const resources = { ...resourcesRef.current };
-    resources.food -= COOK_FOOD_COST;
-    resources.cookedFood = (resources.cookedFood ?? 0) + COOK_YIELD;
+    resources.food -= campfireMechanic.cookFoodCost;
+    resources.cookedFood = (resources.cookedFood ?? 0) + campfireMechanic.cookYield;
     resourcesRef.current = resources;
-    const cooldownMs = effectiveCooldownMs(ACTIVITY_COOLDOWN_MS, legacyRef.current.perks);
+    const gatheringMechanic = resolvedMechanic<GatheringMechanic>(adminConfigRef.current, "gathering");
+    const cooldownMs = effectiveCooldownMs(gatheringMechanic.activityCooldownMs, legacyRef.current.perks);
     const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
     setState((prev) => {
       const activityLog = [
@@ -824,7 +998,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       saveState(next);
       return next;
     });
-    addXp(EAT_XP_REWARD);
+    addXp(resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire").eatXpReward);
     return true;
   }, [addXp]);
 
@@ -834,6 +1008,17 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         ? prev.firstIronTool.triedTools
         : [...prev.firstIronTool.triedTools, toolId];
       const next = { ...prev, firstIronTool: { choice: toolId, triedTools } };
+      saveState(next);
+      return next;
+    });
+  }, []);
+
+  const togglePriorityStep = useCallback((id: string) => {
+    setState((prev) => {
+      const checked = prev.priorities.checked.includes(id)
+        ? prev.priorities.checked.filter((x) => x !== id)
+        : [...prev.priorities.checked, id];
+      const next = { ...prev, priorities: { checked } };
       saveState(next);
       return next;
     });
@@ -856,7 +1041,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       resources[id] = (resources[id] ?? 0) + amount;
     }
     resourcesRef.current = resources;
-    const cooldownMs = effectiveCooldownMs(ACTIVITY_COOLDOWN_MS, legacyRef.current.perks);
+    const gatheringMechanic = resolvedMechanic<GatheringMechanic>(adminConfigRef.current, "gathering");
+    const cooldownMs = effectiveCooldownMs(gatheringMechanic.activityCooldownMs, legacyRef.current.perks);
     const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
     setState((prev) => {
       const activityLog = [
@@ -962,7 +1148,10 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   const prestigeOutpost = useCallback((): boolean => {
     const order = resolvedToolOrder(adminConfigRef.current);
     const toolIndex = Math.max(0, order.indexOf(toolsRef.current.tier));
-    const pointsEarned = pointsForPrestige(toolIndex);
+    const prestigeMechanic = resolvedMechanic<PrestigeMechanic>(adminConfigRef.current, "prestige");
+    const pointsEarned =
+      pointsForPrestige(toolIndex, prestigeMechanic.pointsPerTier) +
+      insightPrestigeBonus(legacyRef.current.perks, ponderRef.current.insight);
     const startIndex = Math.min(order.length - 1, startingTierIndex(legacyRef.current.perks));
     const startTier = order[startIndex] ?? order[0];
 
@@ -993,11 +1182,87 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     return true;
   }, []);
 
+  const buyUpgrade = useCallback((id: UpgradeId): boolean => {
+    const def = resolvedUpgrade(adminConfigRef.current, id);
+    if (!def) return false;
+    if (upgradesRef.current.purchased.includes(id)) return false;
+    if (unlockedRef.current.size < tierThreshold(adminConfigRef.current, def.tierId)) return false;
+    if (upgradesRef.current.skillPoints < def.cost) return false;
+
+    const upgrades = {
+      ...upgradesRef.current,
+      skillPoints: upgradesRef.current.skillPoints - def.cost,
+      purchased: [...upgradesRef.current.purchased, id],
+    };
+    upgradesRef.current = upgrades;
+    setState((prev) => {
+      const activityLog = [
+        { ts: new Date().toISOString(), text: `Unlocked upgrade: ${def.name}` },
+        ...prev.tier2.activityLog,
+      ].slice(0, ACTIVITY_LOG_MAX);
+      const next: HubState = {
+        ...prev,
+        upgrades,
+        tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
+      };
+      saveState(next);
+      return next;
+    });
+    return true;
+  }, []);
+
+  // Only meaningful once "card-reorder" is owned — the components that call
+  // this (HubSection's DraggableSlot) only attach drag handlers at all when
+  // that's true, so this doesn't separately re-check ownership. Single flat
+  // list now that the main grid is one modular grid (see module-registry.ts's
+  // DEFAULT_CARD_ORDER) — a plain splice-out/splice-in, same "move to
+  // position `to`, shifting everything between" semantics regardless of
+  // where in the grid `to` lands.
+  const reorderCard = useCallback((from: number, to: number) => {
+    const list = [...(upgradesRef.current.cardOrder ?? DEFAULT_CARD_ORDER)];
+    // to === list.length is a valid "move to the end" target (the grid's
+    // trailing drop cell) — splice appends there fine. from === to is a
+    // no-op (dropped on itself), and so is dropping the already-last card on
+    // the trailing end cell — every other from/to pair (including an
+    // adjacent forward drop, e.g. index i onto i+1) genuinely reorders the
+    // two, since `to` is the target's index in the array as it stood before
+    // removal, not after.
+    if (
+      from < 0 ||
+      from >= list.length ||
+      to < 0 ||
+      to > list.length ||
+      from === to ||
+      (to === list.length && from === list.length - 1)
+    )
+      return;
+    const [item] = list.splice(from, 1);
+    list.splice(to, 0, item);
+    upgradesRef.current = { ...upgradesRef.current, cardOrder: list };
+    setState((prev) => {
+      const next = { ...prev, upgrades: upgradesRef.current };
+      saveState(next);
+      return next;
+    });
+  }, []);
+
   // Load persisted state once on mount, apply the day-streak, fire the
   // visit-related achievements, and check the handful of conditions that
   // only make sense once at page-load (time of day, the lounge timer, the
   // daily XP bonus, and the expansion's real-date/moon-phase trackers).
+  //
+  // Guarded by a ref (not just the empty dep array) because React's dev-only
+  // StrictMode double-invokes effects: without this, the second invocation
+  // re-reads localStorage before the first invocation's saveState() (queued
+  // inside unlock()'s setState updater) has actually flushed, clobbering
+  // unlockedRef.current back to a state that doesn't have "first-visit" yet
+  // — which then unlocks it a second time and shows its toast twice. This
+  // makes the whole block run exactly once per real mount, full stop.
+  const didInitRef = useRef(false);
   useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+
     const loaded = loadState();
     const hadVisitedToday = loaded.visits.lastVisitDate === todayUTC();
     const visits = applyVisit(loaded.visits);
@@ -1026,10 +1291,11 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     toolsRef.current = next.tools;
     legacyRef.current = next.legacy;
     campfireRef.current = next.campfire;
+    upgradesRef.current = next.upgrades;
     settingsRef.current = next.settings;
+    ponderRef.current = next.ponder;
     const loadedAdminConfig = loadAdminConfig();
     adminConfigRef.current = loadedAdminConfig;
-    tiersRef.current = loadedAdminConfig.tiers;
     setAdminConfig(loadedAdminConfig);
     patchSwitchCountRef.current = loaded.tier2.patchNotesModeSwitchCount;
     themeClicksRef.current = loaded.tier2.themeToggleClicks;
@@ -1051,7 +1317,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     const isDark = document.documentElement.getAttribute("data-theme") === "dark";
     if (hour < 5 && isDark) unlock("hardcore-darkness");
 
-    if (!hadVisitedToday && unlockedRef.current.has("community-edition")) {
+    if (!hadVisitedToday && unlockedRef.current.size >= tierThreshold(loadedAdminConfig, "tier2")) {
       addXp(XP_PER_DAILY_VISIT);
     }
 
@@ -1189,6 +1455,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       sessionTabsVisited: sessionTabsVisitedRef.current,
       sessionExported: sessionExportedRef.current,
       sessionImported: sessionImportedRef.current,
+      tier2Threshold: tierThreshold(adminConfigRef.current, "tier2"),
     };
 
     for (const rule of NUMERIC_RULES) {
@@ -1229,13 +1496,19 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     ledgerRanksRef.current = nextRanks;
   }, [state, mounted, unlock]);
 
-  const tier2Unlocked = unlockedRef.current.has("community-edition");
   const ledgerProgress = useMemo(() => computeLedgerProgress(state), [state]);
 
   const isTierUnlocked = useCallback(
     (tierId: string): boolean => unlockedRef.current.size >= tierThreshold(adminConfig, tierId),
     [adminConfig]
   );
+  // Reaching Tier 2 on the ladder — the one progression system everything
+  // (XP earning, Ponder's Stage 3, skins, the full achievement list
+  // becoming visible) now gates off, same as every later tier. No longer
+  // tied to any one specific achievement — "community-edition" is a plain
+  // flavor achievement that happens to fire at this same moment, not the
+  // thing that causes it (see the CUSTOM_RULES table above).
+  const tier2Unlocked = isTierUnlocked("tier2");
   const moduleTierId = useCallback(
     (id: ModuleId): string => resolvedModuleTier(adminConfig, id, DEFAULT_MODULE_TIER[id]),
     [adminConfig]
@@ -1248,6 +1521,10 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     },
     [adminConfig]
   );
+  const achievementIsDefault = useCallback(
+    (id: AchievementId): boolean => isAchievementDefault(adminConfig, id),
+    [adminConfig]
+  );
   const tiersList = useMemo(() => resolvedTiers(adminConfig), [adminConfig]);
   const toolTiersList = useMemo(() => resolvedToolTiers(adminConfig), [adminConfig]);
   const craftCostFor = useCallback(
@@ -1256,10 +1533,25 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   );
   const resourceMetaResolved = useMemo(() => resolvedResourceMeta(adminConfig), [adminConfig]);
   const featuresResolved = useMemo(() => resolvedFeatures(adminConfig), [adminConfig]);
+  const upgradeCatalogResolved = useMemo(() => resolvedUpgrades(adminConfig), [adminConfig]);
   const unlockedCount = Object.keys(state.unlocked).length;
-  const tierTipsResolved = useMemo(
-    () => resolvedTierTips(adminConfig, currentTierId(adminConfig, unlockedCount)),
+  const currentTierIdValue = useMemo(
+    () => currentTierId(adminConfig, unlockedCount),
     [adminConfig, unlockedCount]
+  );
+  const mechanicsResolved = useMemo(
+    () => ({
+      campfire: resolvedMechanic<CampfireMechanic>(adminConfig, "campfire"),
+      gathering: resolvedMechanic<GatheringMechanic>(adminConfig, "gathering"),
+      prestige: resolvedMechanic<PrestigeMechanic>(adminConfig, "prestige"),
+      upgrades: resolvedMechanic<UpgradesMechanic>(adminConfig, "upgrades"),
+      ponder: resolvedMechanicForTier<AnalyticalEngineMechanic>(adminConfig, "ponder", currentTierIdValue),
+    }),
+    [adminConfig, currentTierIdValue]
+  );
+  const tierTipsResolved = useMemo(
+    () => resolvedTierTips(adminConfig, currentTierIdValue),
+    [adminConfig, currentTierIdValue]
   );
   // Prestige unlocks once the highest CONFIGURED tier (last in the sorted
   // list, admin-added ones included) has been reached — not the same as
@@ -1273,6 +1565,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     unlock,
     toasts,
     dismissToast,
+    dismissAllToasts,
     quiz: state.quiz,
     updateQuiz,
     visits: state.visits,
@@ -1294,11 +1587,20 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     recordPatchNotesOpen,
     recordExport,
     importState,
+    ponder: state.ponder,
+    ponderStage: ponderStageFor({
+      solvedCount: state.ponder.solvedCount,
+      tier2Unlocked,
+      legacyLevel: state.legacy.level,
+    }),
+    recordPonderSolved,
     campfire: state.campfire,
     tendCampfire,
     completeCooking,
     eatCookedFood,
     firstIronTool: state.firstIronTool,
+    priorities: state.priorities,
+    togglePriorityStep,
     chooseIronTool,
     resources: state.resources,
     tools: state.tools,
@@ -1311,17 +1613,25 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     isTierUnlocked,
     moduleTierId,
     achievementTierId,
+    achievementIsDefault,
     toolTiersList,
     craftCostFor,
     resourceMeta: resourceMetaResolved,
     tierTips: tierTipsResolved,
     features: featuresResolved,
+    mechanics: mechanicsResolved,
     settings: state.settings,
     updateSettings,
+    currentTierId: currentTierIdValue,
     legacy: state.legacy,
     canPrestige,
     prestigeOutpost,
     buyLegacyPerk,
+    upgrades: state.upgrades,
+    upgradeCatalog: upgradeCatalogResolved,
+    buyUpgrade,
+    reorderCard,
+    cardOrder: state.upgrades.cardOrder ?? DEFAULT_CARD_ORDER,
   };
 
   return (

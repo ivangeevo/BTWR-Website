@@ -1,6 +1,7 @@
 import type { Mod } from "@/lib/mods";
 import type { AchievementId } from "./achievements-catalog";
 import { defaultLegacyState, type LegacyState } from "./legacy";
+import type { ModuleId } from "./module-registry";
 import type { ResourceState } from "./resources";
 import { SKINS_BY_ID, type SkinId, type Tier2TabId } from "./tier2";
 
@@ -77,9 +78,30 @@ export type CampfireState = {
   lastTendedAt: string | null;
 };
 
+// The Outpost's meta-progression shop state (see upgrade-catalog.ts). cardOrder is
+// null until the visitor actually drags something (or before the
+// card-reorder upgrade even exists) — consumers fall back to
+// DEFAULT_CARD_ORDER, so this never needs a migration default beyond null.
+// A single flat list — the main card grid is one modular grid now, not two
+// independently-ordered columns (see loadState's migration off the old
+// `{ left, right }` shape for visitors with a pre-existing save).
+export type UpgradesState = {
+  skillPoints: number;
+  purchased: string[];
+  cardOrder: ModuleId[] | null;
+};
+
 export type FirstIronToolState = {
   choice: string | null;
   triedTools: string[];
+};
+
+// Which of the Beginner's Guide's own "Priorities for the next few days"
+// steps a visitor has checked off — see priorities-content.ts. Order-
+// independent (a plain set of checked ids), since the guide itself notes
+// most of these can be done in any order.
+export type PrioritiesState = {
+  checked: string[];
 };
 
 export type ToolState = {
@@ -87,8 +109,33 @@ export type ToolState = {
   tier: string;
 };
 
+// Ponder's own progression (see ponder-stage.ts's ponderStageFor, which
+// derives its stage from solvedCount/choicesMade + tier2/prestige — nothing
+// here is a stage itself, just the raw counters it's computed from).
+// Deliberately survives prestigeOutpost (which only resets resources/tools/
+// activity/legacy) — Ponder's journal is the one thing meant to persist
+// through a reset.
+export type PonderState = {
+  /** Lifetime puzzles solved — drives stage-ups and pd-first-sentence/pd-fluent. */
+  solvedCount: number;
+  /** Lifetime Stage-2 branch picks — drives pd-first-choice. */
+  choicesMade: number;
+  /** Completed sentences, newest first, capped at PONDER_JOURNAL_MAX (ponder-content.ts). */
+  journal: string[];
+  /** Cumulative "insight" earned from solves (+ later, idle generation) — the
+   * Engine's own resource, and what its pd-insight-* achievement thresholds read. */
+  insight: number;
+  /** High-water mark for lore reveals, same trick as tier2.loreRevealedLevel —
+   * derived content, never stored per-entry. Keyed to insight, not solvedCount,
+   * so idle generation (once unlocked) also feeds the lore thread. */
+  loreRevealedRank: number;
+  /** Elapsed-time anchor for idle insight generation, once an ability tier
+   * enables it — null until first enabled. Same pattern as campfire.lastTendedAt. */
+  idleGenSince: string | null;
+};
+
 // Tree Mining, Hunting, and Mining all share this single cooldown — see
-// resources.ts's ACTIVITY_COOLDOWN_MS.
+// mechanics.ts's GatheringMechanic.
 export type ActivityState = {
   cooldownUntil: string | null;
 };
@@ -118,12 +165,15 @@ export type HubState = {
   visits: { firstVisitAt: string | null; lastVisitDate: string | null; streakDays: number };
   campfire: CampfireState;
   firstIronTool: FirstIronToolState;
+  priorities: PrioritiesState;
   resources: ResourceState;
   tools: ToolState;
   activity: ActivityState;
   settings: OutpostSettings;
   tier2: Tier2State;
   legacy: LegacyState;
+  upgrades: UpgradesState;
+  ponder: PonderState;
 };
 
 export function defaultState(): HubState {
@@ -143,6 +193,7 @@ export function defaultState(): HubState {
     visits: { firstVisitAt: null, lastVisitDate: null, streakDays: 0 },
     campfire: { stage: 0, lastTendedAt: null },
     firstIronTool: { choice: null, triedTools: [] },
+    priorities: { checked: [] },
     resources: { wood: 0, food: 0, stone: 0, coal: 0, copper: 0, iron: 0, cookedFood: 0 },
     tools: { tier: "none" },
     activity: { cooldownUntil: null },
@@ -153,6 +204,8 @@ export function defaultState(): HubState {
       themeOverrideAllowed: false,
     },
     legacy: defaultLegacyState(),
+    upgrades: { skillPoints: 0, purchased: [], cardOrder: null },
+    ponder: { solvedCount: 0, choicesMade: 0, journal: [], insight: 0, loreRevealedRank: 0, idleGenSince: null },
     tier2: {
       xp: 0,
       prestigeCount: 0,
@@ -206,6 +259,23 @@ export function loadState(): HubState {
     // an old id saved would otherwise crash every consumer that looks it up
     // in SKINS_BY_ID.
     if (!SKINS_BY_ID[tier2.skin]) tier2.skin = base.tier2.skin;
+    // cardOrder used to be stored as separate { left, right } column lists
+    // (pre the modular single-grid rework) — a visitor with that old shape
+    // still saved gets it interleaved into the new flat list (same pairing
+    // the grid used to render) rather than silently falling back to defaults
+    // and losing their customization.
+    const rawCardOrder = parsed.upgrades?.cardOrder;
+    let cardOrder: ModuleId[] | null = base.upgrades.cardOrder;
+    if (Array.isArray(rawCardOrder)) {
+      cardOrder = rawCardOrder;
+    } else if (rawCardOrder && Array.isArray(rawCardOrder.left) && Array.isArray(rawCardOrder.right)) {
+      const { left, right } = rawCardOrder as { left: ModuleId[]; right: ModuleId[] };
+      cardOrder = [];
+      for (let i = 0; i < Math.max(left.length, right.length); i++) {
+        if (left[i]) cardOrder.push(left[i]);
+        if (right[i]) cardOrder.push(right[i]);
+      }
+    }
     return {
       ...base,
       ...parsed,
@@ -214,6 +284,7 @@ export function loadState(): HubState {
       visits: { ...base.visits, ...parsed.visits },
       campfire: { ...base.campfire, ...parsed.campfire },
       firstIronTool: { ...base.firstIronTool, ...parsed.firstIronTool },
+      priorities: { ...base.priorities, ...parsed.priorities },
       resources: { ...base.resources, ...parsed.resources },
       tools: { ...base.tools, ...parsed.tools },
       activity: { ...base.activity, ...parsed.activity },
@@ -223,6 +294,8 @@ export function loadState(): HubState {
         ...parsed.legacy,
         perks: { ...base.legacy.perks, ...parsed.legacy?.perks },
       },
+      upgrades: { ...base.upgrades, ...parsed.upgrades, cardOrder },
+      ponder: { ...base.ponder, ...parsed.ponder },
       tier2,
       unlocked: { ...parsed.unlocked },
     };

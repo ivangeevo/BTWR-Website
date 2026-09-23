@@ -5,7 +5,10 @@
       "Bash(npx --yes playwright --version)",
       "Bash(npm install *)",
       "Bash(npx playwright *)",
-      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name = 'node.exe'\")"
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name = 'node.exe'\")",
+      "Bash(npx next *)",
+      "Bash(chromium-cli --help)",
+      "Bash(node -e ' *)"
     ]
   }
 }

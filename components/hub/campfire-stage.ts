@@ -24,13 +24,19 @@ export const CAMPFIRE_ICONS: Record<CampfireStage, string> = {
 };
 
 // One stage of decay per this many real minutes since the last tend —
-// gentle enough that a same-day return still finds embers, not ash.
+// gentle enough that a same-day return still finds embers, not ash. Admin-
+// configurable via CampfireMechanic (see mechanics.ts); this is just the
+// fallback for callers that don't have a resolved value on hand.
 const DECAY_MINUTES = 15;
 
 /** The campfire's real, decayed stage right now — never stored directly. */
-export function currentCampfireStage(campfire: CampfireState, now: Date = new Date()): CampfireStage {
+export function currentCampfireStage(
+  campfire: CampfireState,
+  decayMinutes: number = DECAY_MINUTES,
+  now: Date = new Date()
+): CampfireStage {
   if (!campfire.lastTendedAt) return campfire.stage as CampfireStage;
   const elapsedMin = (now.getTime() - new Date(campfire.lastTendedAt).getTime()) / 60_000;
-  const decaySteps = Math.floor(elapsedMin / DECAY_MINUTES);
+  const decaySteps = Math.floor(elapsedMin / decayMinutes);
   return Math.max(0, campfire.stage - decaySteps) as CampfireStage;
 }

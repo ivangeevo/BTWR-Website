@@ -70,24 +70,28 @@ export default function CommunityPage() {
         </p>
       </div>
 
-      <Reveal className="mt-8 grid gap-4 sm:grid-cols-2">
-        <LinkCard
-          title="Discord"
-          description="Chat with the community, get support, and follow updates."
-          href={discordInviteUrl}
-          icon={<DiscordIcon className="h-full w-full" />}
-        />
-        <LinkCard
-          title="GitHub"
-          description="Source code, issue tracker, and contribution guide."
-          href={githubRepoUrl}
-          icon={<GithubIcon className="h-full w-full" />}
-        />
-      </Reveal>
+      <div className="mt-10">
+        <Reveal className="mt-4 grid gap-4 sm:grid-cols-2">
+          <LinkCard
+            title="Discord"
+            description="Chat with the community, get support, and follow updates."
+            href={discordInviteUrl}
+            icon={<DiscordIcon className="h-full w-full" />}
+          />
+          <LinkCard
+            title="GitHub"
+            description="Source code, issue tracker, and contribution guide."
+            href={githubRepoUrl}
+            icon={<GithubIcon className="h-full w-full" />}
+          />
 
-      <Reveal>
+        <h2 className="font-heading text-xl font-bold text-chrome-dark dark:text-chrome">
+        Gadgets &amp; extensions
+        </h2>
+        
         <OutpostControlPanel />
-      </Reveal>
+        </Reveal>
+      </div>
 
       <p className="mt-12 text-sm text-slate-600 dark:text-slate-400">
         Looking to install the modpack?{" "}

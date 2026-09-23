@@ -23,10 +23,9 @@ const ACTIONS: { id: ActionId; label: string; icon: string }[] = [
 // shared cooldown (only one can ever be "active" at a time anyway) reads as
 // one coherent hub instead of three cards that happen to fight over the
 // same timer. Tree Mining is always available; Hunting and Mining each
-// unlock at their own admin-configured tier (Features tab in
-// /outpost-admin — features.huntingTierId/miningTierId), defaulting to
-// tier2 for both so a visitor who's never touched that panel sees exactly
-// today's behavior.
+// unlock as their own purchase in the Upgrades shop (upgrade-catalog.ts —
+// ids "hunting"/"mining"), each keeping its own tier requirement there
+// before it can even be bought.
 export default function Gathering() {
   const {
     tools,
@@ -36,9 +35,7 @@ export default function Gathering() {
     completeHunting,
     completeMining,
     resourceMeta,
-    tiers,
-    isTierUnlocked,
-    features,
+    upgrades,
   } = useAchievements();
   const [active, setActive] = useState<ActionId>("tree-mining");
   const remainingMs = useCooldownRemaining(activityCooldownUntil);
@@ -46,9 +43,8 @@ export default function Gathering() {
   const [lastYield, setLastYield] = useState<string | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function unlockTierFor(id: ActionId) {
-    const tierId = id === "tree-mining" ? tiers[0]?.id : id === "hunting" ? features.huntingTierId : features.miningTierId;
-    return tiers.find((t) => t.id === tierId) ?? tiers[tiers.length - 1];
+  function isUnlocked(id: ActionId): boolean {
+    return id === "tree-mining" || upgrades.purchased.includes(id);
   }
 
   function formatYield(gain: Partial<ResourceState>): string {
@@ -65,7 +61,7 @@ export default function Gathering() {
   }
 
   return (
-    <div className="outpost-panel rounded-xl p-5">
+    <div className="outpost-panel outpost-card-md rounded-xl p-5">
       <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-[var(--outpost-accent)]">
         Gathering
       </h3>
@@ -73,8 +69,7 @@ export default function Gathering() {
 
       <div className="mt-4 flex gap-2" role="tablist">
         {ACTIONS.map((a) => {
-          const tierDef = unlockTierFor(a.id);
-          const unlocked = isTierUnlocked(tierDef.id);
+          const unlocked = isUnlocked(a.id);
           const isActive = active === a.id;
           return (
             <button
@@ -94,7 +89,7 @@ export default function Gathering() {
             >
               <span aria-hidden="true">{unlocked ? a.icon : "\u{1F512}"}</span>
               {a.label}
-              {!unlocked && <span className="text-[10px] font-normal text-white/35">{tierDef.name}</span>}
+              {!unlocked && <span className="text-[10px] font-normal text-white/35">Buy in Upgrades</span>}
             </button>
           );
         })}

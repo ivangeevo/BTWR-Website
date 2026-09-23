@@ -21,10 +21,9 @@ export const RESOURCE_META: Record<ResourceId, { name: string; icon: string }> =
 
 // Cooking (see Campfire.tsx) only works while the fire is at the Medium
 // stage — same rule the campfire's own flavor text has described since
-// before this mechanic existed (see campfire-stage.ts's captions).
-export const COOK_FOOD_COST = 1;
-export const COOK_YIELD = 1;
-export const EAT_XP_REWARD = 5;
+// before this mechanic existed (see campfire-stage.ts's captions). Cook
+// cost/yield and eat XP reward are admin-configurable — see mechanics.ts's
+// CampfireMechanic for their defaults.
 
 // The six built-in tiers. Admin-added custom tiers (see admin-config.ts)
 // get free-form string ids instead — anything that reads `tools.tier` off
@@ -188,4 +187,4 @@ export const CRAFTING_GRIDS: CraftingGrid[] = [
 
 // Shared across Tree Mining, Hunting, and Mining — finishing any one of
 // them blocks starting any of the three again until this elapses.
-export const ACTIVITY_COOLDOWN_MS = 20_000;
+// Admin-configurable — see mechanics.ts's GatheringMechanic.

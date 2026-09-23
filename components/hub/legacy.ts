@@ -5,7 +5,7 @@
 // permanent points to spend on small QoL perks that make the next loop a bit
 // faster/cheaper — the loop stays the same shape, just friendlier each time.
 
-export type PerkId = "quick-hands" | "green-thumb" | "head-start" | "master-crafter";
+export type PerkId = "quick-hands" | "green-thumb" | "head-start" | "master-crafter" | "borrowed-insight";
 
 export type PerkDef = {
   id: PerkId;
@@ -50,6 +50,14 @@ export const PERKS: PerkDef[] = [
     maxLevel: 3,
     costForLevel: (level) => (level + 1) * 2,
   },
+  {
+    id: "borrowed-insight",
+    name: "Borrowed Insight",
+    icon: "\u{1F9E0}",
+    description: "Legacy Points banked per prestige scale with the Engine's total insight.",
+    maxLevel: 5,
+    costForLevel: (level) => level * 3,
+  },
 ];
 
 export const PERKS_BY_ID: Record<PerkId, PerkDef> = Object.fromEntries(
@@ -84,9 +92,10 @@ export function nextPerkCost(perks: LegacyPerks, id: PerkId): number | null {
 
 // Reaching further before prestiging earns more points, so there's a real
 // (but never mandatory) reason to keep going instead of resetting the
-// instant it's available.
-export function pointsForPrestige(toolTierIndex: number): number {
-  return Math.max(1, toolTierIndex);
+// instant it's available. pointsPerTier is admin-configurable — see
+// mechanics.ts's PrestigeMechanic — and defaults to 1 (today's behavior).
+export function pointsForPrestige(toolTierIndex: number, pointsPerTier: number = 1): number {
+  return Math.max(1, toolTierIndex * pointsPerTier);
 }
 
 export function effectiveCooldownMs(baseMs: number, perks: LegacyPerks): number {
@@ -103,4 +112,13 @@ export function startingTierIndex(perks: LegacyPerks): number {
 
 export function craftCostDiscount(perks: LegacyPerks): number {
   return perkLevel(perks, "master-crafter");
+}
+
+// Every INSIGHT_PER_BONUS_POINT of the Engine's total insight converts to +1
+// extra Legacy Point per prestige, per level of Borrowed Insight owned — the
+// Engine's endgame tie-in to Prestige (see PONDER_EVOLUTION_PLAN.md).
+const INSIGHT_PER_BONUS_POINT = 50;
+
+export function insightPrestigeBonus(perks: LegacyPerks, insight: number): number {
+  return perkLevel(perks, "borrowed-insight") * Math.floor(insight / INSIGHT_PER_BONUS_POINT);
 }

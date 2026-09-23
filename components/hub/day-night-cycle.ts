@@ -4,7 +4,6 @@
 // every page. Everything here is a pure function of a stored start
 // timestamp plus the current clock, so nothing needs a ticking React
 // context — each consumer just re-derives on its own interval.
-import { loadAdminConfig, resolvedFeatures, tierThreshold } from "./admin-config";
 import { loadState } from "./hub-storage";
 
 const CYCLE_KEY = "btwr:hub:cycle:v1";
@@ -81,9 +80,9 @@ export function computeCyclePhase(startedAt: number, now: number = Date.now()): 
 
 // The cycle only runs "when the Outpost is active" (OutpostControlPanel's
 // enable switch) AND the visitor hasn't turned it off in the Outpost
-// settings dropdown AND the admin hasn't disabled/tier-gated it (Features
-// tab in /outpost-admin — this is what lets an admin decide to "unlock the
-// day/night cycle in later tiers" instead of always-on) — all plain
+// settings dropdown AND the "Day/Night Cycle" upgrade has been purchased
+// (upgrade-catalog.ts — this is what lets a visitor unlock the day/night
+// cycle by spending Skill Points instead of it always being on) — all plain
 // localStorage reads, so this works from anywhere (ThemeToggle lives in the
 // site header, outside the Outpost's own React tree entirely).
 export function isDayNightCycleActive(): boolean {
@@ -91,22 +90,18 @@ export function isDayNightCycleActive(): boolean {
   try {
     const state = loadState();
     if (!state.enabled || !state.settings.dayNightCycleEnabled) return false;
-    const adminConfig = loadAdminConfig();
-    const features = resolvedFeatures(adminConfig);
-    if (!features.dayNightCycleEnabled) return false;
-    const unlockedCount = Object.keys(state.unlocked).length;
-    return unlockedCount >= tierThreshold(adminConfig, features.dayNightCycleTierId);
+    return state.upgrades.purchased.includes("day-night-cycle");
   } catch {
     return false;
   }
 }
 
 export function areStarsEnabled(): boolean {
-  if (typeof window === "undefined") return true;
+  if (typeof window === "undefined") return false;
   try {
-    return resolvedFeatures(loadAdminConfig()).starsEnabled;
+    return loadState().upgrades.purchased.includes("stars");
   } catch {
-    return true;
+    return false;
   }
 }
 

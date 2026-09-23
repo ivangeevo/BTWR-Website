@@ -570,6 +570,27 @@ html.daynight-fighting .outpost-zone::after {
   transition: max-height 420ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* OutpostControlPanel's enable/disable collapse — CSS grid-based
+   (grid-template-rows: 0fr -> 1fr) rather than category-panel's JS-measured
+   max-height: a stale/early scrollHeight measurement there can under-
+   measure and clip the last row's button against the panel's own border.
+   The grid technique always settles at the content's real final height,
+   never a cached number, so it can't under-measure. */
+.outpost-panel-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 420ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.outpost-panel-collapse.open {
+  grid-template-rows: 1fr;
+}
+
+.outpost-panel-collapse > div {
+  overflow: hidden;
+  min-height: 0;
+}
+
 /* Peek fade — blurs the cut-off card(s) at the bottom of a peeked category
    so it reads as "more below", without needing a hardcoded background
    color that would break in dark mode. */
@@ -615,27 +636,28 @@ html.daynight-fighting .outpost-zone::after {
   animation-play-state: paused;
 }
 
-/* Homepage hub — advancement-style toasts. Slide/fade in from the right,
-   the reverse on the way out (driven by a `.leaving` class toggled just
-   before removal so the exit animation gets to play). */
+/* Homepage hub — advancement-style toasts. Slide/fade up from the bottom
+   of the pane (they stack there now, Cookie Clicker-style), the reverse on
+   the way out (driven by a `.leaving` class toggled just before removal so
+   the exit animation gets to play). */
 @keyframes hub-toast-in {
   from {
-    transform: translateX(24px);
+    transform: translateY(16px);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translateY(0);
     opacity: 1;
   }
 }
 
 @keyframes hub-toast-out {
   from {
-    transform: translateX(0);
+    transform: translateY(0);
     opacity: 1;
   }
   to {
-    transform: translateX(24px);
+    transform: translateY(16px);
     opacity: 0;
   }
 }
@@ -808,6 +830,19 @@ html.daynight-fighting .outpost-zone::after {
   animation: outpost-pulse 2s ease-in-out infinite;
 }
 
+/* OutpostControlPanel's enable switch — this dot reports an actual on/off
+   state, not ambiance, so it stays red/green regardless of the current
+   skin/theme accent color the plain .outpost-status-dot above follows. */
+.outpost-status-dot-online {
+  background: #34d399;
+  box-shadow: 0 0 6px 1px rgba(52, 211, 153, 0.55);
+}
+
+.outpost-status-dot-offline {
+  background: #f87171;
+  box-shadow: 0 0 6px 1px rgba(248, 113, 113, 0.55);
+}
+
 @keyframes outpost-pulse {
   0%,
   100% {
@@ -847,6 +882,104 @@ html.daynight-fighting .outpost-zone::after {
     border-color 200ms ease,
     box-shadow 200ms ease,
     transform 200ms ease;
+}
+
+/* Size pass on the Outpost's main card grid — three fixed height buckets
+   (not just a floor) so the whole grid reads as 2-3 consistent pane sizes
+   instead of a different height per card. min-height AND max-height are
+   both set, so a card is pinned to its bucket's height regardless of how
+   much it renders; anything that would overflow scrolls internally instead
+   of growing the card. Opt-in per component (not on .outpost-panel itself)
+   since that class is also used by things deliberately NOT card-shaped —
+   ResourceToolStrip's full-width strip, TierTip's thin bar,
+   AchievementGallery's collapsible accordion. */
+.outpost-card-sm,
+.outpost-card-md,
+.outpost-card-lg {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.outpost-card-sm {
+  min-height: 11rem;
+  max-height: 11rem;
+}
+
+.outpost-card-md {
+  min-height: 17rem;
+  max-height: 17rem;
+}
+
+.outpost-card-lg {
+  min-height: 23rem;
+  max-height: 23rem;
+}
+
+/* Opt-in modifier for a card that wants a pinned (non-scrolling) header —
+   the title/subtitle block stays put and only a designated inner region
+   scrolls, instead of the whole card (header included) sliding under the
+   fold. Two-class selector so it reliably beats the single-class
+   .outpost-card-* overflow:auto above regardless of stylesheet order. */
+.outpost-card-sm.outpost-card-pinned-header,
+.outpost-card-md.outpost-card-pinned-header,
+.outpost-card-lg.outpost-card-pinned-header {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.outpost-card-inner-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* A themed scrollbar for the sized cards above, instead of the browser's
+   default one — pinning cards to a fixed height means several of them
+   genuinely scroll now, so this makes that read as an intentional part of
+   the Outpost's own chrome rather than a stock OS scrollbar poking out of a
+   rounded card. Firefox via scrollbar-width/-color, everything else via the
+   ::-webkit-scrollbar-* pseudo-elements; --outpost-accent(-soft) already
+   follows whichever skin is active (see .outpost-frame), so this retints
+   itself the same way every other accent-colored element does. */
+.outpost-card-sm,
+.outpost-card-md,
+.outpost-card-lg,
+.outpost-card-inner-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--outpost-accent-soft) transparent;
+}
+
+.outpost-card-sm::-webkit-scrollbar,
+.outpost-card-md::-webkit-scrollbar,
+.outpost-card-lg::-webkit-scrollbar,
+.outpost-card-inner-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.outpost-card-sm::-webkit-scrollbar-track,
+.outpost-card-md::-webkit-scrollbar-track,
+.outpost-card-lg::-webkit-scrollbar-track,
+.outpost-card-inner-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.outpost-card-sm::-webkit-scrollbar-thumb,
+.outpost-card-md::-webkit-scrollbar-thumb,
+.outpost-card-lg::-webkit-scrollbar-thumb,
+.outpost-card-inner-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--outpost-accent-soft);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.outpost-card-sm:hover::-webkit-scrollbar-thumb,
+.outpost-card-md:hover::-webkit-scrollbar-thumb,
+.outpost-card-lg:hover::-webkit-scrollbar-thumb,
+.outpost-card-inner-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: var(--outpost-accent);
 }
 
 .outpost-panel::before {
@@ -1095,6 +1228,15 @@ html.daynight-fighting .outpost-zone::after {
   animation: tier2-panel-in 180ms ease;
 }
 
+/* For dropdowns anchored to a LEFT-positioned trigger (e.g. the header's
+   Upgrades/Prestige badges, mirrored opposite the settings gear) — opens
+   rightward instead of leftward so it can't run off the left edge of the
+   viewport on narrow screens. */
+.outpost-settings-dropdown-left {
+  left: 0;
+  right: auto;
+}
+
 [data-theme="dark"] .outpost-settings-dropdown {
   background-color: rgba(15, 11, 7, 0.9);
 }
@@ -1191,76 +1333,18 @@ html.daynight-fighting .outpost-zone::after {
   font-size: 1rem;
 }
 
-/* One-off "wow" reveal, shown only the moment tier 2 first unlocks in a
-   session (never replayed for returning tier-2 visitors). */
-@keyframes tier2-reveal-flicker {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  8% {
-    opacity: 0.2;
-  }
-  16% {
-    opacity: 1;
-  }
-  24% {
-    opacity: 0.4;
-  }
-  32% {
-    opacity: 1;
-  }
-}
-
-@keyframes tier2-reveal-fade {
-  0%,
-  85% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes tier2-reveal-in {
-  from {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.tier2-reveal-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(2, 6, 12, 0.88);
-  animation: tier2-reveal-fade 3.6s ease forwards;
-  pointer-events: none;
-}
-
-.tier2-reveal-banner {
-  text-align: center;
-  animation:
-    tier2-reveal-in 400ms cubic-bezier(0.16, 1, 0.3, 1),
-    tier2-reveal-flicker 1.8s ease-out 1;
-}
-
-.tier2-reveal-tag {
+/* TierRevealNotice — a small toast-vocabulary "Tier Unlocked" notice plus a
+   "here's what's new" card popup, fired generically for ANY forward tier
+   transition (replaces the old one-off, tier1->2-only full-screen scrim). */
+.tier-reveal-toast-tag {
   display: inline-block;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.75rem;
-  letter-spacing: 0.3em;
-  color: var(--tier2-accent, var(--color-glow));
-  border: 1px solid var(--tier2-accent, var(--color-glow));
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  color: var(--outpost-accent, var(--color-glow));
+  border: 1px solid var(--outpost-accent, var(--color-glow));
   border-radius: 9999px;
-  padding: 0.35rem 1rem;
+  padding: 0.2rem 0.6rem;
 }
 
 /* Shared by Tree Mining, Hunting, and Mining — a wide button with its own
@@ -1397,4 +1481,55 @@ html.daynight-fighting .outpost-zone::after {
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
+}
+
+/* Admin panel: hovering (or tap-holding, on touch) an achievement row for a
+   full second reveals its description. The ring fills over that same
+   second so the wait itself reads as progress toward something, not a
+   dead pause. */
+.admin-hint-ring {
+  transform: rotate(-90deg);
+}
+
+.admin-hint-ring-fill {
+  animation: admin-hint-ring-fill 1s linear forwards;
+}
+
+@keyframes admin-hint-ring-fill {
+  from {
+    stroke-dashoffset: 37.7;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.admin-hint-tooltip {
+  animation: outpost-tip-fade-in 150ms ease;
+}
+
+/* Ponder's word-tile puzzle (Ponder.tsx) — a brief shake on a wrong
+   attempt, re-triggered each time via a changing `key` so repeated wrong
+   guesses shake again instead of only once. */
+.ponder-shake {
+  animation: ponder-shake 400ms ease;
+}
+
+@keyframes ponder-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
 }

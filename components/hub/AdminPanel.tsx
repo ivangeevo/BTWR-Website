@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   ACHIEVEMENTS,
@@ -11,27 +12,39 @@ import {
 } from "./achievements-catalog";
 import {
   defaultAdminConfig,
+  importAdminConfig,
   loadAdminConfig,
   resolvedCraftCost,
+  resolvedMechanic,
+  resolvedMechanicForTier,
   resolvedModuleTier,
   resolvedResourceMeta,
   resolvedToolTiers,
+  resolvedUpgrades,
   saveAdminConfig,
   type AdminConfig,
   type CustomToolTier,
   type FeaturesConfig,
   type TierDef,
 } from "./admin-config";
+import { mechanicConfigFields, perTierMechanicConfigFields, PER_TIER_MODULE_MECHANICS } from "./mechanics";
 import { DEFAULT_MODULE_TIER, MODULES, type ModuleId } from "./module-registry";
 import OutpostCorners from "./OutpostCorners";
 import { RESOURCE_IDS, TOOL_ORDER, type ResourceId, type ToolTier } from "./resources";
+import type { UpgradeId } from "./upgrade-catalog";
 
-type Tab = "tiers" | "resources" | "tools" | "features";
+// Same measure-then-position recipe as AchievementGallery.tsx's tile
+// tooltip — see MechanicSettingsMenu below.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+type Tab = "tiers" | "resources" | "tools" | "features" | "upgrades";
 const TAB_LABELS: Record<Tab, string> = {
   tiers: "Tiers",
   resources: "Resources",
   tools: "Tools",
   features: "Features",
+  upgrades: "Upgrades",
 };
 
 type TierSubTab = "list" | "modules" | "achievements" | "tips";
@@ -44,12 +57,14 @@ const TIER_SUB_TAB_LABELS: Record<TierSubTab, string> = {
 
 type Update = (updater: (prev: AdminConfig) => AdminConfig) => void;
 
-function sortedTiers(config: AdminConfig) {
-  return [...config.tiers].sort((a, b) => a.threshold - b.threshold);
-}
-
+// Every tab that lists tiers (here, Modules, Achievements, Tips, Features)
+// shows them in creation order rather than sorting by "unlocks at" —
+// otherwise editing a threshold on the Tier List tab reshuffles rows/groups
+// everywhere else too, and the built-in "Tier N" names stop matching their
+// positions. The live Outpost itself still sorts by threshold where it
+// actually matters for progression (see admin-config.ts's resolvedTiers).
 function TiersTab({ config, update }: { config: AdminConfig; update: Update }) {
-  const tiers = sortedTiers(config);
+  const tiers = config.tiers;
 
   function rename(id: string, name: string) {
     update((prev) => ({ ...prev, tiers: prev.tiers.map((t) => (t.id === id ? { ...t, name } : t)) }));
@@ -180,8 +195,197 @@ function CollapsibleSection({
   );
 }
 
+const MECHANIC_MENU_WIDTH_PX = 272; // matches .outpost-settings-dropdown's own 17rem
+const MECHANIC_MENU_MARGIN_PX = 8;
+
+// A module's mechanic class (mechanics.ts) is the single source of truth
+// for what's tunable — this menu just reads a class's own `configFields`
+// and renders a number input per one, so a module with no registered
+// mechanic (most of them — flavor cards, quizzes, static sections) shows no
+// gear at all rather than an empty popover.
+function MechanicSettingsMenu({ moduleId, config, update }: { moduleId: ModuleId; config: AdminConfig; update: Update }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // A module registered in PER_TIER_MODULE_MECHANICS (currently just Ponder/
+  // The Analytical Engine) gets a tier picker and a per-tier settings path
+  // instead of the flat one below — everything else (Campfire/Gathering/
+  // Prestige/Upgrades) keeps today's flat gear menu completely unchanged.
+  const isPerTier = moduleId in PER_TIER_MODULE_MECHANICS;
+  const fields = isPerTier ? perTierMechanicConfigFields(moduleId) : mechanicConfigFields(moduleId);
+  const [selectedTierId, setSelectedTierId] = useState(config.tiers[0]?.id ?? "tier1");
+  // The button's own rect at the moment the panel opens — recomputed into a
+  // panel position below rather than used directly, since which side it
+  // opens on can flip after mount (see the layout effect below).
+  const [anchorRect, setAnchorRect] = useState<{ left: number; top: number; bottom: number } | null>(null);
+  const [placeAbove, setPlaceAbove] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    function handlePointerDown(e: PointerEvent) {
+      const target = e.target as Node;
+      const insideButton = containerRef.current?.contains(target);
+      const insidePanel = panelRef.current?.contains(target);
+      if (!insideButton && !insidePanel) setOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  // A fixed-position panel doesn't track the page scrolling under it, so
+  // dismiss rather than let it drift out of alignment with its button —
+  // same reasoning as AchievementGallery's tile tooltip.
+  useEffect(() => {
+    if (!open) return;
+    function dismiss() {
+      setOpen(false);
+    }
+    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("resize", dismiss);
+    return () => {
+      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("resize", dismiss);
+    };
+  }, [open]);
+
+  useIsomorphicLayoutEffect(() => {
+    if (!open) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) setAnchorRect({ left: rect.left, top: rect.top, bottom: rect.bottom });
+  }, [open]);
+
+  // Opens below the button by default (the natural reading direction) and
+  // only flips above once actually measured not to fit under the current
+  // scroll position — e.g. a row near the bottom of the admin panel with
+  // the browser window short. Runs before paint so the flip itself never
+  // flashes the wrong placement first. Same recipe as AchievementGallery's
+  // tile tooltip.
+  useIsomorphicLayoutEffect(() => {
+    if (!open || !anchorRect || placeAbove) return;
+    const height = panelRef.current?.getBoundingClientRect().height ?? 0;
+    if (anchorRect.bottom + MECHANIC_MENU_MARGIN_PX + height > window.innerHeight) {
+      setPlaceAbove(true);
+    }
+  }, [open, anchorRect, placeAbove]);
+
+  function toggleOpen() {
+    if (!open) {
+      setAnchorRect(null);
+      setPlaceAbove(false);
+    }
+    setOpen((v) => !v);
+  }
+
+  if (fields.length === 0) return null;
+
+  const resolved = isPerTier
+    ? resolvedMechanicForTier<Record<string, number>>(config, moduleId, selectedTierId)
+    : resolvedMechanic<Record<string, number>>(config, moduleId);
+
+  function setField(key: string, value: number) {
+    if (isPerTier) {
+      update((prev) => ({
+        ...prev,
+        mechanicOverridesByTier: {
+          ...prev.mechanicOverridesByTier,
+          [moduleId]: {
+            ...prev.mechanicOverridesByTier[moduleId],
+            [selectedTierId]: { ...prev.mechanicOverridesByTier[moduleId]?.[selectedTierId], [key]: value },
+          },
+        },
+      }));
+      return;
+    }
+    update((prev) => ({
+      ...prev,
+      mechanicOverrides: {
+        ...prev.mechanicOverrides,
+        [moduleId]: { ...prev.mechanicOverrides[moduleId], [key]: value },
+      },
+    }));
+  }
+
+  return (
+    <div ref={containerRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="true"
+        aria-label="Mechanic settings"
+        className={`flex h-7 w-7 items-center justify-center rounded-md border text-xs transition-colors ${
+          open
+            ? "border-[var(--outpost-accent)] text-[var(--outpost-accent)]"
+            : "border-white/15 text-white/50 hover:border-[var(--outpost-accent)] hover:text-[var(--outpost-accent)]"
+        }`}
+      >
+        <span aria-hidden="true">{"⚙️"}</span>
+      </button>
+
+      {open && (
+        <div className="outpost-settings-dropdown" role="menu">
+          <p className="text-xs font-bold uppercase tracking-wider text-white/40">Mechanic Settings</p>
+          {isPerTier && (
+            <label className="mt-2 block">
+              <span className="text-[0.65rem] font-semibold uppercase tracking-wider text-white/40">
+                Ability tier
+              </span>
+              <select
+                value={selectedTierId}
+                onChange={(e) => setSelectedTierId(e.target.value)}
+                className="mt-1 w-full appearance-none rounded-md border border-white/15 bg-[#241a12] px-2 py-1 text-xs font-semibold text-white"
+              >
+                {config.tiers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <div className="mt-2.5 space-y-3">
+            {fields.map((f) => (
+              <label key={f.key} className="block">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-semibold text-white">{f.label}</span>
+                  <span className="text-[0.65rem] text-white/40">
+                    {resolved[f.key]}
+                    {f.suffix ? ` ${f.suffix}` : ""}
+                  </span>
+                </div>
+                {f.description && <p className="mt-0.5 text-[0.65rem] font-normal normal-case text-white/40">{f.description}</p>}
+                <input
+                  type="number"
+                  min={f.min}
+                  max={f.max}
+                  step={f.step}
+                  value={resolved[f.key]}
+                  onChange={(e) =>
+                    setField(f.key, Math.min(f.max, Math.max(f.min, Number(e.target.value) || 0)))
+                  }
+                  className="mt-1 w-full rounded-md border border-white/15 bg-transparent px-2 py-1 text-xs text-white"
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ModulesTab({ config, update }: { config: AdminConfig; update: Update }) {
-  const tiers = sortedTiers(config);
+  // Creation order, not threshold order — see TiersTab's comment. Grouping
+  // by tier here would otherwise reshuffle every time a threshold is edited
+  // on the Tier List tab, even though nothing on this tab changed.
+  const tiers = config.tiers;
 
   function setModuleTier(id: ModuleId, tierId: string) {
     update((prev) => ({ ...prev, moduleTier: { ...prev.moduleTier, [id]: tierId } }));
@@ -217,17 +421,34 @@ function ModulesTab({ config, update }: { config: AdminConfig; update: Update })
                       <p className="text-sm font-semibold text-white">{m.label}</p>
                       <p className="text-xs text-slate-400">{m.description}</p>
                     </div>
-                    <select
-                      value={t.id}
-                      onChange={(e) => setModuleTier(m.id, e.target.value)}
-                      className="shrink-0 rounded-md border border-white/15 bg-[#241a12] px-2 py-1.5 text-xs font-semibold text-white"
-                    >
-                      {tiers.map((tt) => (
-                        <option key={tt.id} value={tt.id}>
-                          {tt.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <MechanicSettingsMenu moduleId={m.id} config={config} update={update} />
+                      <div className="relative shrink-0">
+                        <select
+                          value={t.id}
+                          onChange={(e) => setModuleTier(m.id, e.target.value)}
+                          className="appearance-none rounded-md border border-white/15 bg-[#241a12] py-1.5 pl-2 pr-6 text-xs font-semibold text-white"
+                        >
+                          {tiers.map((tt) => (
+                            <option key={tt.id} value={tt.id}>
+                              {tt.name}
+                            </option>
+                          ))}
+                        </select>
+                        <svg
+                          aria-hidden="true"
+                          className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-white/50"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M5 7.5l5 5 5-5" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
@@ -239,16 +460,144 @@ function ModulesTab({ config, update }: { config: AdminConfig; update: Update })
   );
 }
 
+const ACHIEVEMENT_HINT_HOLD_MS = 1000;
+const ACHIEVEMENT_HINT_RING_CIRCUMFERENCE = 2 * Math.PI * 6;
+
+// Hovering an achievement's icon/title shows a small ring that fills over
+// one second — a preview of the wait rather than a dead pause — then swaps
+// to the achievement's full description as a tooltip, for rows whose title
+// alone (especially secret ones, shown as "???") doesn't say much.
+function AchievementLabel({ achievement }: { achievement: (typeof ACHIEVEMENTS)[number] }) {
+  const [hovering, setHovering] = useState(false);
+  const [ready, setReady] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  function handleEnter() {
+    setHovering(true);
+    timerRef.current = setTimeout(() => setReady(true), ACHIEVEMENT_HINT_HOLD_MS);
+  }
+  function handleLeave() {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setHovering(false);
+    setReady(false);
+  }
+
+  // Touch devices have no hover — a tap-and-hold does the same job.
+  // preventDefault keeps the hold from also firing a text-selection/callout
+  // or, since this isn't a link/button, a synthetic click on release.
+  function handleTouchStart(e: React.TouchEvent) {
+    e.preventDefault();
+    handleEnter();
+  }
+
+  return (
+    <div
+      className="relative flex min-w-0 items-center gap-2"
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleLeave}
+      onTouchCancel={handleLeave}
+    >
+      <span aria-hidden="true">{achievement.secret ? "❓" : achievement.icon}</span>
+      {achievement.secret ? (
+        <span className="truncate text-slate-200">
+          ??? <span className="text-slate-500">({achievement.title})</span>
+        </span>
+      ) : (
+        <span className="truncate text-slate-200">{achievement.title}</span>
+      )}
+      {hovering && !ready && (
+        <svg className="admin-hint-ring h-3 w-3 shrink-0" viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/15" />
+          <circle
+            cx="8"
+            cy="8"
+            r="6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeDasharray={ACHIEVEMENT_HINT_RING_CIRCUMFERENCE}
+            className="admin-hint-ring-fill text-[var(--outpost-accent)]"
+          />
+        </svg>
+      )}
+      {ready && (
+        <div
+          role="tooltip"
+          className="admin-hint-tooltip pointer-events-none absolute left-0 top-full z-20 mt-1.5 w-56 rounded-md border border-white/15 bg-[#1c140d] px-2.5 py-1.5 text-[0.65rem] font-normal normal-case leading-snug text-slate-200 shadow-lg"
+        >
+          {achievement.description}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AchievementsTab({ config, update }: { config: AdminConfig; update: Update }) {
   const [query, setQuery] = useState("");
-  const tiers = sortedTiers(config);
+  // Creation order, not threshold order — see TiersTab's comment.
+  const tiers = config.tiers;
 
   function setAchievementTier(id: AchievementId, tierId: string) {
     update((prev) => ({ ...prev, achievementTier: { ...prev.achievementTier, [id]: tierId } }));
   }
 
+  function setAchievementDefault(id: AchievementId, isDefault: boolean) {
+    update((prev) => {
+      const achievementDefault = { ...prev.achievementDefault };
+      if (isDefault) achievementDefault[id] = true;
+      else delete achievementDefault[id];
+      return { ...prev, achievementDefault };
+    });
+  }
+
   function tierOf(a: (typeof ACHIEVEMENTS)[number]): string {
     return config.achievementTier[a.id] ?? (a.tier === 2 ? "tier2" : "tier1");
+  }
+
+  // Shared by the Default group and every category group below — the pin
+  // toggle is the one control specific to this row (the tier select is
+  // otherwise identical to ModulesTab's).
+  function AchievementRow({ a, tierId }: { a: (typeof ACHIEVEMENTS)[number]; tierId: string }) {
+    const isDefault = config.achievementDefault[a.id] === true;
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-md bg-white/5 px-2.5 py-1.5 text-xs">
+        <AchievementLabel achievement={a} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setAchievementDefault(a.id, !isDefault)}
+            aria-pressed={isDefault}
+            title={
+              isDefault
+                ? "Default — shown first in its tier, ahead of every category. Click to unpin."
+                : "Pin to the Default group — shown first in its tier, ahead of every category."
+            }
+            className={`rounded-md border px-1.5 py-1 text-[0.65rem] transition-colors ${
+              isDefault
+                ? "border-[var(--outpost-accent)] bg-[var(--outpost-accent-soft)] text-[var(--outpost-accent)]"
+                : "border-white/15 text-white/25 hover:text-white/60"
+            }`}
+          >
+            <span aria-hidden="true">{"\u{1F4CC}"}</span>
+          </button>
+          <select
+            value={tierId}
+            onChange={(e) => setAchievementTier(a.id, e.target.value)}
+            className="rounded-md border border-white/15 bg-[#241a12] px-1.5 py-1 text-[0.65rem] font-semibold text-white"
+          >
+            {tiers.map((tt) => (
+              <option key={tt.id} value={tt.id}>
+                {tt.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    );
   }
 
   const q = query.trim().toLowerCase();
@@ -266,7 +615,9 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
   return (
     <div>
       <p className="text-sm text-slate-400">
-        Which tier each achievement is grouped and gated under — grouped by tier below, then by category.
+        Which tier each achievement is grouped and gated under — grouped by tier below, then by category. Pin the
+        odds and ends that don&apos;t belong to any one category (resizing the window, an old cheat code) to{" "}
+        <span aria-hidden="true">{"\u{1F4CC}"}</span> Default, and they&apos;ll show first in their tier instead.
       </p>
       <input
         value={query}
@@ -279,8 +630,11 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
           const items = byTier.get(t.id) ?? [];
           if (q && items.length === 0) return null;
 
+          const pinned = items.filter((a) => config.achievementDefault[a.id] === true);
+          const rest = items.filter((a) => config.achievementDefault[a.id] !== true);
+
           const byCategory = new Map<AchievementCategory, typeof ACHIEVEMENTS>();
-          for (const a of items) {
+          for (const a of rest) {
             if (!byCategory.has(a.category)) byCategory.set(a.category, []);
             byCategory.get(a.category)!.push(a);
           }
@@ -290,43 +644,32 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
               {items.length === 0 ? (
                 <p className="text-xs text-white/30">Nothing assigned here.</p>
               ) : (
-                CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((c) => (
-                  <div key={c}>
-                    <h5 className="mb-1.5 text-[0.65rem] font-bold uppercase tracking-wider text-white/40">
-                      {CATEGORY_LABELS[c]}
-                    </h5>
-                    <div className="space-y-1.5">
-                      {byCategory.get(c)!.map((a) => (
-                        <div
-                          key={a.id}
-                          className="flex items-center justify-between gap-3 rounded-md bg-white/5 px-2.5 py-1.5 text-xs"
-                        >
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span aria-hidden="true">{a.secret ? "❓" : a.icon}</span>
-                            {a.secret ? (
-                              <span className="truncate text-slate-200">
-                                ??? <span className="text-slate-500">({a.title})</span>
-                              </span>
-                            ) : (
-                              <span className="truncate text-slate-200">{a.title}</span>
-                            )}
-                          </div>
-                          <select
-                            value={t.id}
-                            onChange={(e) => setAchievementTier(a.id, e.target.value)}
-                            className="shrink-0 rounded-md border border-white/15 bg-[#241a12] px-1.5 py-1 text-[0.65rem] font-semibold text-white"
-                          >
-                            {tiers.map((tt) => (
-                              <option key={tt.id} value={tt.id}>
-                                {tt.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      ))}
+                <>
+                  {pinned.length > 0 && (
+                    <div>
+                      <h5 className="mb-1.5 flex items-center gap-1 text-[0.65rem] font-bold uppercase tracking-wider text-white/40">
+                        <span aria-hidden="true">{"\u{1F4CC}"}</span> Default
+                      </h5>
+                      <div className="space-y-1.5">
+                        {pinned.map((a) => (
+                          <AchievementRow key={a.id} a={a} tierId={t.id} />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )}
+                  {CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((c) => (
+                    <div key={c}>
+                      <h5 className="mb-1.5 text-[0.65rem] font-bold uppercase tracking-wider text-white/40">
+                        {CATEGORY_LABELS[c]}
+                      </h5>
+                      <div className="space-y-1.5">
+                        {byCategory.get(c)!.map((a) => (
+                          <AchievementRow key={a.id} a={a} tierId={t.id} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
             </CollapsibleSection>
           );
@@ -337,7 +680,8 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
 }
 
 function TipsTab({ config, update }: { config: AdminConfig; update: Update }) {
-  const tiers = sortedTiers(config);
+  // Creation order, not threshold order — see TiersTab's comment.
+  const tiers = config.tiers;
 
   function tipsFor(tierId: string): string[] {
     return config.tierTips[tierId] ?? [];
@@ -768,6 +1112,7 @@ function FeatureRow({
   tierId,
   onTierChange,
   tiers,
+  extra,
 }: {
   title: string;
   description: string;
@@ -776,6 +1121,10 @@ function FeatureRow({
   tierId?: string;
   onTierChange?: (tierId: string) => void;
   tiers?: TierDef[];
+  /** Extra control slotted in before the tier picker/switch — e.g. a
+   * MechanicSettingsMenu gear for a feature that also has tunable numeric
+   * settings (Upgrades/Prestige, moved here from the Modules tab). */
+  extra?: React.ReactNode;
 }) {
   const hasSwitch = enabled !== undefined && onToggle !== undefined;
   return (
@@ -785,6 +1134,7 @@ function FeatureRow({
         <p className="text-xs text-slate-400">{description}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        {extra}
         {tierId !== undefined && tiers && onTierChange && (
           <label className="flex items-center gap-1.5 text-xs text-white/50">
             Unlocks at
@@ -826,7 +1176,8 @@ function FeatureRow({
 }
 
 function FeaturesTab({ config, update }: { config: AdminConfig; update: Update }) {
-  const tiers = sortedTiers(config);
+  // Creation order, not threshold order — see TiersTab's comment.
+  const tiers = config.tiers;
   const features = config.features;
 
   function setFeature<K extends keyof FeaturesConfig>(key: K, value: FeaturesConfig[K]) {
@@ -837,38 +1188,197 @@ function FeaturesTab({ config, update }: { config: AdminConfig; update: Update }
     <div className="space-y-3">
       <p className="text-sm text-slate-400">
         Whole mechanics, switched on/off — several can also be pushed behind a later tier instead of being available
-        from the start. Everything here defaults to matching today&apos;s actual behavior.
+        from the start. Everything here defaults to matching today&apos;s actual behavior. Day/Night Cycle, Stars,
+        Hunting, Mining, and Snow live in the Upgrades tab now — each is its own shop entry with its own cost and
+        tier there instead of an admin toggle here.
       </p>
 
       <FeatureRow
-        title="Day/Night Cycle"
-        description="Sun/moon arcing across the top of every page, cycling the site's light/dark theme to match."
-        enabled={features.dayNightCycleEnabled}
-        onToggle={(v) => setFeature("dayNightCycleEnabled", v)}
-        tierId={features.dayNightCycleTierId}
-        onTierChange={(v) => setFeature("dayNightCycleTierId", v)}
+        title="Upgrades"
+        description="A Skill Points shop for small permanent capability unlocks — a badge in the Outpost header (top-left, next to Prestige) instead of a card. Individual upgrades still keep their own tier in upgrade-catalog.ts."
+        enabled={features.upgradesEnabled}
+        onToggle={(v) => setFeature("upgradesEnabled", v)}
+        tierId={features.upgradesTierId}
+        onTierChange={(v) => setFeature("upgradesTierId", v)}
         tiers={tiers}
+        extra={<MechanicSettingsMenu moduleId="upgrades" config={config} update={update} />}
       />
       <FeatureRow
-        title="Stars"
-        description="Twinkling stars in the night sky, part of the day/night cycle above."
-        enabled={features.starsEnabled}
-        onToggle={(v) => setFeature("starsEnabled", v)}
+        title="Prestige"
+        description="Resets the resource/tool loop for permanent Legacy perks — a badge in the Outpost header instead of a card. Reveals once the Outpost's own top configured tier (Tier List tab) is reached, same as before; there's no separate tier picker here."
+        enabled={features.prestigeEnabled}
+        onToggle={(v) => setFeature("prestigeEnabled", v)}
+        extra={<MechanicSettingsMenu moduleId="prestige" config={config} update={update} />}
       />
-      <FeatureRow
-        title="Hunting"
-        description="The Hunting toggle inside the Gathering card. Campfire cooking needs Food, so it unlocks at this same tier."
-        tierId={features.huntingTierId}
-        onTierChange={(v) => setFeature("huntingTierId", v)}
-        tiers={tiers}
-      />
-      <FeatureRow
-        title="Mining"
-        description="The Mining toggle inside the Gathering card."
-        tierId={features.miningTierId}
-        onTierChange={(v) => setFeature("miningTierId", v)}
-        tiers={tiers}
-      />
+    </div>
+  );
+}
+
+// The Skill Points shop's catalog (upgrade-catalog.ts) — one entry per
+// purchasable upgrade, grouped by the tier it becomes buyable at (same
+// grouped-by-tier layout as ModulesTab, for the same reason: an admin
+// changing a tier's threshold on the Tier List tab shouldn't reshuffle this
+// list's groups, only which tier each already-assigned entry belongs to).
+// Name/icon/description stay fixed in the catalog itself; cost and tier are
+// the two things worth tuning per-browser without touching code.
+function UpgradesTab({ config, update }: { config: AdminConfig; update: Update }) {
+  const tiers = config.tiers;
+
+  function setUpgradeEdit(id: UpgradeId, patch: { cost?: number; tierId?: string }) {
+    update((prev) => ({
+      ...prev,
+      upgradeEdits: { ...prev.upgradeEdits, [id]: { ...prev.upgradeEdits[id], ...patch } },
+    }));
+  }
+
+  const resolved = resolvedUpgrades(config);
+  const byTier = new Map<string, typeof resolved>();
+  for (const u of resolved) {
+    if (!byTier.has(u.tierId)) byTier.set(u.tierId, []);
+    byTier.get(u.tierId)!.push(u);
+  }
+
+  return (
+    <div>
+      <p className="text-sm text-slate-400">
+        Every purchasable upgrade in the header&apos;s Upgrades shop, grouped by the tier it becomes buyable at — set
+        each one&apos;s Skill Point cost and move it to a different tier.
+      </p>
+      <div className="mt-3 space-y-2">
+        {tiers.map((t) => {
+          const items = byTier.get(t.id) ?? [];
+          return (
+            <CollapsibleSection key={t.id} title={t.name} count={items.length}>
+              {items.length === 0 ? (
+                <p className="text-xs text-white/30">Nothing assigned here.</p>
+              ) : (
+                items.map((u) => (
+                  <div
+                    key={u.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-white/5 px-2.5 py-2"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span aria-hidden="true">{u.icon}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white">{u.name}</p>
+                        <p className="text-xs text-slate-400">{u.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <label className="flex items-center gap-1.5 text-xs text-white/50">
+                        <input
+                          type="number"
+                          min={0}
+                          value={u.cost}
+                          onChange={(e) =>
+                            setUpgradeEdit(u.id, { cost: Math.max(0, Number(e.target.value) || 0) })
+                          }
+                          className="w-16 rounded-md border border-white/15 bg-transparent px-2 py-1 text-xs font-semibold text-white"
+                        />
+                        SP
+                      </label>
+                      <div className="relative shrink-0">
+                        <select
+                          value={t.id}
+                          onChange={(e) => setUpgradeEdit(u.id, { tierId: e.target.value })}
+                          className="appearance-none rounded-md border border-white/15 bg-[#241a12] py-1.5 pl-2 pr-6 text-xs font-semibold text-white"
+                        >
+                          {tiers.map((tt) => (
+                            <option key={tt.id} value={tt.id}>
+                              {tt.name}
+                            </option>
+                          ))}
+                        </select>
+                        <svg
+                          aria-hidden="true"
+                          className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-white/50"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M5 7.5l5 5 5-5" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CollapsibleSection>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ExportImportControl({ config, update }: { config: AdminConfig; update: Update }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  function handleExport() {
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "btwr-outpost-admin-settings.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImportError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const imported = importAdminConfig(reader.result as string);
+      if (!imported) {
+        setImportError("That file doesn't look like Outpost admin settings.");
+        return;
+      }
+      update(() => imported);
+    };
+    reader.onerror = () => setImportError("Couldn't read that file.");
+    reader.readAsText(file);
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-white">Export / import settings</p>
+        <p className="mt-0.5 text-xs text-slate-400">
+          Save this customization (tiers, module placement, resources, tools, features) to a file, or load one you
+          saved earlier. Doesn&apos;t touch your actual progress.
+        </p>
+        {importError && <p className="mt-1 text-xs text-red-400">{importError}</p>}
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <button
+          type="button"
+          onClick={handleExport}
+          className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-[var(--outpost-accent)] hover:text-[var(--outpost-accent)]"
+        >
+          Export
+        </button>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-[var(--outpost-accent)] hover:text-[var(--outpost-accent)]"
+        >
+          Import
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </div>
     </div>
   );
 }
@@ -959,10 +1469,10 @@ export default function AdminPanel() {
               </p>
             </div>
             <Link
-              href="/community"
+              href="/#outpost"
               className="shrink-0 text-xs font-semibold text-white/50 transition-colors hover:text-[var(--outpost-accent)]"
             >
-              {"←"} Back to Community
+              {"←"} Back to The Outpost
             </Link>
           </div>
 
@@ -992,10 +1502,14 @@ export default function AdminPanel() {
                 {tab === "resources" && <ResourcesTab config={config} update={update} />}
                 {tab === "tools" && <ToolsTab config={config} update={update} />}
                 {tab === "features" && <FeaturesTab config={config} update={update} />}
+                {tab === "upgrades" && <UpgradesTab config={config} update={update} />}
               </div>
 
-              <div className="mt-6 border-t border-white/10 pt-4">
-                <ResetControl onReset={resetAll} />
+              <div className="mt-6 space-y-4 border-t border-white/10 pt-4">
+                <ExportImportControl config={config} update={update} />
+                <div className="border-t border-white/10 pt-4">
+                  <ResetControl onReset={resetAll} />
+                </div>
               </div>
             </>
           )}

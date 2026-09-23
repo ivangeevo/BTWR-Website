@@ -10,7 +10,7 @@ export default function FirstIronTool() {
   const chosen = firstIronTool.choice && isIronToolId(firstIronTool.choice) ? IRON_TOOLS_BY_ID[firstIronTool.choice] : null;
 
   return (
-    <div className="outpost-panel rounded-xl p-5">
+    <div className="outpost-panel outpost-card-md rounded-xl p-5">
       <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-[var(--outpost-accent)]">
         Your First Iron Tool
       </h3>

@@ -123,7 +123,7 @@ export default function GuessTheMod({
   }
 
   return (
-    <div className={variant === "card" ? "outpost-panel rounded-xl p-5" : ""}>
+    <div className={variant === "card" ? "outpost-panel outpost-card-md rounded-xl p-5" : ""}>
       <div className={`flex items-center ${variant === "card" ? "justify-between" : "justify-end"}`}>
         {variant === "card" && (
           <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-[var(--outpost-accent)]">

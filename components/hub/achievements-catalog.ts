@@ -27,9 +27,12 @@ export type AchievementId =
   | "campfire-overstoked"
   | "iron-tool-chosen"
   | "iron-tool-completionist"
-  // Tier 2 (13) — unlocked once all 12 tier-1 achievements are done.
-  // "community-edition" is the tier-2 marker itself, auto-granted the
-  // instant tier 1 completes; the rest are the 12 new, harder achievements.
+  | "priorities-started"
+  | "priorities-completionist"
+  // Tier 2 (13) — "community-edition" is a flavor achievement that fires
+  // once unlockedCount reaches the ladder's tier2 threshold (admin-
+  // config.ts); the rest are the 12 new, harder achievements that live
+  // alongside it once that tier's content is visible.
   | "community-edition"
   | "millstone-grind"
   | "perfect-alloy"
@@ -76,13 +79,19 @@ export type AchievementId =
   | "he-round-trip" | "he-chain-master" | "he-quiz-marathon"
   | "fr-wardrobe-certified" | "fr-all-flair" | "fr-all-categories" | "fr-master-every-trade"
   | "fr-nothing-hidden" | "fr-lifes-work" | "fr-half-year" | "fr-prestige-10"
-  | "fr-complete-111" | "fr-founding-settler" | "fr-ledger-100";
+  | "fr-complete-111" | "fr-founding-settler" | "fr-ledger-100"
+  // Ponder (see ponder-stage.ts/ponder-content.ts) — its own small
+  // Day One/Day Two/mid-game/endgame arc.
+  | "pd-first-sentence" | "pd-fluent" | "pd-first-choice"
+  | "pd-automated" | "pd-oracle" | "pd-old-friend"
+  | "pd-insight-1" | "pd-insight-10" | "pd-insight-50" | "pd-insight-200";
 
 // Groups achievements for the gallery. "secrets" is special-cased there:
 // unlocked secrets show normally under this group, but locked ones are
 // capped at 3 anonymous "???" slots regardless of how many actually
 // remain — so the true count of hidden achievements is never revealed.
 export type AchievementCategory =
+  | "ponder"
   | "onboarding"
   | "quiz"
   | "patch-notes"
@@ -100,6 +109,7 @@ export type AchievementCategory =
   | "frontier-record";
 
 export const CATEGORY_LABELS: Record<AchievementCategory, string> = {
+  ponder: "Ponder",
   onboarding: "Getting Started",
   quiz: "Guess the Mod",
   "patch-notes": "Patch Notes",
@@ -119,6 +129,7 @@ export const CATEGORY_LABELS: Record<AchievementCategory, string> = {
 
 // Display order for category sections in the gallery.
 export const CATEGORY_ORDER: AchievementCategory[] = [
+  "ponder",
   "onboarding",
   "quiz",
   "patch-notes",
@@ -149,12 +160,15 @@ export type AchievementDef = {
 };
 
 // The original, easy, non-secret onboarding set — no longer what gates
-// tier 2 (that's now a flat 35-achievement count, see
-// COMMUNITY_EDITION_THRESHOLD in AchievementsProvider.tsx, since
-// achievements can silently accumulate from anywhere in the catalog before
-// tier 2's own UI is ever seen). Still used for pre-tier-2 display
-// purposes (e.g. OutpostControlPanel's visible-count, which must never
-// hint at the bigger pool before tier 2 unlocks).
+// tier 2. Tier 2 (and every later tier) is just a rung on the admin-
+// configurable ladder in admin-config.ts's defaultTiers(): unlockedCount
+// crossing that tier's threshold, full stop, the same rule for tier3-6 too.
+// "community-edition" is a plain flavor achievement that happens to fire
+// at that same moment (see its CUSTOM_RULES entry in
+// AchievementsProvider.tsx) — it has no gating power of its own anymore.
+// TIER1_IDS itself is still used for pre-tier-2 display purposes (e.g.
+// OutpostControlPanel's visible-count, which must never hint at the bigger
+// pool before tier 2 unlocks).
 export const TIER1_IDS: AchievementId[] = [
   "first-visit",
   "mod-of-day-viewed",
@@ -190,6 +204,92 @@ export const TIER2_NEW_IDS: AchievementId[] = [
 export const TIER2_IDS: AchievementId[] = ["community-edition", ...TIER2_NEW_IDS];
 
 export const ACHIEVEMENTS: AchievementDef[] = [
+  {
+    id: "pd-first-sentence",
+    title: "First Thought",
+    description: "Completed your first sentence with Ponder.",
+    icon: "\u{1F4AD}",
+    tier: 1,
+    category: "ponder",
+  },
+  {
+    id: "pd-fluent",
+    title: "Finding Its Words",
+    description: "Completed 10 sentences with Ponder.",
+    icon: "\u{1F4AD}",
+    tier: 1,
+    category: "ponder",
+  },
+  {
+    id: "pd-first-choice",
+    title: "A Mind of Its Own",
+    description: "Let Ponder choose a path for the first time.",
+    icon: "\u{1F500}",
+    tier: 1,
+    category: "ponder",
+  },
+  {
+    id: "pd-automated",
+    title: "Busted Wide Open",
+    description: "Ponder reached its third stage, the moment the Outpost's own automation opened up.",
+    icon: "\u{2699}\u{FE0F}",
+    tier: 2,
+    category: "ponder",
+    xp: 100,
+  },
+  {
+    id: "pd-oracle",
+    title: "Still Here After The End",
+    description: "Ponder reached its final stage.",
+    icon: "\u{1F31F}",
+    tier: 2,
+    category: "ponder",
+    xp: 150,
+  },
+  {
+    id: "pd-old-friend",
+    title: "The One Thing That Remembers",
+    description: "Prestiged with Ponder's journal already full.",
+    icon: "\u{1F4D3}",
+    tier: 2,
+    category: "ponder",
+    xp: 150,
+  },
+  {
+    id: "pd-insight-1",
+    title: "Spark of Insight",
+    description: "Earned your first Insight with Ponder.",
+    icon: "\u{2728}",
+    tier: 1,
+    category: "ponder",
+  },
+  {
+    id: "pd-insight-10",
+    title: "Adding It Up",
+    description: "Earned 10 Insight with Ponder.",
+    icon: "\u{1F9E9}",
+    tier: 1,
+    category: "ponder",
+    xp: 50,
+  },
+  {
+    id: "pd-insight-50",
+    title: "A Working Theory",
+    description: "Earned 50 Insight with Ponder.",
+    icon: "\u{1F4D0}",
+    tier: 1,
+    category: "ponder",
+    xp: 100,
+  },
+  {
+    id: "pd-insight-200",
+    title: "Load-Bearing Thought",
+    description: "Earned 200 Insight with Ponder.",
+    icon: "\u{1F9EE}",
+    tier: 1,
+    category: "ponder",
+    xp: 200,
+  },
   {
     id: "first-visit",
     title: "Welcome to the Outpost",
@@ -352,6 +452,23 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     title: "Every Option Considered",
     description: "Tried every first-iron-tool choice at least once.",
     icon: "\u{1F9F0}",
+    secret: true,
+    tier: 1,
+    category: "secrets",
+  },
+  {
+    id: "priorities-started",
+    title: "Getting Organized",
+    description: "Checked off your first early priority.",
+    icon: "\u{1F4CB}",
+    tier: 1,
+    category: "onboarding",
+  },
+  {
+    id: "priorities-completionist",
+    title: "By the Book",
+    description: "Checked off every early priority, straight from the guide.",
+    icon: "\u{2705}",
     secret: true,
     tier: 1,
     category: "secrets",

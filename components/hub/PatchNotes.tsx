@@ -11,7 +11,10 @@ import { useAchievements } from "./AchievementsProvider";
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-const PEEK_HEIGHT = 160;
+// Trimmed from 160 in a size pass on the Outpost grid — the collapsed peek
+// was consistently one of the tallest cards regardless of content; still
+// enough to preview a release's first couple lines.
+const PEEK_HEIGHT = 128;
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -80,7 +83,7 @@ export default function PatchNotes({
   }
 
   return (
-    <div className={variant === "card" ? "outpost-panel rounded-xl" : ""}>
+    <div className={variant === "card" ? "outpost-panel outpost-card-md rounded-xl" : ""}>
       <div
         className={`flex items-center gap-3 px-5 pt-4 ${
           variant === "card" ? "justify-between" : "justify-end"
