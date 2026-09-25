@@ -22,18 +22,45 @@ import WorksTab from "./works/WorksTab";
 
 type Tab = "mind" | "body" | "works" | "logbook";
 const TAB_LABELS: Record<Tab, string> = { mind: "Mind", body: "Body", works: "Works", logbook: "Logbook" };
+const TAB_ORDER: Tab[] = ["mind", "logbook", "works", "body"];
+const TAB_STAGE: Record<Tab, number> = { mind: 1, logbook: 2, works: 3, body: 4 };
+
+// Which tabs have been opened at least once (a per-browser nicety: a tab
+// that's just appeared carries a dot until it's first opened).
+const SEEN_KEY = "btwr:hub:engine-tabs:v1";
+function readSeen(): Tab[] {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(SEEN_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((t): t is Tab => TAB_ORDER.includes(t)) : [];
+  } catch {
+    return [];
+  }
+}
+function writeSeen(tabs: Tab[]) {
+  try {
+    window.localStorage.setItem(SEEN_KEY, JSON.stringify(tabs));
+  } catch {
+    // Only the "new" dots depend on this.
+  }
+}
 
 // Ponder → The Contraption → The Analytical Engine. At Day One this is just a
-// word puzzle; every stage adds one more thing, and from The Stump on the
-// card opens into a full-width Workshop holding the deeper systems.
+// word puzzle; every stage adds one more thing. Its tabs sit under the
+// caption and appear as they unlock: Mind (the puzzle, the crank and the
+// cipher pages — home), then Logbook, Works and Body. Any tab but Mind
+// widens the card over the Outpost's middle column (the "Workshop"); going
+// back to Mind shrinks it again.
 export default function EngineCard() {
   const eng = useEngine();
   const { e, cfg, title, store, workshopOpen, setWorkshopOpen, holdSky, fx, passive, takeOver } = eng;
   const reduced = useReducedMotion();
   const corePU = useLive(store, (s) => s.corePU);
   const rootRef = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState<Tab>("mind");
+  const [tab, setTabState] = useState<Tab>("mind");
+  const [seen, setSeen] = useState<Tab[]>(["mind"]);
   const [dust, setDust] = useState(0);
+
+  useEffect(() => setSeen(["mind", ...readSeen()]), []);
 
   useEffect(() => {
     const update = () => setDust(dustLevel(e, cfg, Date.now()));
@@ -42,17 +69,26 @@ export default function EngineCard() {
     return () => window.clearInterval(id);
   }, [e, cfg]);
 
-  const tabs: Tab[] = (["mind", "logbook", "works", "body"] as Tab[]).filter((t) =>
-    t === "mind" ? true : t === "logbook" ? e.stage >= 2 : t === "works" ? e.stage >= 3 : e.stage >= 4
-  );
-  const canOpen = e.stage >= 2;
+  const tabs = TAB_ORDER.filter((t) => e.stage >= TAB_STAGE[t]);
+  // A tab can vanish (prestige takes the Engine back a stage): fall back to Mind.
+  const current: Tab = tabs.includes(tab) ? tab : "mind";
   const crankReady = e.stage >= 3 && e.blueprints.includes("handCrank");
   const sizeClass = workshopOpen ? "" : e.stage >= 4 ? "outpost-card-lg" : "outpost-card-md";
   const stageDef = STAGES[e.stage];
+  const frenzyOn = !!e.frenzy && new Date(e.frenzy.until).getTime() > Date.now();
 
-  function open(t: Tab) {
-    setTab(t);
-    setWorkshopOpen(true);
+  // The card is wide on every tab but Mind.
+  useEffect(() => {
+    setWorkshopOpen(current !== "mind");
+  }, [current, setWorkshopOpen]);
+
+  function setTab(t: Tab) {
+    setTabState(t);
+    if (!seen.includes(t)) {
+      const next = [...seen, t];
+      setSeen(next);
+      writeSeen(next.filter((x) => x !== "mind"));
+    }
   }
 
   return (
@@ -69,6 +105,29 @@ export default function EngineCard() {
         <p className="mt-0.5 text-[0.65rem] italic text-slate-500">
           {dust >= 2 ? "Thick with dust. It's thinking slowly." : "A little dusty. It missed you."}
         </p>
+      )}
+
+      {tabs.length > 1 && (
+        <div className="mt-2 flex flex-wrap gap-1 border-b border-white/10 pb-1.5" role="tablist" aria-label={title} data-no-drag>
+          {tabs.map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={current === t}
+              data-engine-target={`tab-${t}`}
+              onClick={() => setTab(t)}
+              className={`relative rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                current === t ? "bg-[var(--outpost-accent-soft)] text-white" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              {TAB_LABELS[t]}
+              {!seen.includes(t) && current !== t && (
+                <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-[var(--outpost-accent)]" aria-label="new" />
+              )}
+            </button>
+          ))}
+        </div>
       )}
 
       <WhileAwaySummary />
@@ -88,119 +147,47 @@ export default function EngineCard() {
         </div>
       )}
 
-      {!workshopOpen && (
-        <>
-          <MindPuzzle compact />
-          {crankReady && (
-            <div className="mt-3">
-              <CrankButton />
-            </div>
-          )}
-          {e.stage >= 3 && !e.ciphers.solved.includes("bp-handCrank") && (
-            <button
-              type="button"
-              onClick={() => open("mind")}
-              className="mt-2 w-full rounded-md border border-dashed border-[var(--outpost-accent-soft)] px-2 py-1.5 text-left text-xs text-[var(--outpost-accent)] hover:bg-[var(--outpost-accent-soft)]/20"
-              data-engine-target="tab-mind"
-            >
-              {"\u{1F4DC}"} There&apos;s a scrambled page in its head. Help it read it →
-            </button>
-          )}
-        </>
-      )}
-
-      {workshopOpen && (
-        <div className="mt-3" data-no-drag>
-          <div className="flex flex-wrap gap-1 border-b border-white/10 pb-1.5" role="tablist">
-            {tabs.map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                aria-selected={tab === t}
-                data-engine-target={`tab-${t}`}
-                onClick={() => setTab(t)}
-                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
-                  tab === t ? "bg-[var(--outpost-accent-soft)] text-white" : "text-slate-400 hover:text-white"
-                }`}
-              >
-                {TAB_LABELS[t]}
-              </button>
-            ))}
+      <div className="mt-3" data-no-drag>
+        {current === "mind" && (
+          <div className="space-y-4">
+            <MindPuzzle />
+            {crankReady && <CrankButton />}
+            {e.stage >= 3 && <CipherPanel />}
           </div>
-          <div className="mt-3">
-            {tab === "mind" && (
-              <div className="space-y-4">
-                <MindPuzzle />
-                {crankReady && <CrankButton />}
-                {e.stage >= 3 && <CipherPanel />}
-              </div>
+        )}
+        {current === "logbook" && <LogbookTab />}
+        {current === "works" && <WorksTab />}
+        {current === "body" && (
+          <>
+            <BodyTab />
+            {e.stage >= 8 && (
+              <section className="mt-4 border-t border-white/10 pt-3">
+                <h4 className="text-[0.7rem] font-bold uppercase tracking-wider text-white/50">The Difference Engine</h4>
+                <div className="mt-1.5">
+                  <DifferenceEngine />
+                </div>
+              </section>
             )}
-            {tab === "logbook" && <LogbookTab />}
-            {tab === "works" && <WorksTab />}
-            {tab === "body" && (
-              <>
-                <BodyTab />
-                {e.stage >= 8 && (
-                  <section className="mt-4 border-t border-white/10 pt-3">
-                    <h4 className="text-[0.7rem] font-bold uppercase tracking-wider text-white/50">The Difference Engine</h4>
-                    <div className="mt-1.5">
-                      <DifferenceEngine />
-                    </div>
-                  </section>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
       <StageGatePanel />
 
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {canOpen && (
-          <button
-            type="button"
-            onClick={() => (workshopOpen ? setWorkshopOpen(false) : open(tab))}
-            className="rounded-md border border-white/15 px-2.5 py-1 text-xs font-semibold text-slate-300 transition-colors hover:border-[var(--outpost-accent)] hover:text-white"
-            data-no-drag
-          >
-            {workshopOpen ? "Close the Workshop" : e.stage >= 4 ? "Open the Engine" : "Open the Journal"}
-          </button>
-        )}
-        {!workshopOpen && e.stage >= 3 && (
-          <button
-            type="button"
-            onClick={() => open("works")}
-            className="text-xs text-slate-400 hover:text-white"
-            data-engine-target="tab-works"
-            data-no-drag
-          >
-            Works →
-          </button>
-        )}
-        {!workshopOpen && e.stage >= 4 && (
-          <button
-            type="button"
-            onClick={() => open("body")}
-            className="text-xs text-slate-400 hover:text-white"
-            data-engine-target="tab-body"
-            data-no-drag
-          >
-            Body →
-          </button>
-        )}
-        {e.stage >= 8 && fx.governsSky && (
-          <button type="button" onClick={holdSky} className="ml-auto text-xs text-[var(--outpost-accent)] hover:underline" data-no-drag>
-            Hold the sky
-          </button>
-        )}
-        {e.frenzy && new Date(e.frenzy.until).getTime() > Date.now() && (
-          <span className="ml-auto text-[0.7rem] font-semibold text-[var(--outpost-accent)]">
-            Eureka frenzy ×{formatInsight(e.frenzy.mult)}
-          </span>
-        )}
-      </div>
+      {((e.stage >= 8 && fx.governsSky) || frenzyOn) && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {e.stage >= 8 && fx.governsSky && (
+            <button type="button" onClick={holdSky} className="text-xs text-[var(--outpost-accent)] hover:underline" data-no-drag>
+              Hold the sky
+            </button>
+          )}
+          {frenzyOn && (
+            <span className="ml-auto text-[0.7rem] font-semibold text-[var(--outpost-accent)]">
+              Eureka frenzy ×{formatInsight(e.frenzy!.mult)}
+            </span>
+          )}
+        </div>
+      )}
 
       {passive ? (
         <div className="engine-ceremony" role="status" data-no-drag>

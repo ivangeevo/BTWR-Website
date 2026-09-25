@@ -8,7 +8,7 @@ export const CEREMONIES: Record<EngineStage, Ceremony> = {
   1: { lines: ["…", "Oh. Hello.", "I only know a few words. Help me put them in order?"], unlocks: ["Word tiles"] },
   2: {
     lines: ["Day Two.", "I've started keeping a journal. And I have questions — for you, for once."],
-    unlocks: ["Sentence forks", "The Journal", "The Engine's questions"],
+    unlocks: ["Sentence forks", "The Logbook tab (its journal)", "The Engine's questions"],
   },
   3: {
     lines: ["There's a page in my head I didn't write.", "It's scrambled. If you help me read it, I think I can build something."],
