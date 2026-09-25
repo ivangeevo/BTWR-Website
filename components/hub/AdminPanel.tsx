@@ -8,6 +8,7 @@ import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
   type AchievementCategory,
+  type AchievementDef,
   type AchievementId,
 } from "./achievements-catalog";
 import {
@@ -15,6 +16,7 @@ import {
   importAdminConfig,
   isModuleDisabled,
   loadAdminConfig,
+  resolvedAchievementCatalog,
   resolvedAchievementTree,
   resolvedCraftCost,
   resolvedMechanic,
@@ -36,6 +38,13 @@ import EngineAdminTab from "./engine/ui/admin/EngineAdminTab";
 import EngineDebugPanel from "./engine/ui/admin/EngineDebugPanel";
 import { STAGES } from "./engine/stages";
 import { DEFAULT_ACHIEVEMENT_TREE, isSelfOrDescendant, type AdvFrame } from "./achievement-tree";
+import {
+  ACHIEVEMENT_STATS,
+  describeTrigger,
+  newCustomId,
+  type ActiveCatalog,
+  type CustomAchievement,
+} from "./custom-achievements";
 import { ENGINE_STAGES } from "./engine/types";
 
 // Same measure-then-position recipe as AchievementGallery.tsx's tile
@@ -402,7 +411,7 @@ const ACHIEVEMENT_HINT_RING_CIRCUMFERENCE = 2 * Math.PI * 6;
 // one second — a preview of the wait rather than a dead pause — then swaps
 // to the achievement's full description as a tooltip, for rows whose title
 // alone (especially secret ones, shown as "???") doesn't say much.
-function AchievementLabel({ achievement }: { achievement: (typeof ACHIEVEMENTS)[number] }) {
+function AchievementLabel({ achievement }: { achievement: AchievementDef }) {
   const [hovering, setHovering] = useState(false);
   const [ready, setReady] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -471,18 +480,224 @@ function AchievementLabel({ achievement }: { achievement: (typeof ACHIEVEMENTS)[
   );
 }
 
-// The Achievements tab's advancement trees: each achievement's parent (what
-// it chains off, within its own category) and frame. Parent options leave
-// out the achievement itself and everything below it, so no loop can be
-// picked. See achievement-tree.ts for the authored defaults.
+const INPUT_CLASS =
+  "rounded-md border border-white/15 bg-[#241a12] px-2 py-1.5 text-xs text-white placeholder:text-white/30";
+const SMALL_BUTTON =
+  "rounded-md border px-2 py-1 text-[0.65rem] font-semibold transition-colors";
+
+function blankCustom(): CustomAchievement {
+  return {
+    id: "custom-new",
+    title: "",
+    description: "",
+    icon: "\u{1F3C6}",
+    category: CATEGORY_ORDER[0],
+    xp: 25,
+    secret: false,
+    trigger: { kind: "stat", stat: ACHIEVEMENT_STATS[0].id, at: 1 },
+  };
+}
+
+// Add or edit one custom achievement: its words and looks, then the rule
+// that unlocks it — a number the Outpost already counts reaching a target,
+// or earning a set of other achievements.
+function CustomAchievementEditor({
+  draft: initial,
+  isNew,
+  catalog,
+  onSave,
+  onCancel,
+}: {
+  draft: CustomAchievement;
+  isNew: boolean;
+  catalog: ActiveCatalog;
+  onSave: (a: CustomAchievement) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(initial);
+  const set = (patch: Partial<CustomAchievement>) => setDraft((d) => ({ ...d, ...patch }));
+  const t = draft.trigger;
+  const groups = [...new Set(ACHIEVEMENT_STATS.map((st) => st.group))];
+  const picked = t.kind === "all" ? t.ids : [];
+  const pickable = catalog.list.filter((a) => a.id !== draft.id && !picked.includes(a.id));
+  const valid = draft.title.trim() !== "" && (t.kind === "stat" ? t.at >= 1 : t.ids.length > 0);
+
+  return (
+    <div className="space-y-3 rounded-lg border border-[var(--outpost-accent-soft)] bg-white/5 p-3 text-xs">
+      <p className="text-sm font-semibold text-white">{isNew ? "New achievement" : `Edit “${initial.title}”`}</p>
+      <div className="grid gap-2 sm:grid-cols-[4rem_1fr]">
+        <label className="space-y-1">
+          <span className="text-white/50">Icon</span>
+          <input
+            value={draft.icon}
+            onChange={(e) => set({ icon: e.target.value })}
+            className={`${INPUT_CLASS} w-full text-center text-base`}
+            maxLength={8}
+            aria-label="Icon (an emoji)"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-white/50">Title</span>
+          <input value={draft.title} onChange={(e) => set({ title: e.target.value })} className={`${INPUT_CLASS} w-full`} placeholder="First Snowfall" />
+        </label>
+      </div>
+      <label className="block space-y-1">
+        <span className="text-white/50">Description (shown on its card and toast)</span>
+        <input
+          value={draft.description}
+          onChange={(e) => set({ description: e.target.value })}
+          className={`${INPUT_CLASS} w-full`}
+          placeholder="What the player did to earn it."
+        />
+      </label>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <label className="space-y-1">
+          <span className="text-white/50">Category (its tree tab)</span>
+          <select value={draft.category} onChange={(e) => set({ category: e.target.value as AchievementCategory })} className={`${INPUT_CLASS} w-full`}>
+            {CATEGORY_ORDER.map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_LABELS[c]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="text-white/50">XP when earned</span>
+          <input
+            type="number"
+            min={0}
+            value={draft.xp}
+            onChange={(e) => set({ xp: Math.max(0, Number(e.target.value) || 0) })}
+            className={`${INPUT_CLASS} w-full`}
+          />
+        </label>
+        <label className="flex items-center gap-2 self-end pb-1.5 text-white/70">
+          <input type="checkbox" checked={draft.secret} onChange={(e) => set({ secret: e.target.checked })} />
+          Secret (hidden until earned)
+        </label>
+      </div>
+
+      <fieldset className="space-y-2 rounded-md border border-white/10 p-2">
+        <legend className="px-1 text-white/50">Unlocks when…</legend>
+        <label className="flex items-center gap-2 text-white/80">
+          <input
+            type="radio"
+            checked={t.kind === "stat"}
+            onChange={() => set({ trigger: { kind: "stat", stat: ACHIEVEMENT_STATS[0].id, at: 1 } })}
+          />
+          A number the Outpost counts reaches a target
+        </label>
+        {t.kind === "stat" && (
+          <div className="flex flex-wrap items-center gap-2 pl-6">
+            <select
+              value={t.stat}
+              onChange={(e) => set({ trigger: { ...t, stat: e.target.value } })}
+              className={`${INPUT_CLASS} max-w-[18rem]`}
+              aria-label="What to count"
+            >
+              {groups.map((g) => (
+                <optgroup key={g} label={g}>
+                  {ACHIEVEMENT_STATS.filter((st) => st.group === g).map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {st.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <span className="text-white/50">reaches</span>
+            <input
+              type="number"
+              min={1}
+              value={t.at}
+              onChange={(e) => set({ trigger: { ...t, at: Math.max(1, Number(e.target.value) || 1) } })}
+              className={`${INPUT_CLASS} w-24`}
+              aria-label="Target"
+            />
+          </div>
+        )}
+        <label className="flex items-center gap-2 text-white/80">
+          <input type="radio" checked={t.kind === "all"} onChange={() => set({ trigger: { kind: "all", ids: [] } })} />
+          Every one of these achievements is earned
+        </label>
+        {t.kind === "all" && (
+          <div className="space-y-2 pl-6">
+            <div className="flex flex-wrap gap-1.5">
+              {t.ids.length === 0 && <span className="text-white/30">None picked yet.</span>}
+              {t.ids.map((id) => (
+                <span key={id} className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-white">
+                  {catalog.byId[id]?.title ?? id}
+                  <button
+                    type="button"
+                    onClick={() => set({ trigger: { kind: "all", ids: t.ids.filter((x) => x !== id) } })}
+                    className="text-white/40 hover:text-white"
+                    aria-label={`Remove ${catalog.byId[id]?.title ?? id}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <select
+              value=""
+              onChange={(e) => e.target.value && set({ trigger: { kind: "all", ids: [...t.ids, e.target.value as AchievementId] } })}
+              className={`${INPUT_CLASS} max-w-[18rem]`}
+              aria-label="Add an achievement to the list"
+            >
+              <option value="">+ Add an achievement…</option>
+              {CATEGORY_ORDER.map((c) => {
+                const opts = pickable.filter((a) => a.category === c);
+                if (opts.length === 0) return null;
+                return (
+                  <optgroup key={c} label={CATEGORY_LABELS[c]}>
+                    {opts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.title}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </select>
+          </div>
+        )}
+      </fieldset>
+
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className={`${SMALL_BUTTON} border-white/15 text-white/60 hover:text-white`}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={!valid}
+          onClick={() => onSave({ ...draft, title: draft.title.trim(), description: draft.description.trim() })}
+          className={`${SMALL_BUTTON} border-[var(--outpost-accent)] text-[var(--outpost-accent)] hover:bg-[var(--outpost-accent-soft)] disabled:border-white/15 disabled:text-white/30 disabled:hover:bg-transparent`}
+        >
+          {isNew ? "Add achievement" : "Save changes"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// The Achievements tab: add your own achievements (custom-achievements.ts)
+// and remove built-in ones, plus how each is drawn in the Outpost's
+// advancement trees — its parent (what it chains off, within its own
+// category) and frame. Parent options leave out the achievement itself and
+// everything below it, so no loop can be picked. See achievement-tree.ts
+// for the authored defaults.
 function AchievementsTab({ config, update }: { config: AdminConfig; update: Update }) {
   const [query, setQuery] = useState("");
-  const tree = resolvedAchievementTree(config);
+  const [editing, setEditing] = useState<{ draft: CustomAchievement; isNew: boolean } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<AchievementId | null>(null);
+  const catalog = resolvedAchievementCatalog(config);
+  const tree = resolvedAchievementTree(config, catalog);
+  const customById = new Map<AchievementId, CustomAchievement>(config.customAchievements.map((a) => [a.id, a]));
 
   function setParent(id: AchievementId, value: string) {
     update((prev) => {
       const achievementParent = { ...prev.achievementParent };
-      const authored = DEFAULT_ACHIEVEMENT_TREE[id].parent;
+      const authored = DEFAULT_ACHIEVEMENT_TREE[id]?.parent ?? null;
       const next = value === "root" ? null : (value as AchievementId);
       if (next === authored) delete achievementParent[id];
       else achievementParent[id] = next ?? "root";
@@ -493,78 +708,181 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
   function setFrame(id: AchievementId, value: AdvFrame) {
     update((prev) => {
       const achievementFrame = { ...prev.achievementFrame };
-      if (value === DEFAULT_ACHIEVEMENT_TREE[id].frame) delete achievementFrame[id];
+      const authored = DEFAULT_ACHIEVEMENT_TREE[id]?.frame ?? (customById.get(id)?.secret ? "challenge" : "task");
+      if (value === authored) delete achievementFrame[id];
       else achievementFrame[id] = value;
       return { ...prev, achievementFrame };
     });
   }
 
-  function AchievementRow({ a }: { a: (typeof ACHIEVEMENTS)[number] }) {
+  function setRemoved(id: AchievementId, removed: boolean) {
+    update((prev) => ({
+      ...prev,
+      removedAchievements: removed
+        ? [...prev.removedAchievements.filter((x) => x !== id), id]
+        : prev.removedAchievements.filter((x) => x !== id),
+    }));
+  }
+
+  function saveCustom(a: CustomAchievement, isNew: boolean) {
+    update((prev) => {
+      if (!isNew) return { ...prev, customAchievements: prev.customAchievements.map((x) => (x.id === a.id ? a : x)) };
+      const taken = new Set<string>([...ACHIEVEMENTS.map((x) => x.id), ...prev.customAchievements.map((x) => x.id)]);
+      return { ...prev, customAchievements: [...prev.customAchievements, { ...a, id: newCustomId(a.title, taken) }] };
+    });
+    setEditing(null);
+  }
+
+  function deleteCustom(id: AchievementId) {
+    update((prev) => {
+      const achievementParent = { ...prev.achievementParent };
+      const achievementFrame = { ...prev.achievementFrame };
+      delete achievementParent[id];
+      delete achievementFrame[id];
+      return { ...prev, customAchievements: prev.customAchievements.filter((x) => x.id !== id), achievementParent, achievementFrame };
+    });
+    setConfirmDelete(null);
+    if (editing?.draft.id === id) setEditing(null);
+  }
+
+  function AchievementRow({ a }: { a: AchievementDef }) {
     const node = tree[a.id];
+    const custom = customById.get(a.id);
     const edited = config.achievementParent[a.id] !== undefined || config.achievementFrame[a.id] !== undefined;
-    const options = ACHIEVEMENTS.filter((o) => o.category === a.category && !isSelfOrDescendant(tree, a.id, o.id));
+    const options = catalog.list.filter((o) => o.category === a.category && !isSelfOrDescendant(tree, a.id, o.id));
     return (
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white/5 px-2.5 py-1.5 text-xs">
-        <AchievementLabel achievement={a} />
-        <div className="flex shrink-0 items-center gap-1.5">
-          {edited && (
-            <span className="text-[0.6rem] font-semibold text-[var(--outpost-accent)]" title="Changed from the default">
-              edited
-            </span>
-          )}
-          <label className="flex items-center gap-1 text-[0.6rem] text-white/40">
-            After
+      <div className="rounded-md bg-white/5 px-2.5 py-1.5 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <AchievementLabel achievement={a} />
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            {custom && (
+              <span className="rounded bg-[var(--outpost-accent-soft)] px-1.5 py-0.5 text-[0.6rem] font-semibold text-white">custom</span>
+            )}
+            {edited && (
+              <span className="text-[0.6rem] font-semibold text-[var(--outpost-accent)]" title="Tree placement changed from the default">
+                edited
+              </span>
+            )}
+            <label className="flex items-center gap-1 text-[0.6rem] text-white/40">
+              After
+              <select
+                value={node?.parent ?? "root"}
+                onChange={(e) => setParent(a.id, e.target.value)}
+                className="max-w-[11rem] rounded-md border border-white/15 bg-[#241a12] px-1.5 py-1 text-[0.65rem] font-semibold text-white"
+              >
+                <option value="root">(starts a tree)</option>
+                {options.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.title}
+                  </option>
+                ))}
+              </select>
+            </label>
             <select
-              value={node.parent ?? "root"}
-              onChange={(e) => setParent(a.id, e.target.value)}
-              className="max-w-[11rem] rounded-md border border-white/15 bg-[#241a12] px-1.5 py-1 text-[0.65rem] font-semibold text-white"
+              value={node?.frame ?? "task"}
+              onChange={(e) => setFrame(a.id, e.target.value as AdvFrame)}
+              aria-label="Frame"
+              className="rounded-md border border-white/15 bg-[#241a12] px-1.5 py-1 text-[0.65rem] font-semibold text-white"
             >
-              <option value="root">(starts a tree)</option>
-              {options.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.title}
-                </option>
-              ))}
+              <option value="task">Task</option>
+              <option value="goal">Goal</option>
+              <option value="challenge">Challenge</option>
             </select>
-          </label>
-          <select
-            value={node.frame}
-            onChange={(e) => setFrame(a.id, e.target.value as AdvFrame)}
-            aria-label="Frame"
-            className="rounded-md border border-white/15 bg-[#241a12] px-1.5 py-1 text-[0.65rem] font-semibold text-white"
-          >
-            <option value="task">Task</option>
-            <option value="goal">Goal</option>
-            <option value="challenge">Challenge</option>
-          </select>
+            {custom ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setEditing({ draft: custom, isNew: false })}
+                  className={`${SMALL_BUTTON} border-white/15 text-white/70 hover:border-[var(--outpost-accent)] hover:text-white`}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => (confirmDelete === a.id ? deleteCustom(a.id) : setConfirmDelete(a.id))}
+                  onBlur={() => setConfirmDelete((cur) => (cur === a.id ? null : cur))}
+                  className={`${SMALL_BUTTON} ${
+                    confirmDelete === a.id ? "border-red-500 bg-red-950/60 text-red-300" : "border-white/15 text-white/50 hover:text-red-300"
+                  }`}
+                >
+                  {confirmDelete === a.id ? "Delete for good?" : "Delete"}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setRemoved(a.id, true)}
+                title="Hide it, stop it unlocking, and leave it out of every total. Undo from Removed below."
+                className={`${SMALL_BUTTON} border-white/15 text-white/50 hover:border-red-500/60 hover:text-red-300`}
+              >
+                Remove
+              </button>
+            )}
+          </div>
         </div>
+        {custom && (
+          <p className="mt-1 text-[0.65rem] text-white/40">
+            Unlocks when: {describeTrigger(custom.trigger, catalog)} · {custom.xp} XP{custom.secret ? " · secret" : ""}
+          </p>
+        )}
       </div>
     );
   }
 
   const q = query.trim().toLowerCase();
-  const filtered = q
-    ? ACHIEVEMENTS.filter((a) => a.title.toLowerCase().includes(q) || a.id.toLowerCase().includes(q))
-    : ACHIEVEMENTS;
-  const byCategory = new Map<AchievementCategory, typeof ACHIEVEMENTS>();
-  for (const a of filtered) {
+  const matches = (a: AchievementDef) => !q || a.title.toLowerCase().includes(q) || a.id.toLowerCase().includes(q);
+  const byCategory = new Map<AchievementCategory, AchievementDef[]>();
+  for (const a of catalog.list.filter(matches)) {
     if (!byCategory.has(a.category)) byCategory.set(a.category, []);
     byCategory.get(a.category)!.push(a);
   }
+  const removed = config.removedAchievements
+    .map((id) => ACHIEVEMENTS.find((a) => a.id === id))
+    .filter((a): a is AchievementDef => !!a && matches(a));
 
   return (
     <div>
       <p className="text-sm text-slate-400">
-        How the Outpost&apos;s Achievements tab chains its advancement trees. For each achievement, pick the one it
-        comes <span className="font-semibold text-white">after</span> (same category only) and its frame: Task,
-        Goal, or a spiky Challenge. Unlocking isn&apos;t affected, only how the trees are drawn.
+        Add your own achievements, remove built-in ones, and chain them into the Outpost&apos;s advancement trees. For
+        each one, pick the achievement it comes <span className="font-semibold text-white">after</span> (same
+        category only) and its frame: Task, Goal, or a spiky Challenge.
       </p>
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search achievements..."
-        className="mt-3 w-full rounded-md border border-white/15 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/30"
-      />
+      <p className="mt-2 text-xs text-slate-500">
+        A new achievement unlocks from something the Outpost already counts (visits, quiz answers, meals, the
+        Engine&apos;s stage, and more) or from earning a set of other achievements. A brand-new kind of trigger still
+        needs code.
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search achievements..."
+          className="min-w-0 flex-1 rounded-md border border-white/15 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/30"
+        />
+        <button
+          type="button"
+          onClick={() => setEditing({ draft: blankCustom(), isNew: true })}
+          disabled={editing?.isNew}
+          className="rounded-md border border-[var(--outpost-accent)] px-3 py-2 text-sm font-semibold text-[var(--outpost-accent)] transition-colors hover:bg-[var(--outpost-accent-soft)] disabled:opacity-40"
+        >
+          + Add achievement
+        </button>
+      </div>
+
+      {editing && (
+        <div className="mt-3">
+          <CustomAchievementEditor
+            key={editing.draft.id}
+            draft={editing.draft}
+            isNew={editing.isNew}
+            catalog={catalog}
+            onSave={(a) => saveCustom(a, editing.isNew)}
+            onCancel={() => setEditing(null)}
+          />
+        </div>
+      )}
+
       <div className="mt-3 max-h-[32rem] space-y-2 overflow-y-auto pr-1">
         {CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((c) => (
           <CollapsibleSection key={c} foldKey={`achievements:${c}`} title={CATEGORY_LABELS[c]} count={byCategory.get(c)!.length}>
@@ -573,6 +891,22 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
             ))}
           </CollapsibleSection>
         ))}
+        {removed.length > 0 && (
+          <CollapsibleSection foldKey="achievements:removed" title="Removed" count={removed.length} danger>
+            {removed.map((a) => (
+              <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white/5 px-2.5 py-1.5 text-xs opacity-70">
+                <AchievementLabel achievement={a} />
+                <button
+                  type="button"
+                  onClick={() => setRemoved(a.id, false)}
+                  className={`${SMALL_BUTTON} border-white/15 text-white/70 hover:border-[var(--outpost-accent)] hover:text-white`}
+                >
+                  Restore
+                </button>
+              </div>
+            ))}
+          </CollapsibleSection>
+        )}
       </div>
     </div>
   );

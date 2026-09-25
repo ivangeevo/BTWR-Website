@@ -247,7 +247,7 @@ export function loadState(): HubState {
       cardOrder = [...known, ...DEFAULT_CARD_ORDER.filter((id) => !known.includes(id))];
     }
     const unlocked = Object.fromEntries(
-      Object.entries(parsed.unlocked ?? {}).filter(([id]) => id in ACHIEVEMENTS_BY_ID)
+      Object.entries(parsed.unlocked ?? {}).filter(([id]) => id in ACHIEVEMENTS_BY_ID || id.startsWith("custom-"))
     ) as HubState["unlocked"];
     // Old saves may still carry the retired First Iron Tool / Priorities slices.
     delete (parsed as Record<string, unknown>).firstIronTool;

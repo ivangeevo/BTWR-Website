@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Mod, PackRelease } from "@/lib/mods";
-import { ACHIEVEMENTS } from "./achievements-catalog";
 import { AchievementsProvider, useAchievements } from "./AchievementsProvider";
 import AccomplishmentsSection from "./AccomplishmentsSection";
 import AchievementToastStack from "./AchievementToastStack";
@@ -103,9 +102,9 @@ function rankForProgress(unlockedCount: number, total: number): string {
 // The slim bar across the top: status and title (with the Prestige badge),
 // the tabs in the middle, the rank bar and settings gear on the right.
 function TopBar({ tabs }: { tabs: ReturnType<typeof useOutpostTabs> }) {
-  const { unlocked, mounted } = useAchievements();
+  const { unlocked, mounted, achievements } = useAchievements();
   const totalUnlocked = unlocked.size;
-  const totalAchievements = ACHIEVEMENTS.length;
+  const totalAchievements = achievements.length;
   const percent = mounted ? Math.round((totalUnlocked / totalAchievements) * 100) : 0;
 
   return (

@@ -3,11 +3,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  ACHIEVEMENTS,
-  ACHIEVEMENTS_BY_ID,
   CATEGORY_LABELS,
   CATEGORY_ORDER,
   type AchievementCategory,
+  type AchievementDef,
   type AchievementId,
 } from "./achievements-catalog";
 import {
@@ -65,8 +64,8 @@ function writeView(v: SavedView) {
 
 // A category's tab icon: its first root that isn't a secret (a secret's
 // icon would give it away before it's found).
-function tabIcon(tree: AchievementTree, category: AchievementCategory): string {
-  const root = ACHIEVEMENTS.find((a) => a.category === category && tree[a.id].parent === null && !a.secret);
+function tabIcon(tree: AchievementTree, list: readonly AchievementDef[], category: AchievementCategory): string {
+  const root = list.find((a) => a.category === category && tree[a.id].parent === null && !a.secret);
   return root?.icon ?? "\u{2754}";
 }
 
@@ -88,7 +87,9 @@ function NodeCard({ node, frame, earnedAt, anchor }: {
   earnedAt: string | undefined;
   anchor: DOMRect;
 }) {
-  const a = ACHIEVEMENTS_BY_ID[node.id];
+  const { achievementsById } = useAchievements();
+  const a = achievementsById[node.id];
+  if (!a) return null;
   const earned = !!earnedAt;
   const hidden = node.masked;
   const right = anchor.right + CARD_MARGIN + CARD_W <= window.innerWidth;
@@ -117,7 +118,7 @@ function AdvancementCanvas({ category, pan, onPan }: {
   pan: Pan | undefined;
   onPan: (p: Pan) => void;
 }) {
-  const { unlocked, unlockedAt, achievementTree } = useAchievements();
+  const { unlocked, unlockedAt, achievementTree, achievements, achievementsById } = useAchievements();
   const reduced = useReducedMotion();
   const viewportRef = useRef<HTMLDivElement>(null);
   const [vw, setVw] = useState(0);
@@ -126,8 +127,12 @@ function AdvancementCanvas({ category, pan, onPan }: {
   const drag = useRef<{ startX: number; startY: number; from: Pan; moved: boolean } | null>(null);
 
   const layout = useMemo(
-    () => layoutTree(achievementTree, visibleNodes(achievementTree, category, unlocked)),
-    [achievementTree, category, unlocked]
+    () =>
+      layoutTree(
+        achievementTree,
+        visibleNodes(achievementTree, category, unlocked, { list: achievements, byId: achievementsById })
+      ),
+    [achievementTree, category, unlocked, achievements, achievementsById]
   );
   const layerW = layout.width + PAD * 2;
   const layerH = layout.height + PAD * 2;
@@ -233,7 +238,7 @@ function AdvancementCanvas({ category, pan, onPan }: {
             })}
           </svg>
           {layout.nodes.map((n) => {
-            const a = ACHIEVEMENTS_BY_ID[n.id];
+            const a = achievementsById[n.id]!;
             const frame = achievementTree[n.id].frame;
             const earned = unlocked.has(n.id);
             return (
@@ -321,7 +326,7 @@ function LedgerSection() {
 }
 
 export default function AchievementGallery() {
-  const { unlocked, mounted, achievementTree } = useAchievements();
+  const { unlocked, mounted, achievementTree, achievements } = useAchievements();
   const [view, setView] = useState<SavedView>({ tab: CATEGORY_ORDER[0], pans: {} });
   const loaded = useRef(false);
 
@@ -346,12 +351,12 @@ export default function AchievementGallery() {
   const totals = useMemo(() => {
     const out = {} as Record<AchievementCategory, { earned: number; total: number }>;
     for (const c of CATEGORY_ORDER) out[c] = { earned: 0, total: 0 };
-    for (const a of ACHIEVEMENTS) {
+    for (const a of achievements) {
       out[a.category].total++;
       if (unlocked.has(a.id)) out[a.category].earned++;
     }
     return out;
-  }, [unlocked]);
+  }, [unlocked, achievements]);
 
   const tabs = CATEGORY_ORDER.filter((c) => totals[c].total > 0);
   const tab = tabs.includes(view.tab) ? view.tab : tabs[0];
@@ -360,7 +365,7 @@ export default function AchievementGallery() {
     <div>
       <div className="flex items-center justify-end">
         <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-[var(--outpost-accent)]">
-          {unlocked.size}/{ACHIEVEMENTS.length} unlocked
+          {unlocked.size}/{achievements.length} unlocked
         </span>
       </div>
 
@@ -379,7 +384,7 @@ export default function AchievementGallery() {
               className={`adv-tab ${active ? "adv-tab-active" : ""}`}
             >
               <span className="text-lg leading-none" aria-hidden="true">
-                {tabIcon(achievementTree, c)}
+                {tabIcon(achievementTree, achievements, c)}
               </span>
               <span className="adv-tab-count">{c === "secrets" ? `${t.earned} found` : `${t.earned}/${t.total}`}</span>
             </button>

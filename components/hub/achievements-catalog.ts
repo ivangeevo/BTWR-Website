@@ -1,6 +1,6 @@
 import { ENGINE_ACHIEVEMENT_DEFS, type EngineAchievementId } from "./engine/achievements";
 
-export type AchievementId =
+export type BuiltinAchievementId =
   // Tier 1 (12) — the original, simple hangout-spot achievements.
   | "first-visit"
   | "mod-of-day-viewed"
@@ -74,6 +74,11 @@ export type AchievementId =
   | "pd-insight-1" | "pd-insight-10" | "pd-insight-50" | "pd-insight-200"
   // The Analytical Engine's own category (engine/achievements.ts).
   | EngineAchievementId;
+
+// Achievements added in /outpost-admin (see custom-achievements.ts) carry
+// a "custom-" prefix, so they can never collide with a built-in id.
+export type CustomAchievementId = `custom-${string}`;
+export type AchievementId = BuiltinAchievementId | CustomAchievementId;
 
 // Groups achievements for the gallery. "secrets" is special-cased there:
 // unlocked secrets show normally under this group, but locked ones are

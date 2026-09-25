@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ACHIEVEMENTS } from "./achievements-catalog";
+import { loadAdminConfig, resolvedAchievementCatalog } from "./admin-config";
+import type { ActiveCatalog } from "./custom-achievements";
 import { defaultState, loadState, saveState, type HubState } from "./hub-storage";
 import OutpostCorners from "./OutpostCorners";
 import Link from "next/link";
@@ -18,6 +19,8 @@ const RESET_CONFIRM_WINDOW_MS = 4000;
 export default function OutpostControlPanel() {
   const [state, setState] = useState<HubState>(defaultState());
   const [mounted, setMounted] = useState(false);
+  // Achievements that exist with this browser's /outpost-admin settings.
+  const [catalog, setCatalog] = useState<ActiveCatalog | null>(null);
   const [confirmingReset, setConfirmingReset] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -26,6 +29,7 @@ export default function OutpostControlPanel() {
 
   useEffect(() => {
     setState(loadState());
+    setCatalog(resolvedAchievementCatalog(loadAdminConfig()));
     setPhone(isPhoneDevice());
     setMounted(true);
     return () => {
@@ -63,8 +67,8 @@ export default function OutpostControlPanel() {
   }
 
   const isEnabled = mounted && state.enabled && !phone;
-  const visibleTotal = ACHIEVEMENTS.length;
-  const visibleUnlockedCount = Object.keys(state.unlocked).length;
+  const visibleTotal = catalog?.list.length ?? 0;
+  const visibleUnlockedCount = catalog ? Object.keys(state.unlocked).filter((id) => id in catalog.byId).length : 0;
 
   const enableSwitch = (
     <button

@@ -3,6 +3,10 @@
 // fog-of-war and layout logic the tree view draws from. Display only —
 // how and when achievements unlock is untouched (AchievementsProvider).
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID, type AchievementCategory, type AchievementId } from "./achievements-catalog";
+import { BUILTIN_CATALOG, type ActiveCatalog } from "./custom-achievements";
+
+/** The achievements that exist right now (see custom-achievements.ts). */
+type Catalog = Pick<ActiveCatalog, "list" | "byId">;
 
 /** Minecraft's three advancement frames: plain task, milestone goal, spiky challenge. */
 export type AdvFrame = "task" | "goal" | "challenge";
@@ -271,11 +275,20 @@ export type TreeOverrides = {
   frame?: Partial<Record<AchievementId, AdvFrame>>;
 };
 
-// The authored tree with admin edits applied. A parent edit is ignored if
-// the parent doesn't exist, sits in a different category (each tab is one
-// category's canvas) or would create a loop.
-export function resolveTree(overrides: TreeOverrides = {}): AchievementTree {
-  const tree: AchievementTree = { ...DEFAULT_ACHIEVEMENT_TREE };
+// The authored tree with admin edits applied, over whichever achievements
+// exist right now (custom-achievements.ts): a custom one starts as its own
+// root, a removed one leaves the tree and its children become roots. A
+// parent edit is ignored if the parent doesn't exist, sits in a different
+// category (each tab is one category's canvas) or would create a loop.
+export function resolveTree(overrides: TreeOverrides = {}, catalog: Catalog = BUILTIN_CATALOG): AchievementTree {
+  const byId = catalog.byId;
+  const tree = {} as AchievementTree;
+  for (const a of catalog.list) {
+    const authored = DEFAULT_ACHIEVEMENT_TREE[a.id];
+    tree[a.id] = authored
+      ? { ...authored, parent: authored.parent && byId[authored.parent] ? authored.parent : null }
+      : { parent: null, frame: a.secret ? "challenge" : "task" };
+  }
   for (const [id, frame] of Object.entries(overrides.frame ?? {}) as [AchievementId, AdvFrame][]) {
     if (tree[id] && (frame === "task" || frame === "goal" || frame === "challenge")) tree[id] = { ...tree[id], frame };
   }
@@ -285,8 +298,8 @@ export function resolveTree(overrides: TreeOverrides = {}): AchievementTree {
       tree[id] = { ...tree[id], parent: null };
       continue;
     }
-    const p = ACHIEVEMENTS_BY_ID[parent];
-    if (!p || p.category !== ACHIEVEMENTS_BY_ID[id].category) continue;
+    const p = byId[parent];
+    if (!p || p.category !== byId[id]?.category) continue;
     if (isSelfOrDescendant(tree, id, parent)) continue;
     tree[id] = { ...tree[id], parent };
   }
@@ -307,10 +320,11 @@ export type TreeNodeView = {
 export function visibleNodes(
   tree: AchievementTree,
   category: AchievementCategory,
-  unlocked: ReadonlySet<string>
+  unlocked: ReadonlySet<string>,
+  catalog: Catalog = BUILTIN_CATALOG
 ): TreeNodeView[] {
-  const ids = ACHIEVEMENTS.filter((a) => a.category === category).map((a) => a.id);
-  const secret = (id: AchievementId) => !!ACHIEVEMENTS_BY_ID[id]?.secret;
+  const ids = catalog.list.filter((a) => a.category === category && tree[a.id]).map((a) => a.id);
+  const secret = (id: AchievementId) => !!catalog.byId[id]?.secret;
   const shown = new Set<AchievementId>();
   for (const id of ids) {
     const parent = tree[id].parent;

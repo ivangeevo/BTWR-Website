@@ -10,8 +10,6 @@ import {
   useState,
 } from "react";
 import {
-  ACHIEVEMENTS,
-  ACHIEVEMENTS_BY_ID,
   ALL_HAND_AUTHORED_IDS,
   CATEGORY_ORDER,
   EXPANSION_IDS,
@@ -59,6 +57,7 @@ import {
 } from "./resources";
 import {
   defaultAdminConfig,
+  resolvedAchievementCatalog,
   resolvedAchievementTree,
   isModuleDisabled,
   loadAdminConfig,
@@ -84,6 +83,11 @@ import type {
 } from "./mechanics";
 import { DEFAULT_CARD_ORDER, type ModuleId } from "./module-registry";
 import type { AchievementTree } from "./achievement-tree";
+import {
+  BUILTIN_CATALOG,
+  customTriggerMet,
+  type ActiveCatalog,
+} from "./custom-achievements";
 import type { UpgradeDef, UpgradeId } from "./upgrade-catalog";
 import {
   computeLedgerProgress,
@@ -111,6 +115,10 @@ export type ToastInstance = { instanceId: string; achievementId: AchievementId }
 
 type AchievementsContextValue = {
   mounted: boolean;
+  /** Every achievement that exists right now — built-ins not removed in /outpost-admin, plus custom ones. */
+  achievements: ActiveCatalog["list"];
+  achievementsById: ActiveCatalog["byId"];
+  /** Earned achievements that still exist (a removed one's unlock stays saved, just not shown or counted). */
   unlocked: Set<AchievementId>;
   /** When each earned achievement was unlocked (ISO timestamps). */
   unlockedAt: HubState["unlocked"];
@@ -229,6 +237,8 @@ const RESIZE_DEBOUNCE_MS = 300;
 // `if (x >= n) unlock(...)` calls throughout this file.
 type ExpansionCtx = {
   state: HubState;
+  /** Achievements that exist right now (admin-removed ones left out, custom ones in). */
+  catalog: ActiveCatalog;
   unlockedCount: number;
   unlockedSet: Set<AchievementId>;
   level: number;
@@ -373,7 +383,7 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
   {
     id: "nr-secrets-half",
     check: (c) => {
-      const secrets = ACHIEVEMENTS.filter((a) => a.secret);
+      const secrets = c.catalog.list.filter((a) => a.secret);
       const have = secrets.filter((a) => c.unlockedSet.has(a.id)).length;
       return secrets.length > 0 && have >= Math.ceil(secrets.length / 2);
     },
@@ -381,14 +391,14 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
   {
     id: "nr-secrets-most",
     check: (c) => {
-      const secrets = ACHIEVEMENTS.filter((a) => a.secret);
+      const secrets = c.catalog.list.filter((a) => a.secret);
       const have = secrets.filter((a) => c.unlockedSet.has(a.id)).length;
       return secrets.length > 0 && have >= Math.ceil(secrets.length * 0.8);
     },
   },
   {
     id: "nr-category-quiz",
-    check: (c) => ACHIEVEMENTS.filter((a) => a.category === "quiz").every((a) => c.unlockedSet.has(a.id)),
+    check: (c) => c.catalog.list.filter((a) => a.category === "quiz").every((a) => c.unlockedSet.has(a.id)),
   },
   {
     id: "nr-category-manual",
@@ -424,7 +434,11 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
   {
     id: "fr-all-categories",
     check: (c) =>
-      CATEGORY_ORDER.every((cat) => ACHIEVEMENTS.some((a) => a.category === cat && c.unlockedSet.has(a.id))),
+      CATEGORY_ORDER.every(
+        (cat) =>
+          !c.catalog.list.some((a) => a.category === cat) ||
+          c.catalog.list.some((a) => a.category === cat && c.unlockedSet.has(a.id))
+      ),
   },
   {
     id: "fr-master-every-trade",
@@ -435,7 +449,7 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
   {
     id: "fr-nothing-hidden",
     check: (c) =>
-      ACHIEVEMENTS.filter((a) => a.secret && a.id !== "fr-nothing-hidden").every((a) => c.unlockedSet.has(a.id)),
+      c.catalog.list.filter((a) => a.secret && a.id !== "fr-nothing-hidden").every((a) => c.unlockedSet.has(a.id)),
   },
   {
     id: "fr-complete-111",
@@ -514,6 +528,9 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // editing, this is a fresh mount that picks up the new config naturally.
   const [adminConfig, setAdminConfig] = useState<AdminConfig>(defaultAdminConfig());
   const adminConfigRef = useRef<AdminConfig>(defaultAdminConfig());
+  // Which achievements exist (read synchronously by unlock(), so a removed
+  // one can never be earned — not even by a direct unlock("id") call).
+  const catalogRef = useRef<ActiveCatalog>(BUILTIN_CATALOG);
 
   // --- Ponder / The Analytical Engine ---
   // The engine slice's single source of truth is this ref: EngineProvider
@@ -605,10 +622,12 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   const unlock = useCallback(
     (id: AchievementId) => {
       if (unlockedRef.current.has(id)) return;
+      // Removed in /outpost-admin (or unknown): nothing to earn.
+      const def = catalogRef.current.byId[id];
+      if (!def) return;
       unlockedRef.current.add(id);
       sessionUnlockCountRef.current += 1;
       const timestamp = new Date().toISOString();
-      const def = ACHIEVEMENTS_BY_ID[id];
       // Skill Points per achievement — the Upgrades shop's passive income
       // (see mechanics.ts's UpgradesMechanic). Bumped in lockstep with the
       // ref, same pattern as every other synchronously-read mutator here.
@@ -620,7 +639,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
       setState((prev) => {
         const activityLog = [
-          { ts: timestamp, text: `Achievement: ${def?.title ?? id}` },
+          { ts: timestamp, text: `Achievement: ${def.title}` },
           ...prev.tier2.activityLog,
         ].slice(0, ACTIVITY_LOG_MAX);
         const next = {
@@ -632,7 +651,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         saveState(next);
         return next;
       });
-      if (def) addXp(def.xp ?? DEFAULT_ACHIEVEMENT_XP);
+      addXp(def.xp ?? DEFAULT_ACHIEVEMENT_XP);
 
       if (settingsRef.current.toastsEnabled) {
         setToasts((prev) => [
@@ -1359,6 +1378,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     liveEngine.current = next.engine;
     const loadedAdminConfig = loadAdminConfig();
     adminConfigRef.current = loadedAdminConfig;
+    catalogRef.current = resolvedAchievementCatalog(loadedAdminConfig);
     engineCfgRef.current = resolveEngineConfig(loadedAdminConfig.engine);
     setAdminConfig(loadedAdminConfig);
     patchSwitchCountRef.current = loaded.tier2.patchNotesModeSwitchCount;
@@ -1481,6 +1501,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     const ledger = computeLedgerProgress(state);
     const ctx: ExpansionCtx = {
       state,
+      catalog: catalogRef.current,
       unlockedCount: unlockedRef.current.size,
       unlockedSet: unlockedRef.current,
       level,
@@ -1500,6 +1521,10 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     }
     for (const rule of CUSTOM_RULES) {
       if (!unlockedRef.current.has(rule.id) && rule.check(ctx)) unlock(rule.id);
+    }
+    // Achievements added in /outpost-admin, each with its own rule.
+    for (const a of ctx.catalog.custom) {
+      if (!unlockedRef.current.has(a.id) && customTriggerMet(a, ctx, ctx.catalog)) unlock(a.id);
     }
 
     // Ledger Entries — log a Chronicle line only for newly-crossed ranks,
@@ -1542,7 +1567,15 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     (id: ModuleId): boolean => !isModuleDisabled(adminConfig, id) && engineStage >= resolvedModuleStage(adminConfig, id),
     [adminConfig, engineStage]
   );
-  const achievementTree = useMemo(() => resolvedAchievementTree(adminConfig), [adminConfig]);
+  const catalog = useMemo(() => resolvedAchievementCatalog(adminConfig), [adminConfig]);
+  const achievementTree = useMemo(() => resolvedAchievementTree(adminConfig, catalog), [adminConfig, catalog]);
+  // Rebuilt whenever the save's unlocks change (unlockedRef itself is mutated in place).
+  const shownUnlocked = useMemo(() => {
+    const all = unlockedRef.current;
+    if (adminConfig.removedAchievements.length === 0) return all;
+    return new Set([...all].filter((id) => catalog.byId[id]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog, adminConfig.removedAchievements, state.unlocked]);
   const toolTiersList = useMemo(() => resolvedToolTiers(adminConfig), [adminConfig]);
   const craftCostFor = useCallback(
     (tierId: string) => resolvedCraftCost(adminConfig, tierId),
@@ -1590,7 +1623,9 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
   const value: AchievementsContextValue = {
     mounted,
-    unlocked: unlockedRef.current,
+    achievements: catalog.list,
+    achievementsById: catalog.byId,
+    unlocked: shownUnlocked,
     unlockedAt: state.unlocked,
     unlock,
     toasts,

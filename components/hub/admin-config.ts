@@ -9,6 +9,12 @@ import { DEFAULT_MODULE_STAGE, type ModuleId } from "./module-registry";
 import { MODULE_MECHANICS } from "./mechanics";
 import type { EngineAdminOverrides } from "./engine/config";
 import { resolveTree, type AchievementTree, type AdvFrame } from "./achievement-tree";
+import {
+  activeCatalog,
+  sanitizeCustom,
+  type ActiveCatalog,
+  type CustomAchievement,
+} from "./custom-achievements";
 import { UPGRADES, type UpgradeDef, type UpgradeId } from "./upgrade-catalog";
 import {
   RESOURCE_IDS,
@@ -62,6 +68,10 @@ export type AdminConfig = {
   achievementParent: Partial<Record<AchievementId, AchievementId | "root">>;
   /** Overrides an achievement's tree frame (task / goal / challenge). */
   achievementFrame: Partial<Record<AchievementId, AdvFrame>>;
+  /** Achievements added here, each with its own unlock rule — see custom-achievements.ts. */
+  customAchievements: CustomAchievement[];
+  /** Built-in achievements taken out: hidden, never unlocked, left out of every total. */
+  removedAchievements: AchievementId[];
   toolTierEdits: Partial<Record<string, Partial<ToolTier>>>;
   customToolTiers: CustomToolTier[];
   /** Overrides a tool tier's craft cost — works for both built-ins (which
@@ -94,6 +104,8 @@ export function defaultAdminConfig(): AdminConfig {
     moduleDisabled: {},
     achievementParent: {},
     achievementFrame: {},
+    customAchievements: [],
+    removedAchievements: [],
     toolTierEdits: {},
     customToolTiers: [],
     craftCostEdits: {},
@@ -142,6 +154,12 @@ function normalizeAdminConfig(parsed: Partial<AdminConfig>): AdminConfig {
     moduleDisabled: { ...base.moduleDisabled, ...parsed.moduleDisabled },
     achievementParent: { ...base.achievementParent, ...parsed.achievementParent },
     achievementFrame: { ...base.achievementFrame, ...parsed.achievementFrame },
+    customAchievements: Array.isArray(parsed.customAchievements)
+      ? parsed.customAchievements.map(sanitizeCustom).filter((a): a is CustomAchievement => a !== null)
+      : [],
+    removedAchievements: Array.isArray(parsed.removedAchievements)
+      ? parsed.removedAchievements.filter((id): id is AchievementId => typeof id === "string")
+      : [],
     toolTierEdits: { ...base.toolTierEdits, ...parsed.toolTierEdits },
     customToolTiers: Array.isArray(parsed.customToolTiers) ? parsed.customToolTiers : [],
     craftCostEdits: { ...base.craftCostEdits, ...parsed.craftCostEdits },
@@ -204,8 +222,13 @@ export function isModuleDisabled(config: AdminConfig, moduleId: ModuleId): boole
   return moduleId !== "ponder" && config.moduleDisabled[moduleId] === true;
 }
 
-export function resolvedAchievementTree(config: AdminConfig): AchievementTree {
-  return resolveTree({ parent: config.achievementParent, frame: config.achievementFrame });
+/** Every achievement that exists with these settings: built-ins not removed, plus custom ones. */
+export function resolvedAchievementCatalog(config: AdminConfig): ActiveCatalog {
+  return activeCatalog(config.customAchievements, config.removedAchievements);
+}
+
+export function resolvedAchievementTree(config: AdminConfig, catalog = resolvedAchievementCatalog(config)): AchievementTree {
+  return resolveTree({ parent: config.achievementParent, frame: config.achievementFrame }, catalog);
 }
 
 // Merges the built-in 6-tier ladder with any admin edits/additions into one

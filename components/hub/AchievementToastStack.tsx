@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ACHIEVEMENTS_BY_ID } from "./achievements-catalog";
 import type { AdvFrame } from "./achievement-tree";
 import { useAchievements, type ToastInstance } from "./AchievementsProvider";
 
@@ -23,8 +22,8 @@ function Toast({
   onRemove: (instanceId: string) => void;
 }) {
   const [leaving, setLeaving] = useState(false);
-  const { achievementTree } = useAchievements();
-  const achievement = ACHIEVEMENTS_BY_ID[toast.achievementId];
+  const { achievementTree, achievementsById } = useAchievements();
+  const achievement = achievementsById[toast.achievementId];
 
   useEffect(() => {
     const timer = setTimeout(() => setLeaving(true), AUTO_DISMISS_MS);
