@@ -62,13 +62,13 @@ export default function Gathering() {
   }
 
   return (
-    <div className="outpost-panel outpost-card-md rounded-xl p-5">
+    <div className="outpost-panel outpost-card-md rounded-xl p-4">
       <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-[var(--outpost-accent)]">
         Gathering
       </h3>
       <p className="mt-2 text-sm text-slate-300">Pick an activity — they share one rest timer.</p>
 
-      <div className="mt-4 flex gap-2" role="tablist">
+      <div className="mt-2.5 flex gap-1.5" role="tablist">
         {ACTIONS.map((a) => {
           const unlocked = isUnlocked(a.id);
           const isActive = active === a.id;
@@ -80,7 +80,7 @@ export default function Gathering() {
               aria-selected={isActive}
               disabled={!unlocked}
               onClick={() => unlocked && setActive(a.id)}
-              className={`flex flex-1 flex-col items-center gap-0.5 rounded-md border px-2 py-2 text-xs font-semibold transition-colors ${
+              className={`flex flex-1 flex-col items-center rounded-md border px-1.5 py-1 text-[11px] font-semibold leading-tight transition-colors ${
                 !unlocked
                   ? "cursor-not-allowed border-white/10 text-white/25"
                   : isActive
@@ -90,23 +90,23 @@ export default function Gathering() {
             >
               <span aria-hidden="true">{unlocked ? a.icon : "\u{1F512}"}</span>
               {a.label}
-              {!unlocked && <span className="text-[10px] font-normal text-white/35">Buy in Upgrades</span>}
+              {!unlocked && <span className="text-[9px] font-normal text-white/35">Buy in Upgrades</span>}
             </button>
           );
         })}
       </div>
 
       {active === "tree-mining" && (
-        <div className="mt-4">
-          <p className="text-sm text-slate-300">
+        <div className="mt-2.5">
+          <p className="text-xs text-slate-300">
             Hold to break down a tree for wood. Keep holding — letting go just pauses it.
           </p>
           {engineBuffs.sawPowered && (
-            <p className="mt-1 text-xs text-[var(--outpost-accent)]">
+            <p className="mt-1 text-[11px] text-[var(--outpost-accent)]">
               {"\u{1FA9A}"} The Engine&apos;s Saw is running: faster chops, +{engineBuffs.sawWood} {resourceMeta.wood.name}.
             </p>
           )}
-          <div className="mt-3">
+          <div className="mt-2">
             <HoldButton
               durationMs={Math.round(tool.treeMiningMs * engineBuffs.sawHoldMult)}
               disabled={remainingMs > 0}
@@ -119,16 +119,16 @@ export default function Gathering() {
       )}
 
       {active === "hunting" && (
-        <div className="mt-4">
-          <p className="text-sm text-slate-300">
+        <div className="mt-2.5">
+          <p className="text-xs text-slate-300">
             Head out for food. Once you&apos;ve set off there&apos;s no calling it back early.
           </p>
           {engineBuffs.millstonePowered && engineBuffs.millstoneFood > 0 && (
-            <p className="mt-1 text-xs text-[var(--outpost-accent)]">
+            <p className="mt-1 text-[11px] text-[var(--outpost-accent)]">
               {"\u{1FAA8}"} The Engine&apos;s Millstone is running: +{engineBuffs.millstoneFood} {resourceMeta.food.name} per trip.
             </p>
           )}
-          <div className="mt-3">
+          <div className="mt-2">
             <LoadingBarButton
               durationMs={tool.huntingMs}
               disabled={remainingMs > 0}
@@ -141,17 +141,17 @@ export default function Gathering() {
       )}
 
       {active === "mining" && (
-        <div className="mt-4">
-          <p className="text-sm text-slate-300">
+        <div className="mt-2.5">
+          <p className="text-xs text-slate-300">
             Hold to break rock. Yields Stone, Coal, Copper, and Iron — a better tool finds more of each.
           </p>
           {tool.miningMs === null ? (
-            <p className="mt-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-xs text-white/50">
+            <p className="mt-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-white/50">
               Craft a Stone Tool in the Crafting card first — mining bare-handed doesn&apos;t get you anywhere.
             </p>
           ) : (
             <>
-              <div className="mt-3">
+              <div className="mt-2">
                 <HoldButton
                   durationMs={tool.miningMs}
                   disabled={remainingMs > 0}
@@ -160,7 +160,7 @@ export default function Gathering() {
                   onComplete={handleMiningComplete}
                 />
               </div>
-              {lastYield && <p className="mt-2 text-xs text-[var(--outpost-accent)]">Found: {lastYield}</p>}
+              {lastYield && <p className="mt-1.5 text-[11px] text-[var(--outpost-accent)]">Found: {lastYield}</p>}
             </>
           )}
         </div>

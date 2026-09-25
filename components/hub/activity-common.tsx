@@ -26,7 +26,7 @@ export function useCooldownRemaining(cooldownUntil: string | null): number {
 export function CooldownNotice({ remainingMs }: { remainingMs: number }) {
   if (remainingMs <= 0) return null;
   return (
-    <p className="mt-2 text-xs text-white/40">
+    <p className="mt-1.5 text-[11px] text-white/40">
       Resting for {Math.ceil(remainingMs / 1000)}s before the next activity...
     </p>
   );

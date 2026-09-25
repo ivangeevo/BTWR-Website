@@ -86,10 +86,10 @@ export default function Campfire() {
       ) : (
         <>
           <div className="mt-2 flex items-center gap-2">
-            <span className="campfire-icon text-2xl leading-none" data-stage={stage} aria-hidden="true">
+            <span className="campfire-icon text-xl leading-none" data-stage={stage} aria-hidden="true">
               {CAMPFIRE_ICONS[stage]}
             </span>
-            <p className="font-semibold text-white">{CAMPFIRE_STAGES[stage]}</p>
+            <p className="text-sm font-semibold text-white">{CAMPFIRE_STAGES[stage]}</p>
           </div>
           <p className="mt-2 text-sm text-slate-300">{CAMPFIRE_CAPTIONS[stage]}</p>
           <button
@@ -98,12 +98,12 @@ export default function Campfire() {
               tendCampfire();
               setStage((s) => (s === null ? s : (Math.min(4, s + 1) as CampfireStage)));
             }}
-            className="btn-glow btn-gradient mt-3 rounded-lg px-4 py-1.5 text-sm font-semibold text-white"
+            className="btn-glow btn-gradient mt-2 rounded-lg px-3 py-1 text-xs font-semibold text-white"
           >
             Tend the Fire
           </button>
           {engineBuffs.bellowsPowered && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-[var(--outpost-accent)]">
+            <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--outpost-accent)]">
               <span>
                 {"\u{1FAAD}"} The Engine&apos;s Bellows are pumping — the fire lasts {engineBuffs.bellowsDecayMult}× longer.
               </span>
@@ -122,19 +122,19 @@ export default function Campfire() {
           )}
 
           {foodAvailable && (
-            <div className="mt-3 border-t border-white/10 pt-3">
-              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-white/40">
+            <div className="mt-2 border-t border-white/10 pt-2">
+              <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-white/40">
                 <span>Cooking</span>
                 <span className="normal-case text-white/60">
                   {resourceMeta.food.icon} {resources.food} · {resourceMeta.cookedFood.icon} {resources.cookedFood}
                 </span>
               </div>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-1.5 flex gap-2">
                 <button
                   type="button"
                   onClick={handleCook}
                   disabled={!canCook}
-                  className={`flex-1 rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors ${
+                  className={`flex-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors ${
                     canCook
                       ? "border-[var(--outpost-accent)] text-[var(--outpost-accent)] hover:bg-[var(--outpost-accent-soft)]"
                       : "border-white/15 text-white/30"
@@ -146,7 +146,7 @@ export default function Campfire() {
                   type="button"
                   onClick={handleEat}
                   disabled={resources.cookedFood < 1}
-                  className={`flex-1 rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors ${
+                  className={`flex-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors ${
                     resources.cookedFood >= 1
                       ? "border-[var(--outpost-accent)] text-[var(--outpost-accent)] hover:bg-[var(--outpost-accent-soft)]"
                       : "border-white/15 text-white/30"
@@ -156,14 +156,14 @@ export default function Campfire() {
                 </button>
               </div>
               {stage !== 3 && (
-                <p className="mt-1.5 text-[11px] text-white/35">
-                  Needs a Medium fire to cook — Low won&apos;t cook it, High just burns it.
+                <p className="mt-1 text-[10px] leading-snug text-white/35">
+                  Cooks on a Medium fire — Low won&apos;t, High burns it.
                 </p>
               )}
               {stage === 3 && resources.food < cookFoodCost && (
-                <p className="mt-1.5 text-[11px] text-white/35">Needs at least {cookFoodCost} Food — go hunting.</p>
+                <p className="mt-1 text-[10px] leading-snug text-white/35">Needs at least {cookFoodCost} Food — go hunting.</p>
               )}
-              {feedback && <p className="mt-1.5 text-xs text-[var(--outpost-accent)]">{feedback}</p>}
+              {feedback && <p className="mt-1 text-[11px] text-[var(--outpost-accent)]">{feedback}</p>}
               <CooldownNotice remainingMs={remainingMs} />
             </div>
           )}

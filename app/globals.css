@@ -1322,8 +1322,8 @@ html.daynight-fighting .outpost-zone::after {
   border-radius: 0.6rem;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background-color: rgba(255, 255, 255, 0.04);
-  padding: 0.65rem 1rem;
-  font-size: 0.85rem;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: #fff;
   text-align: center;
