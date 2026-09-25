@@ -31,7 +31,6 @@ import {
   type Tier2State,
 } from "./hub-storage";
 import { currentCampfireStage, type CampfireStage } from "./campfire-stage";
-import { PRIORITY_STEPS } from "./priorities-content";
 import { computeBuffs, type EngineBuffs } from "./engine/buffs";
 import { researchEffects } from "./engine/catalog/research";
 import { resolveEngineConfig, type EngineConfig } from "./engine/config";
@@ -159,10 +158,6 @@ type AchievementsContextValue = {
   /** Only succeeds while the fire is at the Medium stage and there's enough Food — see resources.ts. */
   completeCooking: () => boolean;
   eatCookedFood: () => boolean;
-  firstIronTool: HubState["firstIronTool"];
-  chooseIronTool: (toolId: string) => void;
-  priorities: HubState["priorities"];
-  togglePriorityStep: (id: string) => void;
   resources: HubState["resources"];
   tools: HubState["tools"];
   activityCooldownUntil: string | null;
@@ -351,13 +346,11 @@ const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) 
   { id: "fr-lifes-work", at: 20_000, read: (c) => c.state.tier2.lifetimeXp },
   { id: "fr-half-year", at: 180, read: (c) => c.state.tier2.totalDaysVisited },
   { id: "fr-prestige-10", at: 10, read: (c) => c.state.tier2.prestigeCount },
-  // The Campfire / Your First Iron Tool — stage/count only ever increase in
+  // The Campfire — stage/count only ever increase in
   // storage (decay is a display-layer computation, see campfire.ts), so a
   // plain threshold read is safe here.
   { id: "campfire-medium", at: 3, read: (c) => c.state.campfire.stage },
   { id: "campfire-overstoked", at: 4, read: (c) => c.state.campfire.stage },
-  { id: "iron-tool-completionist", at: 8, read: (c) => c.state.firstIronTool.triedTools.length },
-  { id: "priorities-completionist", at: PRIORITY_STEPS.length, read: (c) => c.state.priorities.checked.length },
   // Ponder / The Analytical Engine — its own rules live beside its
   // definitions in engine/achievements.ts.
   ...ENGINE_NUMERIC_RULES,
@@ -429,8 +422,6 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
   { id: "he-skin-session-swap", check: (c) => c.sessionSkinChanges >= 2 },
   { id: "he-round-trip", check: (c) => c.sessionExported && c.sessionImported },
   { id: "he-quiz-marathon", check: (c) => c.sessionAnswered >= 25 },
-  { id: "iron-tool-chosen", check: (c) => c.state.firstIronTool.choice !== null },
-  { id: "priorities-started", check: (c) => c.state.priorities.checked.length >= 1 },
   {
     id: "fr-wardrobe-certified",
     check: (c) => c.state.tier2.skinsTried.length >= 4 && c.state.tier2.skinChangeCount >= 20,
@@ -876,8 +867,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         modOfDay: { ...base.modOfDay, ...incoming.modOfDay },
         visits: { ...base.visits, ...incoming.visits },
         campfire: { ...base.campfire, ...incoming.campfire },
-        firstIronTool: { ...base.firstIronTool, ...incoming.firstIronTool },
-        priorities: { ...base.priorities, ...incoming.priorities },
         resources: { ...base.resources, ...incoming.resources },
         tools: { ...base.tools, ...incoming.tools },
         legacy: {
@@ -1021,28 +1010,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     addXp(resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire").eatXpReward);
     return true;
   }, [addXp]);
-
-  const chooseIronTool = useCallback((toolId: string) => {
-    setState((prev) => {
-      const triedTools = prev.firstIronTool.triedTools.includes(toolId)
-        ? prev.firstIronTool.triedTools
-        : [...prev.firstIronTool.triedTools, toolId];
-      const next = { ...prev, firstIronTool: { choice: toolId, triedTools } };
-      saveState(next);
-      return next;
-    });
-  }, []);
-
-  const togglePriorityStep = useCallback((id: string) => {
-    setState((prev) => {
-      const checked = prev.priorities.checked.includes(id)
-        ? prev.priorities.checked.filter((x) => x !== id)
-        : [...prev.priorities.checked, id];
-      const next = { ...prev, priorities: { checked } };
-      saveState(next);
-      return next;
-    });
-  }, []);
 
   function formatYield(yieldAmounts: Partial<ResourceState>): string {
     const meta = resolvedResourceMeta(adminConfigRef.current);
@@ -1716,10 +1683,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     tendCampfire,
     completeCooking,
     eatCookedFood,
-    firstIronTool: state.firstIronTool,
-    priorities: state.priorities,
-    togglePriorityStep,
-    chooseIronTool,
     resources: state.resources,
     tools: state.tools,
     activityCooldownUntil: state.activity.cooldownUntil,

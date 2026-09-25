@@ -19,8 +19,6 @@ export type ModuleId =
   | "campfire"
   | "gathering"
   | "patch-notes"
-  | "first-iron-tool"
-  | "priorities"
   | "crafting"
   | "guess-the-mod"
   | "tier-tip"
@@ -53,13 +51,6 @@ export const MODULES: ModuleDef[] = [
       "Tree Mining / Hunting / Mining combined into one card with tab toggles — Tree Mining is always available, Hunting and Mining reveal as later tiers unlock.",
   },
   { id: "patch-notes", label: "Patch Notes", description: "Modpack/mod changelog feed." },
-  { id: "first-iron-tool", label: "Your First Iron Tool", description: "Tool-choice flavor card." },
-  {
-    id: "priorities",
-    label: "Priorities",
-    description:
-      "The Beginner's Guide's own \"Priorities for the next few days\" checklist — sugarcane and clay through your first Chisel and Crafting Table.",
-  },
   { id: "crafting", label: "Crafting", description: "Spend resources on better tools." },
   { id: "guess-the-mod", label: "Guess the Mod", description: "Quiz card." },
   {
@@ -72,8 +63,8 @@ export const MODULES: ModuleDef[] = [
     label: "Resources & Tool",
     description: "Full-width readout of collected resources and the current tool tier.",
   },
-  { id: "your-progress", label: "Your Progress", description: "Full-width Overview + Progression section." },
-  { id: "accomplishments", label: "Accomplishments", description: "Full-width achievement gallery section." },
+  { id: "your-progress", label: "Progress tab", description: "The Outpost's Progress tab — Overview + Progression." },
+  { id: "accomplishments", label: "Achievements tab", description: "The Outpost's Achievements tab — the full achievement gallery." },
   // Prestige and Upgrades are deliberately absent here — see the ModuleId
   // comment above. They're configured from the Features tab now, not here.
 ];
@@ -90,8 +81,6 @@ export const DEFAULT_MODULE_TIER: Record<ModuleId, string> = {
   campfire: "tier1",
   gathering: "tier1",
   "patch-notes": "tier1",
-  "first-iron-tool": "tier1",
-  priorities: "tier1",
   crafting: "tier1",
   "guess-the-mod": "tier1",
   "tier-tip": "tier1",
@@ -106,7 +95,7 @@ export const DEFAULT_MODULE_TIER: Record<ModuleId, string> = {
 // list now that the grid is one modular 2-column layout instead of two
 // independently-stacked columns, laid out row-major (index 0 and 1 share a
 // row, 2 and 3 share the next, etc). This interleaving of the old left/right
-// lists (ponder, patch-notes, daily-briefing, first-iron-tool, ...) exactly
+// lists (ponder, patch-notes, daily-briefing, campfire, ...) exactly
 // reproduces the row pairings the old two-column layout already had, since
 // every card is the same height — so a visitor who hasn't bought the
 // card-reorder upgrade (or hasn't dragged anything yet) sees no change.
@@ -118,9 +107,7 @@ export const DEFAULT_CARD_ORDER: ModuleId[] = [
   "ponder",
   "patch-notes",
   "daily-briefing",
-  "first-iron-tool",
   "campfire",
-  "priorities",
   "gathering",
   "crafting",
   "guess-the-mod",

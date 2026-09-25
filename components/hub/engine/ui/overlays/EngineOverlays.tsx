@@ -77,8 +77,9 @@ export function EurekaLayer() {
       const btn = btnRef.current;
       const el = document.querySelector<HTMLElement>(`[data-module-id="${active.cardId}"]`);
       if (btn) {
-        if (el) {
-          const r = el.getBoundingClientRect();
+        // A card on a tab that isn't showing has no box — hide, don't fly to 0,0.
+        const r = el?.getBoundingClientRect();
+        if (el && r && r.width > 0) {
           btn.style.top = `${r.top + r.height * fyr}px`;
           btn.style.left = `${r.left + r.width * fxr}px`;
           btn.style.visibility = "visible";

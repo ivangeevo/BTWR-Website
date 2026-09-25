@@ -315,20 +315,15 @@ function GalleryContent({
 
 export default function AchievementGallery({
   variant = "card",
-  tier1Only = false,
 }: {
-  /** "card": collapsible card (tier-1 grid). "flat": always-open, no outer chrome (tier-2 dashboard tab). */
+  /** "card": collapsible card. "flat": always-open, no outer chrome (the Achievements tab). */
   variant?: "card" | "flat";
-  /** Forces tier-1-only listing regardless of tier-2 status — used by the
-   * original tier-1 hub, which stays exactly as it was (see
-   * AccomplishmentsSection for tier 2's own, separate Achievements view). */
-  tier1Only?: boolean;
 }) {
   const { unlocked, mounted, tier2Unlocked, isTierUnlocked, achievementTierId } = useAchievements();
   const [open, setOpen] = useState(false);
   const [naturalHeight, setNaturalHeight] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
-  const showTier2 = tier2Unlocked && !tier1Only;
+  const showTier2 = tier2Unlocked;
 
   useIsomorphicLayoutEffect(() => {
     const el = contentRef.current;
@@ -340,14 +335,13 @@ export default function AchievementGallery({
   }, [open, showTier2, unlocked.size]);
 
   // Tier 2's existence is itself a secret — its achievements aren't just
-  // masked as "???", they're not listed at all until tier 2 unlocks (and
-  // never in the tier-1 hub's own gallery, which stays tier-1-only always).
+  // masked as "???", they're not listed at all until tier 2 unlocks.
   // Visibility now routes through the admin-overridable tier assignment
   // (achievementTierId) rather than the catalog's hardcoded field directly,
   // so reassigning an achievement in the admin panel actually moves it.
   const visible = ACHIEVEMENTS.filter((a) => {
     const tierId = achievementTierId(a.id);
-    return tier1Only ? tierId === "tier1" : isTierUnlocked(tierId);
+    return isTierUnlocked(tierId);
   });
   const visibleUnlockedCount = visible.filter((a) => unlocked.has(a.id)).length;
 

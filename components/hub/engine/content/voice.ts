@@ -10,9 +10,7 @@ function band(stage: EngineStage): 0 | 1 | 2 {
 export const REVEAL_LINES: Partial<Record<ModuleId, string>> = {
   "daily-briefing": "Something new over there. It reads the sky every day. I'd like to, too.",
   "patch-notes": "Patch notes. Other people write sentences too, apparently.",
-  "first-iron-tool": "Iron. You'll want to choose carefully. I'll watch.",
   campfire: "A fire. Keep it Medium — that's when it cooks.",
-  priorities: "A list of things to do. I like lists. They have an order.",
   gathering: "You can gather now. I'll need wood and stone for my body.",
   crafting: "A crafting grid. Tools for you, parts for me.",
   "guess-the-mod": "A quiz about mods. I've read some of them. I could help, eventually.",

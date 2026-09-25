@@ -23,14 +23,9 @@ export type AchievementId =
   | "secret-logo-clicks"
   | "snow-pile-10min"
   | "snow-pile-50min"
-  // The Campfire and Your First Iron Tool — small BTW-Beginner's-Guide-
-  // inspired widgets, both tier 1.
+  // The Campfire — a small BTW-Beginner's-Guide-inspired widget, tier 1.
   | "campfire-medium"
   | "campfire-overstoked"
-  | "iron-tool-chosen"
-  | "iron-tool-completionist"
-  | "priorities-started"
-  | "priorities-completionist"
   // Tier 2 (13) — "community-edition" is a flavor achievement that fires
   // once unlockedCount reaches the ladder's tier2 threshold (admin-
   // config.ts); the rest are the 12 new, harder achievements that live
@@ -446,40 +441,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     tier: 1,
     category: "secrets",
   },
-  {
-    id: "iron-tool-chosen",
-    title: "Which Would You Choose?",
-    description: "Picked your first iron tool.",
-    icon: "\u{26CF}\u{FE0F}",
-    tier: 1,
-    category: "onboarding",
-  },
-  {
-    id: "iron-tool-completionist",
-    title: "Every Option Considered",
-    description: "Tried every first-iron-tool choice at least once.",
-    icon: "\u{1F9F0}",
-    secret: true,
-    tier: 1,
-    category: "secrets",
-  },
-  {
-    id: "priorities-started",
-    title: "Getting Organized",
-    description: "Checked off your first early priority.",
-    icon: "\u{1F4CB}",
-    tier: 1,
-    category: "onboarding",
-  },
-  {
-    id: "priorities-completionist",
-    title: "By the Book",
-    description: "Checked off every early priority, straight from the guide.",
-    icon: "\u{2705}",
-    secret: true,
-    tier: 1,
-    category: "secrets",
-  },
 
   // --- Tier 2 ---
   {
@@ -775,7 +736,7 @@ export const EXPANSION_IDS: AchievementId[] = [
 // expansion) — the "everything" capstones check against this.
 // Derived from ACHIEVEMENTS directly (not unioned from the individual id
 // lists) so it automatically includes every achievement that exists,
-// including ones outside those three groupings (e.g. the Campfire and
-// Your First Iron Tool) — the "everything" capstones should mean
+// including ones outside those three groupings (e.g. the
+// Campfire) — the "everything" capstones should mean
 // everything, not just the ids someone remembered to list here.
 export const ALL_HAND_AUTHORED_IDS: AchievementId[] = ACHIEVEMENTS.map((a) => a.id);

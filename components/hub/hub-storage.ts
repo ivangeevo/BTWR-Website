@@ -1,11 +1,11 @@
 import type { Mod } from "@/lib/mods";
-import type { AchievementId } from "./achievements-catalog";
+import { ACHIEVEMENTS_BY_ID, type AchievementId } from "./achievements-catalog";
 import { isPhoneDevice } from "./device";
 import { hashString } from "./engine/rng";
 import { defaultEngineState, normalizeEngineState } from "./engine/state";
 import type { EngineState } from "./engine/types";
 import { defaultLegacyState, type LegacyState } from "./legacy";
-import type { ModuleId } from "./module-registry";
+import { DEFAULT_CARD_ORDER, type ModuleId } from "./module-registry";
 import type { ResourceState } from "./resources";
 import { SKINS_BY_ID, type SkinId, type Tier2TabId } from "./tier2";
 
@@ -95,19 +95,6 @@ export type UpgradesState = {
   cardOrder: ModuleId[] | null;
 };
 
-export type FirstIronToolState = {
-  choice: string | null;
-  triedTools: string[];
-};
-
-// Which of the Beginner's Guide's own "Priorities for the next few days"
-// steps a visitor has checked off — see priorities-content.ts. Order-
-// independent (a plain set of checked ids), since the guide itself notes
-// most of these can be done in any order.
-export type PrioritiesState = {
-  checked: string[];
-};
-
 export type ToolState = {
   /** A built-in ToolTierId, or an admin-added custom tier's string id. */
   tier: string;
@@ -143,8 +130,6 @@ export type HubState = {
   modOfDay: { lastSeenDate: string | null };
   visits: { firstVisitAt: string | null; lastVisitDate: string | null; streakDays: number };
   campfire: CampfireState;
-  firstIronTool: FirstIronToolState;
-  priorities: PrioritiesState;
   resources: ResourceState;
   tools: ToolState;
   activity: ActivityState;
@@ -173,8 +158,6 @@ export function defaultState(): HubState {
     modOfDay: { lastSeenDate: null },
     visits: { firstVisitAt: null, lastVisitDate: null, streakDays: 0 },
     campfire: { stage: 0, lastTendedAt: null },
-    firstIronTool: { choice: null, triedTools: [] },
-    priorities: { checked: [] },
     resources: { wood: 0, food: 0, stone: 0, coal: 0, copper: 0, iron: 0, cookedFood: 0 },
     tools: { tier: "none" },
     activity: { cooldownUntil: null },
@@ -257,6 +240,18 @@ export function loadState(): HubState {
         if (right[i]) cardOrder.push(right[i]);
       }
     }
+    // Cards and achievements get retired over time — drop ids that no longer
+    // exist, and slot any new card in at the end of a customized order.
+    if (cardOrder) {
+      const known = cardOrder.filter((id, i) => DEFAULT_CARD_ORDER.includes(id) && cardOrder!.indexOf(id) === i);
+      cardOrder = [...known, ...DEFAULT_CARD_ORDER.filter((id) => !known.includes(id))];
+    }
+    const unlocked = Object.fromEntries(
+      Object.entries(parsed.unlocked ?? {}).filter(([id]) => id in ACHIEVEMENTS_BY_ID)
+    ) as HubState["unlocked"];
+    // Old saves may still carry the retired First Iron Tool / Priorities slices.
+    delete (parsed as Record<string, unknown>).firstIronTool;
+    delete (parsed as Record<string, unknown>).priorities;
     return {
       ...base,
       ...parsed,
@@ -264,8 +259,6 @@ export function loadState(): HubState {
       modOfDay: { ...base.modOfDay, ...parsed.modOfDay },
       visits: { ...base.visits, ...parsed.visits },
       campfire: { ...base.campfire, ...parsed.campfire },
-      firstIronTool: { ...base.firstIronTool, ...parsed.firstIronTool },
-      priorities: { ...base.priorities, ...parsed.priorities },
       resources: { ...base.resources, ...parsed.resources },
       tools: { ...base.tools, ...parsed.tools },
       activity: { ...base.activity, ...parsed.activity },
@@ -278,7 +271,7 @@ export function loadState(): HubState {
       upgrades: { ...base.upgrades, ...parsed.upgrades, cardOrder },
       engine: normalizeEngineState(parsed.engine),
       tier2,
-      unlocked: { ...parsed.unlocked },
+      unlocked,
     };
   } catch {
     return defaultState();

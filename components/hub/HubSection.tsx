@@ -6,18 +6,16 @@ import { ACHIEVEMENTS } from "./achievements-catalog";
 import { AchievementsProvider, useAchievements } from "./AchievementsProvider";
 import AccomplishmentsSection from "./AccomplishmentsSection";
 import AchievementToastStack from "./AchievementToastStack";
-import AchievementGallery from "./AchievementGallery";
 import Campfire from "./Campfire";
 import CraftingCard from "./CraftingCard";
 import DailyBriefing from "./DailyBriefing";
-import FirstIronTool from "./FirstIronTool";
 import Gathering from "./Gathering";
 import OutpostCorners from "./OutpostCorners";
 import OutpostSettings from "./OutpostSettings";
+import OutpostTabs, { OutpostTabPanel, useOutpostTabs } from "./OutpostTabs";
 import PatchNotes from "./PatchNotes";
 import Ponder from "./Ponder";
 import PrestigeBadge from "./PrestigeBadge";
-import Priorities from "./Priorities";
 import GuessTheMod from "./GuessTheMod";
 import ResourceToolStrip from "./ResourceToolStrip";
 import TierRevealNotice from "./TierRevealNotice";
@@ -63,10 +61,6 @@ function renderCard(id: ModuleId, mods: Mod[], packReleases: PackRelease[]): Rea
       return <Gathering />;
     case "patch-notes":
       return <PatchNotes mods={mods} packReleases={packReleases} />;
-    case "first-iron-tool":
-      return <FirstIronTool />;
-    case "priorities":
-      return <Priorities />;
     case "crafting":
       return <CraftingCard />;
     case "guess-the-mod":
@@ -122,7 +116,7 @@ function rankForProgress(unlockedCount: number, total: number): string {
 // Level/XP is a genuinely different kind of progress (see rankForProgress's
 // comment above) and now reads entirely from YourProgressSection instead,
 // so this stays the same plain achievement-completion bar for everyone.
-function HubHeader() {
+function HubHeader({ tabs }: { tabs: ReturnType<typeof useOutpostTabs> }) {
   const { unlocked, mounted } = useAchievements();
   const totalUnlocked = unlocked.size;
   const totalAchievements = ACHIEVEMENTS.length;
@@ -165,6 +159,7 @@ function HubHeader() {
           </div>
         </div>
       )}
+      <OutpostTabs {...tabs} />
     </div>
   );
 }
@@ -288,11 +283,6 @@ function HubBody({ mods, packReleases }: { mods: Mod[]; packReleases: PackReleas
         </ModuleGate>
       ))}
       <DropzoneEnd reorder={reorder} />
-      {!tier2Unlocked && (
-        <div className="sm:col-span-2">
-          <AchievementGallery tier1Only />
-        </div>
-      )}
     </div>
   );
 }
@@ -303,6 +293,7 @@ function HubBody({ mods, packReleases }: { mods: Mod[]; packReleases: PackReleas
 // (fixed amber) apply untouched, so a tier-1-only visitor sees no change.
 function OutpostFrame({ mods, packReleases }: { mods: Mod[]; packReleases: PackRelease[] }) {
   const { tier2Unlocked, tier2, settings } = useAchievements();
+  const tabs = useOutpostTabs();
   const skin = tier2Unlocked ? SKINS_BY_ID[tier2.skin] ?? SKINS_BY_ID.iron : null;
   const style = skin
     ? ({
@@ -319,19 +310,27 @@ function OutpostFrame({ mods, packReleases }: { mods: Mod[]; packReleases: PackR
       data-reduced-motion={settings.reducedMotion || undefined}
     >
       <OutpostCorners />
-      <HubHeader />
-      <div className="px-3 py-8 sm:py-10">
-        <HubBody mods={mods} packReleases={packReleases} />
-      </div>
+      <HubHeader tabs={tabs} />
+      {/* Basecamp stays mounted while another tab is open, so its cards keep
+          their in-progress state; the other two mount when opened. */}
+      <OutpostTabPanel id="basecamp" active={tabs.tab === "basecamp"} labelled={tabs.available.length > 1}>
+        <div className="px-3 py-8 sm:py-10">
+          <HubBody mods={mods} packReleases={packReleases} />
+        </div>
+      </OutpostTabPanel>
+      {tabs.tab === "progress" && (
+        <OutpostTabPanel id="progress" active labelled>
+          <YourProgressSection />
+        </OutpostTabPanel>
+      )}
+      {tabs.tab === "achievements" && (
+        <OutpostTabPanel id="achievements" active labelled>
+          <AccomplishmentsSection />
+        </OutpostTabPanel>
+      )}
       <TierRevealNotice />
       <EngineToasts />
       <EurekaLayer />
-      <ModuleGate id="your-progress">
-        <YourProgressSection />
-      </ModuleGate>
-      <ModuleGate id="accomplishments">
-        <AccomplishmentsSection />
-      </ModuleGate>
       <AchievementToastStack />
     </div>
   );

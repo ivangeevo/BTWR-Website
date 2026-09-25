@@ -54,7 +54,7 @@ export const BASE_TIER_IDS = ["tier1", "tier2"] as const;
 // from the Tier List tab.
 //
 // tier1-5 gate the actual module reveals (Ponder -> Daily Briefing/Patch
-// Notes -> First Iron Tool/Campfire/Priorities -> Gathering/Crafting/
+// Notes -> Campfire -> Gathering/Crafting/
 // Upgrades -> Guess the Mod/Your Progress/Accomplishments), same as always.
 // Everything past tier5 is achievement-hunting-only — no more modules to
 // reveal — but the 111-achievement expansion is far too big to dump into a
@@ -68,7 +68,9 @@ export function defaultTiers(): TierDef[] {
     { id: "tier2", name: "Word Gets Around", threshold: 10 },
     { id: "tier3", name: "Making Camp", threshold: 20 },
     { id: "tier4", name: "Working the Land", threshold: 35 },
-    { id: "tier5", name: "Keeping Record", threshold: 55 },
+    // Tier 5 was 55 when First Iron Tool and Priorities still added four
+    // achievements below it; 45 leaves slack now that only 51 sit below.
+    { id: "tier5", name: "Keeping Record", threshold: 45 },
     // Retuned for the Engine's 37 extra achievements (catalog ~193): tier1-5
     // stay put because the Engine's stage gates lean on those card reveals.
     { id: "tier6", name: "Deep Roots", threshold: 70 },
@@ -143,8 +145,8 @@ export type AdminConfig = {
 };
 
 // A visitor who's never opened /outpost-admin sees this designed curve:
-// Ponder alone at Tier 1, then Daily Briefing/Patch Notes, then First Iron
-// Tool/Campfire/Priorities, then Gathering/Crafting/the Upgrades shop, then
+// Ponder alone at Tier 1, then Daily Briefing/Patch Notes, then the
+// Campfire, then Gathering/Crafting/the Upgrades shop, then
 // Guess the Mod/Your Progress/Accomplishments, and finally Prestige at the
 // top. moduleTier below places each card; achievementTier places every
 // achievement alongside whichever tier unlocks the module it's tied to
@@ -160,9 +162,7 @@ export function defaultAdminConfig(): AdminConfig {
     moduleTier: {
       "daily-briefing": "tier2",
       "patch-notes": "tier2",
-      "first-iron-tool": "tier3",
       campfire: "tier3",
-      priorities: "tier3",
       gathering: "tier4",
       crafting: "tier4",
       "resource-tool-strip": "tier4",
@@ -209,13 +209,9 @@ export function defaultAdminConfig(): AdminConfig {
       "rw-open-5": "tier2",
       "he-every-day": "tier2",
 
-      // Tier 3 — Making Camp (First Iron Tool + Campfire + Priorities)
+      // Tier 3 — Making Camp (Campfire)
       "campfire-medium": "tier3",
       "campfire-overstoked": "tier3",
-      "iron-tool-chosen": "tier3",
-      "iron-tool-completionist": "tier3",
-      "priorities-started": "tier3",
-      "priorities-completionist": "tier3",
 
       // Tier 4 — Working the Land (Gathering/Crafting/Upgrades shop)
       "snow-pile-10min": "tier4",
@@ -366,13 +362,13 @@ export function defaultAdminConfig(): AdminConfig {
         "Keep an eye on the rest of the site too... not everything announces itself.",
       ],
       tier3: [
-        "Pick your first Iron Tool, keep the Campfire fed, and work through the Priorities checklist — the Beginner's Guide's own early steps.",
+        "Keep the Campfire fed — at Medium it cooks, and cooked food keeps you (and later, the Engine's crank) going.",
       ],
       tier4: [
         "Gathering and Crafting are open. Chop some Wood, then spend the Skill Points you've earned in the Upgrades shop (top-left badge) — Hunting and Mining are in there.",
         "Mining needs a Stone Tool first — craft one before heading underground.",
       ],
-      tier5: ["Guess the Mod, and check Your Progress and Accomplishments for the full picture of how far you've come."],
+      tier5: ["Guess the Mod — and the Progress and Achievements tabs are open now, up under the rank bar, for the full picture of how far you've come."],
       tier6: [
         "Everything's open now — the rest of the ladder is pure achievement hunting. Keep playing and the gallery keeps filling in.",
       ],
@@ -383,7 +379,7 @@ export function defaultAdminConfig(): AdminConfig {
         "You're well past the halfway point of the catalog. Odd hours and moon phases hide a few of what's left.",
       ],
       tier9: [
-        "Most of what remains is meta and lifetime-total achievements — check Your Progress for exactly what's still outstanding.",
+        "Most of what remains is meta and lifetime-total achievements — check the Progress tab for exactly what's still outstanding.",
       ],
       tier10: [
         "You've reached the top of the ladder. Prestige resets your resources and tools for permanent Legacy perks — a fresh start, not a finish line.",
