@@ -335,9 +335,12 @@ export function visibleNodes(
     .map((id) => ({ id, masked: secret(id) && !unlocked.has(id) }));
 }
 
-export const TREE_COL_W = 92;
-export const TREE_ROW_H = 64;
-export const TREE_ROOT_GAP = 28;
+// Everything sits on the canvas's background grid: each node centred in its
+// own grid square (TREE_CELL), rows one square apart, columns two.
+export const TREE_CELL = 64;
+export const TREE_COL_W = TREE_CELL * 2;
+export const TREE_ROW_H = TREE_CELL;
+export const TREE_ROOT_GAP = TREE_CELL;
 
 export type LaidOutNode = TreeNodeView & { x: number; y: number; depth: number };
 export type TreeLayout = {
@@ -348,8 +351,8 @@ export type TreeLayout = {
 };
 
 // Left-to-right tidy tree over just the visible nodes: depth sets the
-// column, leaves take successive rows, and each parent sits at the midpoint
-// of its first and last child. Several roots stack top to bottom. x/y are
+// column, leaves take successive rows, and each parent sits on the grid row
+// nearest the midpoint of its first and last child, so it stays on the grid. Several roots stack top to bottom. x/y are
 // node centres in px, measured from the layout's own top-left.
 export function layoutTree(tree: AchievementTree, visible: TreeNodeView[]): TreeLayout {
   const inView = new Map(visible.map((v) => [v.id, v]));
@@ -384,7 +387,7 @@ export function layoutTree(tree: AchievementTree, visible: TreeNodeView[]): Tree
         edges.push({ from: id, to: k });
         return place(k, depth + 1);
       });
-      y = (ys[0] + ys[ys.length - 1]) / 2;
+      y = Math.round((ys[0] + ys[ys.length - 1]) / 2 / TREE_ROW_H) * TREE_ROW_H;
     }
     nodes.push({ ...inView.get(id)!, x: depth * TREE_COL_W, y, depth });
     return y;

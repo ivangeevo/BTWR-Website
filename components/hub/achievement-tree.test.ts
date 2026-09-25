@@ -5,6 +5,7 @@ import {
   isSelfOrDescendant,
   layoutTree,
   resolveTree,
+  TREE_CELL,
   TREE_ROW_H,
   visibleNodes,
 } from "./achievement-tree";
@@ -85,7 +86,7 @@ describe("fog of war", () => {
 });
 
 describe("layoutTree", () => {
-  it("gives unique positions and centres parents on their children", () => {
+  it("gives unique on-grid positions, parents on the row nearest their children's midpoint", () => {
     const earned = new Set(ACHIEVEMENTS.filter((a) => a.category === "engine").map((a) => a.id));
     const layout = layoutTree(TREE, visibleNodes(TREE, "engine", earned));
     const keys = new Set(layout.nodes.map((n) => `${n.x},${n.y}`));
@@ -94,7 +95,10 @@ describe("layoutTree", () => {
     for (const n of layout.nodes) {
       const kids = layout.edges.filter((e) => e.from === n.id).map((e) => byId.get(e.to)!);
       if (kids.length === 0) continue;
-      expect(n.y).toBeCloseTo((kids[0].y + kids[kids.length - 1].y) / 2);
+      const mid = (kids[0].y + kids[kids.length - 1].y) / 2;
+      expect(Math.abs(n.y - mid)).toBeLessThanOrEqual(TREE_ROW_H / 2);
+      expect(n.y % TREE_ROW_H).toBe(0);
+      expect(n.x % TREE_CELL).toBe(0);
       for (const k of kids) expect(k.depth).toBe(n.depth + 1);
     }
   });

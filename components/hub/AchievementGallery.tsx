@@ -10,7 +10,14 @@ import {
   type AchievementCategory,
   type AchievementId,
 } from "./achievements-catalog";
-import { layoutTree, visibleNodes, type AchievementTree, type AdvFrame, type LaidOutNode } from "./achievement-tree";
+import {
+  layoutTree,
+  TREE_CELL,
+  visibleNodes,
+  type AchievementTree,
+  type AdvFrame,
+  type LaidOutNode,
+} from "./achievement-tree";
 import { useAchievements } from "./AchievementsProvider";
 import { useReducedMotion } from "./engine/ui/use-reduced-motion";
 
@@ -24,7 +31,8 @@ import { useReducedMotion } from "./engine/ui/use-reduced-motion";
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 const CANVAS_H = 440;
-const PAD = 56;
+// A grid square and a half, so each node's centre lands in the middle of a square.
+const PAD = TREE_CELL * 1.5;
 const NODE = 40;
 const CARD_W = 240;
 const CARD_MARGIN = 8;
@@ -132,10 +140,11 @@ function AdvancementCanvas({ category, pan, onPan }: {
   }, []);
 
   // Keeps the tree inside the viewport; a tree smaller than it is centred.
+  // Whole pixels, so grid lines and node edges stay crisp.
   function clamp(p: Pan): Pan {
     const x = layerW <= vw ? (vw - layerW) / 2 : Math.min(0, Math.max(vw - layerW, p.x));
     const y = layerH <= CANVAS_H ? (CANVAS_H - layerH) / 2 : Math.min(0, Math.max(CANVAS_H - layerH, p.y));
-    return { x, y };
+    return { x: Math.round(x), y: Math.round(y) };
   }
 
   // Opens with the first root in view (left edge, vertically centred on it).
@@ -185,7 +194,8 @@ function AdvancementCanvas({ category, pan, onPan }: {
     <div
       ref={viewportRef}
       className={`adv-canvas adv-tint-${category}`}
-      style={{ height: CANVAS_H }}
+      // The grid pans with the tree, so every node stays inside its square.
+      style={{ height: CANVAS_H, backgroundPosition: `0 0, ${current.x}px ${current.y}px, ${current.x}px ${current.y}px` }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

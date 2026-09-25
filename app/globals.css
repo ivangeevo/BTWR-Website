@@ -2011,11 +2011,12 @@ html.outpost-card-dragging * {
   background-color: #1e1b18;
   background-image:
     radial-gradient(ellipse at 30% 20%, var(--adv-tint, rgba(217, 138, 74, 0.08)), transparent 65%),
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(rgba(0, 0, 0, 0.25) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.25) 1px, transparent 1px);
-  background-size: 100% 100%, 32px 32px, 32px 32px, 16px 16px, 16px 16px;
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  /* One square per node — keep in sync with TREE_CELL in achievement-tree.ts.
+     AchievementGallery pans the two grid layers with the tree. */
+  background-size: 100% 100%, 64px 64px, 64px 64px;
+  background-position: 0 0;
   box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
 }
 .adv-canvas:active {
