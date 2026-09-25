@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Mod } from "@/lib/mods";
 import { useAchievements } from "./AchievementsProvider";
+import { useEngineOptional } from "./engine/ui/EngineProvider";
 import { XP_PER_CORRECT_ANSWER } from "./tier2";
 
 const ROUND_SIZE = 5;
@@ -28,8 +29,12 @@ export default function GuessTheMod({
   /** "card": self-contained panel (tier-1 grid). "flat": no outer chrome (tier-2 dashboard tab). */
   variant?: "card" | "flat";
 }) {
-  const { quiz, updateQuiz, unlock, tier2Unlocked, addXp, markQuizPlayedToday, recordModGuessCorrect } =
+  const { quiz, updateQuiz, unlock, tier2Unlocked, addXp, markQuizPlayedToday, recordModGuessCorrect, engineBuffs } =
     useAchievements();
+  // The Engine's Detector Block (a powered attachment on its gear grid)
+  // can strike one wrong answer per charge — see engine/buffs.ts.
+  const engine = useEngineOptional();
+  const [struck, setStruck] = useState<string[]>([]);
   const pool = useMemo(() => mods.filter((m) => m.iconUrl && !m.disabled), [mods]);
   const lastPickRef = useRef<string | null>(null);
 
@@ -50,6 +55,16 @@ export default function GuessTheMod({
     lastPickRef.current = correct.projectId;
     const wrongs = shuffle(pool.filter((m) => m.projectId !== correct.projectId)).slice(0, 3);
     return { correct, choices: shuffle([correct, ...wrongs]) };
+  }
+
+  useEffect(() => setStruck([]), [question]);
+
+  function strikeWithDetector() {
+    if (!question || answered || !engine) return;
+    const wrong = question.choices.filter((c) => c.projectId !== question.correct.projectId && !struck.includes(c.projectId));
+    if (wrong.length <= 1) return;
+    if (!engine.useDetector()) return;
+    setStruck((prev) => [...prev, wrong[Math.floor(Math.random() * wrong.length)].projectId]);
   }
 
   function startRound() {
@@ -170,18 +185,21 @@ export default function GuessTheMod({
               const isCorrectChoice = choice.projectId === question.correct.projectId;
               const isPicked = answered?.choiceId === choice.projectId;
               const showState = Boolean(answered) && (isCorrectChoice || isPicked);
+              const isStruck = struck.includes(choice.projectId) && !answered;
               return (
                 <button
                   key={choice.projectId}
                   type="button"
-                  disabled={Boolean(answered)}
+                  disabled={Boolean(answered) || isStruck}
                   onClick={() => selectChoice(choice)}
                   className={`rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors ${
                     showState
                       ? isCorrectChoice
                         ? "border-emerald-500 bg-emerald-950/60 text-emerald-300"
                         : "border-red-500 bg-red-950/60 text-red-300"
-                      : "border-white/15 text-slate-200 hover:border-[var(--outpost-accent)] hover:bg-white/5"
+                      : isStruck
+                        ? "border-white/5 text-white/25 line-through"
+                        : "border-white/15 text-slate-200 hover:border-[var(--outpost-accent)] hover:bg-white/5"
                   }`}
                 >
                   {choice.name}
@@ -189,6 +207,17 @@ export default function GuessTheMod({
               );
             })}
           </div>
+          {engine && engineBuffs.detectorPowered && (
+            <button
+              type="button"
+              onClick={strikeWithDetector}
+              disabled={Boolean(answered) || engine.e.detector.charges < 1}
+              className="mt-2 w-full rounded-md border border-white/15 px-2 py-1 text-xs text-slate-300 transition-colors hover:border-[var(--outpost-accent)] disabled:opacity-40"
+              title="The Engine's Detector Block senses one wrong answer"
+            >
+              {"\u{1F4E1}"} Detector — strike a wrong answer ({engine.e.detector.charges}/{engineBuffs.detectorMaxCharges})
+            </button>
+          )}
         </>
       )}
 

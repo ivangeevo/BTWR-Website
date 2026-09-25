@@ -6,6 +6,13 @@ import Reveal from "@/components/Reveal";
 import modsData from "@/data/mods.json";
 import { MISC_SUBCATEGORIES } from "@/data/mod-categories.mjs";
 import type { Mod } from "@/lib/mods";
+import {
+  EVT_MODS_READ,
+  markModRead,
+  pushInbox,
+  readEnginePublic,
+  readModsRead,
+} from "@/components/hub/engine/bridge-storage";
 
 // How tall the "peek" preview is before a category has ever been expanded —
 // tall enough to hint at a full card, short enough to make it obvious more
@@ -32,9 +39,59 @@ function formatDate(iso: string | null) {
   });
 }
 
-function ModCard({ mod }: { mod: Mod }) {
+// The Outpost's Engine "reads" mods you open here (a click on a card) — it
+// can only write sentences about, and draw cipher keys from, mods it has
+// read. Pure side-key plumbing (engine/bridge-storage.ts): this page never
+// touches the Outpost's own save.
+type EngineReading = {
+  active: boolean;
+  read: Set<string>;
+  onRead: (slug: string) => void;
+  fragmentSlug: string | null;
+  onFragment: () => void;
+};
+
+const FRAGMENT_MOD_SLUG = "btwr-core";
+
+function useEngineReading(): EngineReading {
+  const [pub, setPub] = useState<ReturnType<typeof readEnginePublic>>(null);
+  const [read, setRead] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const sync = () => {
+      setPub(readEnginePublic());
+      setRead(new Set(readModsRead()));
+    };
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener(EVT_MODS_READ, sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener(EVT_MODS_READ, sync);
+    };
+  }, []);
+  const active = !!pub && pub.stage >= 2;
+  const huntOn = !!pub && pub.keywordHunt && !pub.fragments.includes("frag-page");
+  return {
+    active,
+    read,
+    onRead: (slug) => {
+      if (active && markModRead(slug)) setRead((prev) => new Set([...prev, slug]));
+    },
+    fragmentSlug: huntOn ? FRAGMENT_MOD_SLUG : null,
+    onFragment: () => {
+      pushInbox({ type: "keyFragment", data: { frag: "frag-page", via: "mods" } });
+      setPub((p) => (p ? { ...p, fragments: [...p.fragments, "frag-page"] } : p));
+    },
+  };
+}
+
+function ModCard({ mod, reading }: { mod: Mod; reading: EngineReading }) {
+  const isRead = reading.read.has(mod.slug);
   return (
-    <li className="card-glow rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+    <li
+      className="card-glow rounded-lg border border-slate-200 p-4 dark:border-slate-700"
+      onClick={() => reading.onRead(mod.slug)}
+    >
       <div className="flex items-start gap-3">
         {mod.iconUrl ? (
           <Image
@@ -67,6 +124,24 @@ function ModCard({ mod }: { mod: Mod }) {
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                 Outdated
               </span>
+            )}
+            {reading.active && isRead && (
+              <span className="text-xs text-amber-700 dark:text-amber-400" title="The Outpost's Engine has read this mod">
+                {"\u{2699}\u{FE0F}"} read
+              </span>
+            )}
+            {reading.fragmentSlug === mod.slug && (
+              <button
+                type="button"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  reading.onFragment();
+                }}
+                className="engine-fragment-glyph ml-auto"
+                title="Something the Engine is looking for"
+              >
+                {"\u{2699}"} LFO
+              </button>
             )}
           </div>
           <dl className="mt-2 grid grid-cols-2 gap-x-4 text-sm">
@@ -127,10 +202,12 @@ function ModSection({
   title,
   mods,
   grouped = false,
+  reading,
 }: {
   title: string;
   mods: Mod[];
   grouped?: boolean;
+  reading: EngineReading;
 }) {
   // Three states: a slightly-open "peek" (first impression only), fully
   // open, and fully closed. Once a category has been opened at least once,
@@ -211,7 +288,7 @@ function ModSection({
                 )}
                 <ul className="space-y-3">
                   {groupMods.map((mod) => (
-                    <ModCard key={mod.projectId} mod={mod} />
+                    <ModCard key={mod.projectId} mod={mod} reading={reading} />
                   ))}
                 </ul>
               </div>
@@ -229,6 +306,7 @@ function ModSection({
 export default function ModsPage() {
   const allMods = modsData.mods as Mod[];
   const [query, setQuery] = useState("");
+  const reading = useEngineReading();
 
   const mods = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -283,9 +361,9 @@ export default function ModsPage() {
         </p>
       ) : (
         <>
-          <ModSection title="Core Mods" mods={core} />
-          <ModSection title="Miscellaneous" mods={misc} grouped />
-          <ModSection title="Needs Categorization" mods={uncategorized} />
+          <ModSection title="Core Mods" mods={core} reading={reading} />
+          <ModSection title="Miscellaneous" mods={misc} grouped reading={reading} />
+          <ModSection title="Needs Categorization" mods={uncategorized} reading={reading} />
         </>
       )}
     </div>

@@ -22,7 +22,8 @@ import { BLUEPRINTS_BY_ID, KEY_FRAGMENTS } from "../content/blueprints";
 import type { LiveCtx } from "../content/live";
 import { LORE_FRAGMENT_RANK, loreRankForInsight } from "../content/lore";
 import { JOURNAL_ASK_PREFIX } from "../content/puzzles";
-import { eurekaLine, POP_LINES, welcomeBackLine } from "../content/voice";
+import { eurekaLine, POP_LINES, revealLine, welcomeBackLine } from "../content/voice";
+import { MODULES } from "../../module-registry";
 import {
   bulkCost,
   cipherBurst,
@@ -306,6 +307,31 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted]);
+
+  // --- The Engine narrates new cards as the Outpost reveals them ---
+  // Tier thresholds are untouched (admin-config.ts); this just gives each
+  // reveal a line in the Engine's voice and a brief glow on the new card.
+  const prevTierRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!mounted) return;
+    const tierId = a.currentTierId;
+    const prev = prevTierRef.current;
+    prevTierRef.current = tierId;
+    if (prev === null || prev === tierId) return;
+    const newCards = MODULES.filter((m) => m.id !== "ponder" && a.moduleTierId(m.id) === tierId);
+    newCards.forEach((m, i) => {
+      const line = revealLine(m.id);
+      window.setTimeout(() => {
+        if (line) toast(line, "info");
+        const el = document.querySelector<HTMLElement>(`[data-module-id="${m.id}"]`);
+        if (el) {
+          el.classList.add("engine-reveal-glow");
+          window.setTimeout(() => el.classList.remove("engine-reveal-glow"), 2600);
+        }
+      }, 900 + i * 1400);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a.currentTierId, mounted]);
 
   // --- Drain events from outside the Outpost (Mods page, header gear, sky) ---
   const drainRef = useRef<() => void>(() => {});

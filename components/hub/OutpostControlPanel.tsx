@@ -5,6 +5,7 @@ import { ACHIEVEMENTS, TIER1_IDS } from "./achievements-catalog";
 import { defaultState, loadState, saveState, type HubState } from "./hub-storage";
 import { defaultAdminConfig, loadAdminConfig, tierThreshold, type AdminConfig } from "./admin-config";
 import OutpostCorners from "./OutpostCorners";
+import { clearEngineSideKeys } from "./engine/bridge-storage";
 
 const RESET_CONFIRM_WINDOW_MS = 4000;
 
@@ -49,6 +50,8 @@ export default function OutpostControlPanel() {
     const next = defaultState();
     next.enabled = state.enabled;
     saveState(next);
+    // The Engine's cross-page side keys (mods read, inbox, sky hold) go too.
+    clearEngineSideKeys();
     setState(next);
   }
 

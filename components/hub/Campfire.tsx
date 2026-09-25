@@ -10,6 +10,7 @@ import {
   type CampfireStage,
 } from "./campfire-stage";
 import { useAchievements } from "./AchievementsProvider";
+import { useEngineOptional } from "./engine/ui/EngineProvider";
 
 // Live decay refresh — the fire's displayed stage used to only recompute
 // when `campfire` itself changed (i.e. right after tending), so a visitor
@@ -30,7 +31,9 @@ export default function Campfire() {
     mechanics,
     activityCooldownUntil,
     mounted,
+    engineBuffs,
   } = useAchievements();
+  const engine = useEngineOptional();
   const { decayMinutes, cookFoodCost, cookYield, eatXpReward } = mechanics.campfire;
   const [stage, setStage] = useState<CampfireStage | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -51,7 +54,9 @@ export default function Campfire() {
   }
 
   function handleCook() {
-    if (completeCooking()) flash(`${resourceMeta.cookedFood.icon} +${cookYield} ${resourceMeta.cookedFood.name}`);
+    if (completeCooking()) {
+      flash(`${resourceMeta.cookedFood.icon} +${cookYield + engineBuffs.millstoneCook} ${resourceMeta.cookedFood.name}`);
+    }
   }
 
   function handleEat() {
@@ -97,6 +102,24 @@ export default function Campfire() {
           >
             Tend the Fire
           </button>
+          {engineBuffs.bellowsPowered && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-[var(--outpost-accent)]">
+              <span>
+                {"\u{1FAAD}"} The Engine&apos;s Bellows are pumping — the fire lasts {engineBuffs.bellowsDecayMult}× longer.
+              </span>
+              {engine && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (engine.stokeCampfire()) setStage((s) => (s === null ? s : (Math.min(4, s + 1) as CampfireStage)));
+                  }}
+                  className="ml-auto shrink-0 rounded-md border border-[var(--outpost-accent)] px-2 py-0.5 font-semibold hover:bg-[var(--outpost-accent-soft)]"
+                >
+                  Stoke
+                </button>
+              )}
+            </div>
+          )}
 
           {foodAvailable && (
             <div className="mt-3 border-t border-white/10 pt-3">

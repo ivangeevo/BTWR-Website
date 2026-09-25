@@ -14,6 +14,7 @@ import {
   themeForPhase,
   type CyclePhase,
 } from "./hub/day-night-cycle";
+import { isSkyHeldByEngine, pushInbox, readEnginePublic } from "./hub/engine/bridge-storage";
 
 // The whole-page crossfade spans 8s before the true rise/set instant to 8s
 // after it — CSS transitions can only animate FORWARD from the moment a
@@ -106,6 +107,9 @@ export default function DayNightSky() {
   const [justRose, setJustRose] = useState(false);
   const [nowMs, setNowMs] = useState(0);
   const [starsOn, setStarsOn] = useState(true);
+  // The marker star's secret: while the Outpost's Engine is hunting its
+  // keyword (Stage 7), the marker star can be clicked at night for a piece.
+  const [starHunt, setStarHunt] = useState(false);
   const startedAtRef = useRef<number | null>(null);
   const prevBodyVisibleRef = useRef<boolean | null>(null);
   const themeTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,8 +132,11 @@ export default function DayNightSky() {
       setPhase(nextPhase);
       setNowMs(now);
       setStarsOn(areStarsEnabled());
+      const pub = readEnginePublic();
+      setStarHunt(!!pub?.keywordHunt && !pub.fragments.includes("frag-star"));
       const root = document.documentElement;
-      if (!isThemeOverrideAllowed() && !root.classList.contains("daynight-fighting")) {
+      // The Engine can hold the sky still (Stage 8) — the theme stays where the visitor put it.
+      if (!isThemeOverrideAllowed() && !root.classList.contains("daynight-fighting") && !isSkyHeldByEngine(now)) {
         // Decided from 8s in the future, not "now" — see THEME_FLIP_LEAD_MS.
         const themePhase = computeCyclePhase(startedAtRef.current, now + THEME_FLIP_LEAD_MS);
         const nextTheme = themeForPhase(themePhase.isDay);
@@ -227,13 +234,34 @@ export default function DayNightSky() {
     >
       {starsOn && (
         <div className="day-night-stars" style={{ opacity: starOpacity }}>
-          {STARS.map((star, i) => (
-            <span
-              key={i}
-              className={star.marker ? "day-night-star day-night-star--marker" : "day-night-star"}
-              style={{ left: `${star.left}%`, top: `${star.top}%`, animationDelay: `${star.delay}s` }}
-            />
-          ))}
+          {STARS.map((star, i) =>
+            star.marker && starHunt && !phase.isDay ? (
+              <button
+                key={i}
+                type="button"
+                tabIndex={-1}
+                className="day-night-star day-night-star--marker"
+                style={{
+                  left: `${star.left}%`,
+                  top: `${star.top}%`,
+                  animationDelay: `${star.delay}s`,
+                  pointerEvents: "auto",
+                  cursor: "pointer",
+                  boxShadow: "0 0 10px 3px rgba(255, 210, 122, 0.9)",
+                }}
+                onClick={() => {
+                  pushInbox({ type: "keyFragment", data: { frag: "frag-star", via: "star" } });
+                  setStarHunt(false);
+                }}
+              />
+            ) : (
+              <span
+                key={i}
+                className={star.marker ? "day-night-star day-night-star--marker" : "day-night-star"}
+                style={{ left: `${star.left}%`, top: `${star.top}%`, animationDelay: `${star.delay}s` }}
+              />
+            )
+          )}
         </div>
       )}
       <div

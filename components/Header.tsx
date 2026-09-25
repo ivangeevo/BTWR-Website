@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef, useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
+import HeaderCompanion from "@/components/hub/engine/ui/HeaderCompanion";
 import { enableRoadmap, siteName } from "@/lib/site-config";
 
 const navLinks = [
@@ -40,6 +41,7 @@ export default function Header() {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
           <ThemeToggle />
+          <HeaderCompanion />
           <Link
             href="/"
             className="flex items-center gap-3"

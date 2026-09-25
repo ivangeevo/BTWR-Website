@@ -36,6 +36,7 @@ export default function Gathering() {
     completeMining,
     resourceMeta,
     upgrades,
+    engineBuffs,
   } = useAchievements();
   const [active, setActive] = useState<ActionId>("tree-mining");
   const remainingMs = useCooldownRemaining(activityCooldownUntil);
@@ -100,9 +101,14 @@ export default function Gathering() {
           <p className="text-sm text-slate-300">
             Hold to break down a tree for wood. Keep holding — letting go just pauses it.
           </p>
+          {engineBuffs.sawPowered && (
+            <p className="mt-1 text-xs text-[var(--outpost-accent)]">
+              {"\u{1FA9A}"} The Engine&apos;s Saw is running: faster chops, +{engineBuffs.sawWood} {resourceMeta.wood.name}.
+            </p>
+          )}
           <div className="mt-3">
             <HoldButton
-              durationMs={tool.treeMiningMs}
+              durationMs={Math.round(tool.treeMiningMs * engineBuffs.sawHoldMult)}
               disabled={remainingMs > 0}
               idleLabel="Hold to chop"
               holdingLabel="Chopping..."
@@ -117,6 +123,11 @@ export default function Gathering() {
           <p className="text-sm text-slate-300">
             Head out for food. Once you&apos;ve set off there&apos;s no calling it back early.
           </p>
+          {engineBuffs.millstonePowered && engineBuffs.millstoneFood > 0 && (
+            <p className="mt-1 text-xs text-[var(--outpost-accent)]">
+              {"\u{1FAA8}"} The Engine&apos;s Millstone is running: +{engineBuffs.millstoneFood} {resourceMeta.food.name} per trip.
+            </p>
+          )}
           <div className="mt-3">
             <LoadingBarButton
               durationMs={tool.huntingMs}

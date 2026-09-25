@@ -8,6 +8,10 @@ import {
   loadCycleStartedAt,
   themeForPhase,
 } from "./hub/day-night-cycle";
+import { isSkyHeldByEngine, pushInbox, readEnginePublic, setSkyHold } from "./hub/engine/bridge-storage";
+
+// How long the Engine holds the sky still once asked — about one phase.
+const SKY_HOLD_MS = 180_000;
 
 const FIGHT_BACK_MS = 1500;
 const TOAST_MS = 4500;
@@ -46,7 +50,7 @@ export default function ThemeToggle() {
   // /community), neither of which shares a React tree with this component.
   useEffect(() => {
     function check() {
-      setLocked(isDayNightCycleActive() && !isThemeOverrideAllowed());
+      setLocked(isDayNightCycleActive() && !isThemeOverrideAllowed() && !isSkyHeldByEngine());
     }
     check();
     const id = window.setInterval(check, 1000);
@@ -57,7 +61,16 @@ export default function ThemeToggle() {
     const root = document.documentElement;
     const current = root.getAttribute("data-theme") === "dark" ? "dark" : "light";
     const opposite = current === "dark" ? "light" : "dark";
-    const cycleBlocking = isDayNightCycleActive() && !isThemeOverrideAllowed();
+    let cycleBlocking = isDayNightCycleActive() && !isThemeOverrideAllowed() && !isSkyHeldByEngine();
+
+    // At its final stage (with the Celestial Governor researched), the
+    // Outpost's Engine can hold the sky still when you ask — the click that
+    // would have been fought back just sticks, for a while.
+    if (cycleBlocking && readEnginePublic()?.governsSky) {
+      setSkyHold(Date.now() + SKY_HOLD_MS);
+      pushInbox({ type: "skyHold" });
+      cycleBlocking = false;
+    }
 
     if (cycleBlocking) {
       root.setAttribute("data-theme", opposite);
