@@ -13,7 +13,7 @@ export type EngineBuffs = {
   hibachiLit: boolean;
   /** Extra wood per Wood Chopping. */
   sawWood: number;
-  /** Multiplier on the Wood Chopping hold duration (< 1 = faster). */
+  /** Multiplier on how long a Wood Chopping run takes (< 1 = faster). */
   sawHoldMult: number;
   millstoneFood: number;
   millstoneCook: number;

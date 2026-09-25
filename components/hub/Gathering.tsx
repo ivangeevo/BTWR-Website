@@ -99,7 +99,7 @@ export default function Gathering() {
       {active === "tree-mining" && (
         <div className="mt-2.5">
           <p className="text-xs text-slate-300">
-            Hold to break down a tree for wood. Keep holding — letting go just pauses it.
+            Chop down a tree for wood. Once you start swinging, it runs by itself.
           </p>
           {engineBuffs.sawPowered && (
             <p className="mt-1 text-[11px] text-[var(--outpost-accent)]">
@@ -107,11 +107,11 @@ export default function Gathering() {
             </p>
           )}
           <div className="mt-2">
-            <HoldButton
+            <LoadingBarButton
               durationMs={Math.round(tool.treeMiningMs * engineBuffs.sawHoldMult)}
               disabled={remainingMs > 0}
-              idleLabel="Hold to chop"
-              holdingLabel="Chopping..."
+              idleLabel="Chop wood"
+              runningLabel="Chopping..."
               onComplete={completeTreeMining}
             />
           </div>

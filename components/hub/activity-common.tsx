@@ -32,7 +32,7 @@ export function CooldownNotice({ remainingMs }: { remainingMs: number }) {
   );
 }
 
-// Press-and-hold mechanic shared by Wood Chopping and Mining — releasing
+// Press-and-hold mechanic used by Mining — releasing
 // early pauses progress rather than resetting it (matches vanilla
 // Minecraft's own block-breaking forgiveness), so a twitchy mouse isn't
 // punished as harshly as a hard reset would be.

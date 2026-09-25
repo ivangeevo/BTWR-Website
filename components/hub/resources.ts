@@ -37,7 +37,7 @@ export type ToolTier = {
   id: string;
   name: string;
   icon: string;
-  /** Hold duration for Wood Chopping, in ms. */
+  /** How long one Wood Chopping run takes, in ms. */
   treeMiningMs: number;
   /** Loading-bar duration for Hunting, in ms. */
   huntingMs: number;
