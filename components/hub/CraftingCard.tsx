@@ -11,11 +11,14 @@ import {
   type ToolTier,
 } from "./resources";
 
+// One fixed-size square block whatever the grid (2×2, 3×3 or 4×4) — its
+// squares divide it evenly, so they're always square and a bigger grid
+// never makes the card taller (see .outpost-crafting-grid).
 function GridSlots({ size }: { size: string }) {
   const count = size === "2×2" ? 4 : size === "3×3" ? 9 : 16;
   const cols = size === "2×2" ? 2 : size === "3×3" ? 3 : 4;
   return (
-    <div className="outpost-crafting-grid" style={{ gridTemplateColumns: `repeat(${cols}, 1.1rem)` }}>
+    <div className="outpost-crafting-grid" style={{ "--cols": cols } as React.CSSProperties}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="outpost-crafting-slot" aria-hidden="true">
           {"⚒️"}
@@ -37,16 +40,16 @@ function GridSection({
   const currentIndex = order.indexOf(tools.tier);
 
   return (
-    <div className="mt-2 rounded-lg border border-white/10 p-2">
+    <div className="mt-1.5 rounded-lg border border-white/10 p-1.5">
       <div className="flex items-center gap-2">
         <GridSlots size={grid.size} />
         <div>
           <p className="text-xs font-semibold text-white">{grid.name}</p>
-          <p className="text-[10px] text-white/40">{grid.size} grid</p>
+          <p className="text-[9px] text-white/40">{grid.size} grid</p>
         </div>
       </div>
 
-      <div className="mt-1.5 space-y-1">
+      <div className="mt-1.5 space-y-0.5">
         {craftableIds.map((tierId) => {
           const targetIndex = order.indexOf(tierId);
           const tool: ToolTier = findToolTier(toolTiersList, tierId);
@@ -60,27 +63,31 @@ function GridSection({
           return (
             <div
               key={tierId}
-              className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[11px] ${
+              className={`flex items-center justify-between gap-2 rounded-md px-1.5 py-0.5 text-[10px] ${
                 status === "done" ? "bg-white/5 text-white/40" : "bg-white/5"
               }`}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <span aria-hidden="true">{tool.icon}</span>
                 <span className="font-semibold text-white">{tool.name}</span>
                 <span className="text-white/40">
                   {(Object.entries(cost) as [ResourceId, number][])
                     .map(([id, amount]) => `${resourceMeta[id].icon} ${amount}`)
-                    .join("  ")}
+                    .join(" ")}
                 </span>
               </div>
               {status === "done" && <span className="shrink-0 text-white/40">Crafted</span>}
-              {status === "locked" && <span className="shrink-0 text-white/40">Craft earlier tools first</span>}
+              {status === "locked" && (
+                <span className="shrink-0 text-white/40" title="Craft the tools above it first">
+                  Locked
+                </span>
+              )}
               {status === "next" && (
                 <button
                   type="button"
                   onClick={() => craftTool(tierId)}
                   disabled={!canAfford}
-                  className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+                  className={`shrink-0 rounded-md border px-1.5 py-px text-[10px] font-semibold transition-colors ${
                     canAfford
                       ? "border-[var(--outpost-accent)] text-[var(--outpost-accent)] hover:bg-[var(--outpost-accent-soft)]"
                       : "border-white/15 text-white/30"
@@ -130,18 +137,18 @@ export default function CraftingCard() {
       </p>
 
       {unlockedGrids.length === 0 ? (
-        <p className="mt-2 text-[11px] text-white/40">Keep leveling up to unlock your first crafting grid.</p>
+        <p className="mt-1.5 text-[10px] text-white/40">Keep leveling up to unlock your first crafting grid.</p>
       ) : (
         <>
           {unlockedGrids.length > 1 && (
-            <div className="mt-2 flex gap-1.5">
+            <div className="mt-1.5 flex gap-1">
               {unlockedGrids.map((grid) => (
                 <button
                   key={grid.id}
                   type="button"
                   onClick={() => setActiveGridId(grid.id)}
                   aria-pressed={activeGrid?.id === grid.id}
-                  className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+                  className={`rounded-md border px-1.5 py-px text-[10px] font-semibold transition-colors ${
                     activeGrid?.id === grid.id
                       ? "border-[var(--outpost-accent)] text-[var(--outpost-accent)] bg-[var(--outpost-accent-soft)]"
                       : "border-white/15 text-white/40 hover:text-white/70"
