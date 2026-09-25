@@ -16,7 +16,7 @@ import {
   loadAdminConfig,
   resolvedCraftCost,
   resolvedMechanic,
-  resolvedModuleTier,
+  resolvedModuleStage,
   resolvedResourceMeta,
   resolvedToolTiers,
   resolvedUpgrades,
@@ -24,24 +24,25 @@ import {
   type AdminConfig,
   type CustomToolTier,
   type FeaturesConfig,
-  type TierDef,
 } from "./admin-config";
 import { mechanicConfigFields } from "./mechanics";
-import { DEFAULT_MODULE_TIER, MODULES, type ModuleId } from "./module-registry";
+import { MODULES, type ModuleId } from "./module-registry";
 import OutpostCorners from "./OutpostCorners";
 import { RESOURCE_IDS, TOOL_ORDER, type ResourceId, type ToolTier } from "./resources";
 import type { UpgradeId } from "./upgrade-catalog";
 import EngineAdminTab from "./engine/ui/admin/EngineAdminTab";
 import EngineDebugPanel from "./engine/ui/admin/EngineDebugPanel";
+import { STAGES } from "./engine/stages";
+import { ENGINE_STAGES } from "./engine/types";
 
 // Same measure-then-position recipe as AchievementGallery.tsx's tile
 // tooltip — see MechanicSettingsMenu below.
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-type Tab = "tiers" | "resources" | "tools" | "features" | "upgrades" | "engine" | "engine-debug";
+type Tab = "stages" | "resources" | "tools" | "features" | "upgrades" | "engine" | "engine-debug";
 const TAB_LABELS: Record<Tab, string> = {
-  tiers: "Tiers",
+  stages: "Stages",
   resources: "Resources",
   tools: "Tools",
   features: "Features",
@@ -50,111 +51,22 @@ const TAB_LABELS: Record<Tab, string> = {
   "engine-debug": "Engine Debug",
 };
 
-type TierSubTab = "list" | "modules" | "achievements" | "tips";
-const TIER_SUB_TAB_LABELS: Record<TierSubTab, string> = {
-  list: "Tier List",
+type StageSubTab = "modules" | "achievements" | "tips";
+const STAGE_SUB_TAB_LABELS: Record<StageSubTab, string> = {
   modules: "Modules",
   achievements: "Achievements",
   tips: "Tips",
 };
 
+// The Engine's eight stages, as the groups/options every "when does this
+// appear" picker below uses (ids are the stage number as a string, since
+// that's what a <select> hands back).
+const STAGE_LIST = ENGINE_STAGES.map((n) => ({ id: String(n), name: `Stage ${n} · ${STAGES[n].chapter}` }));
+
 type Update = (updater: (prev: AdminConfig) => AdminConfig) => void;
 
-// Every tab that lists tiers (here, Modules, Achievements, Tips, Features)
-// shows them in creation order rather than sorting by "unlocks at" —
-// otherwise editing a threshold on the Tier List tab reshuffles rows/groups
-// everywhere else too, and the built-in "Tier N" names stop matching their
-// positions. The live Outpost itself still sorts by threshold where it
-// actually matters for progression (see admin-config.ts's resolvedTiers).
-function TiersTab({ config, update }: { config: AdminConfig; update: Update }) {
-  const tiers = config.tiers;
-
-  function rename(id: string, name: string) {
-    update((prev) => ({ ...prev, tiers: prev.tiers.map((t) => (t.id === id ? { ...t, name } : t)) }));
-  }
-  function rethreshold(id: string, threshold: number) {
-    update((prev) => ({ ...prev, tiers: prev.tiers.map((t) => (t.id === id ? { ...t, threshold } : t)) }));
-  }
-  function add() {
-    update((prev) => {
-      let n = prev.tiers.length + 1;
-      let id = `tier${n}`;
-      while (prev.tiers.some((t) => t.id === id)) {
-        n += 1;
-        id = `tier${n}`;
-      }
-      const maxThreshold = Math.max(0, ...prev.tiers.map((t) => t.threshold));
-      return { ...prev, tiers: [...prev.tiers, { id, name: `Tier ${n}`, threshold: maxThreshold + 20 }] };
-    });
-  }
-  function remove(id: string) {
-    update((prev) => ({ ...prev, tiers: prev.tiers.filter((t) => t.id !== id) }));
-  }
-
-  return (
-    <div>
-      <p className="text-sm text-slate-400">
-        A tier unlocks once you&apos;ve earned this many achievements (any category, counted together). Tier 1 and
-        Tier 2 are built-in — Tier 2 also carries the reveal animation, skins, and XP/level system, so its threshold
-        is editable but it can&apos;t be removed or renamed away. Anything past Tier 2 just gates which cards and
-        achievements show up — no special ceremony.
-      </p>
-      <div className="mt-3 space-y-2">
-        {tiers.map((t) => {
-          const builtin = t.id === "tier1" || t.id === "tier2";
-          return (
-            <div
-              key={t.id}
-              className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-3"
-            >
-              <input
-                value={t.name}
-                disabled={t.id === "tier1"}
-                onChange={(e) => rename(t.id, e.target.value)}
-                className="min-w-0 flex-1 rounded-md border border-white/15 bg-transparent px-2 py-1 text-sm text-white disabled:opacity-40"
-              />
-              <label className="flex items-center gap-1.5 text-xs text-slate-400">
-                Unlocks at
-                <input
-                  type="number"
-                  min={0}
-                  value={t.threshold}
-                  disabled={t.id === "tier1"}
-                  onChange={(e) => rethreshold(t.id, Math.max(0, Number(e.target.value) || 0))}
-                  className="w-20 rounded-md border border-white/15 bg-transparent px-2 py-1 text-sm text-white disabled:opacity-40"
-                />
-                achievements
-              </label>
-              {builtin ? (
-                <span className="ml-auto text-xs text-white/30">Built-in</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => remove(t.id)}
-                  className="ml-auto text-xs font-semibold text-red-400 hover:text-red-300"
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <button
-        type="button"
-        onClick={add}
-        className="mt-3 rounded-lg border border-white/15 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-[var(--outpost-accent)] hover:text-[var(--outpost-accent)]"
-      >
-        + Add tier
-      </button>
-    </div>
-  );
-}
-
-// Shared by Modules and Achievements — a tier is the "category" you drop
-// things into, rather than a per-item dropdown being the only place that
-// relationship shows up, so it's actually visible at a glance which tier
-// holds what without scanning every row.
+// Shared by the Stages and Upgrades tabs — a stage is the group you drop
+// things into, so it's visible at a glance which stage holds what.
 function CollapsibleSection({
   title,
   count,
@@ -346,18 +258,15 @@ function MechanicSettingsMenu({ moduleId, config, update }: { moduleId: ModuleId
 }
 
 function ModulesTab({ config, update }: { config: AdminConfig; update: Update }) {
-  // Creation order, not threshold order — see TiersTab's comment. Grouping
-  // by tier here would otherwise reshuffle every time a threshold is edited
-  // on the Tier List tab, even though nothing on this tab changed.
-  const tiers = config.tiers;
+  const tiers = STAGE_LIST;
 
-  function setModuleTier(id: ModuleId, tierId: string) {
-    update((prev) => ({ ...prev, moduleTier: { ...prev.moduleTier, [id]: tierId } }));
+  function setModuleTier(id: ModuleId, stage: string) {
+    update((prev) => ({ ...prev, moduleStage: { ...prev.moduleStage, [id]: Number(stage) } }));
   }
 
   const byTier = new Map<string, typeof MODULES>();
   for (const m of MODULES) {
-    const tierId = resolvedModuleTier(config, m.id, DEFAULT_MODULE_TIER[m.id]);
+    const tierId = String(resolvedModuleStage(config, m.id));
     if (!byTier.has(tierId)) byTier.set(tierId, []);
     byTier.get(tierId)!.push(m);
   }
@@ -365,7 +274,7 @@ function ModulesTab({ config, update }: { config: AdminConfig; update: Update })
   return (
     <div>
       <p className="text-sm text-slate-400">
-        Which tier each card/section shows up at, grouped by tier — use a module&apos;s dropdown to move it to a
+        Which Engine stage reveals each card/section, grouped by stage — use a module&apos;s dropdown to move it to a
         different one.
       </p>
       <div className="mt-3 space-y-2">
@@ -502,12 +411,6 @@ function AchievementLabel({ achievement }: { achievement: (typeof ACHIEVEMENTS)[
 
 function AchievementsTab({ config, update }: { config: AdminConfig; update: Update }) {
   const [query, setQuery] = useState("");
-  // Creation order, not threshold order — see TiersTab's comment.
-  const tiers = config.tiers;
-
-  function setAchievementTier(id: AchievementId, tierId: string) {
-    update((prev) => ({ ...prev, achievementTier: { ...prev.achievementTier, [id]: tierId } }));
-  }
 
   function setAchievementDefault(id: AchievementId, isDefault: boolean) {
     update((prev) => {
@@ -518,14 +421,8 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
     });
   }
 
-  function tierOf(a: (typeof ACHIEVEMENTS)[number]): string {
-    return config.achievementTier[a.id] ?? (a.tier === 2 ? "tier2" : "tier1");
-  }
-
-  // Shared by the Default group and every category group below — the pin
-  // toggle is the one control specific to this row (the tier select is
-  // otherwise identical to ModulesTab's).
-  function AchievementRow({ a, tierId }: { a: (typeof ACHIEVEMENTS)[number]; tierId: string }) {
+  // Shared by the Default group and every category group below.
+  function AchievementRow({ a }: { a: (typeof ACHIEVEMENTS)[number] }) {
     const isDefault = config.achievementDefault[a.id] === true;
     return (
       <div className="flex items-center justify-between gap-2 rounded-md bg-white/5 px-2.5 py-1.5 text-xs">
@@ -537,8 +434,8 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
             aria-pressed={isDefault}
             title={
               isDefault
-                ? "Default — shown first in its tier, ahead of every category. Click to unpin."
-                : "Pin to the Default group — shown first in its tier, ahead of every category."
+                ? "Default — shown first in the gallery, ahead of every category. Click to unpin."
+                : "Pin to the Default group — shown first in the gallery, ahead of every category."
             }
             className={`rounded-md border px-1.5 py-1 text-[0.65rem] transition-colors ${
               isDefault
@@ -548,17 +445,6 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
           >
             <span aria-hidden="true">{"\u{1F4CC}"}</span>
           </button>
-          <select
-            value={tierId}
-            onChange={(e) => setAchievementTier(a.id, e.target.value)}
-            className="rounded-md border border-white/15 bg-[#241a12] px-1.5 py-1 text-[0.65rem] font-semibold text-white"
-          >
-            {tiers.map((tt) => (
-              <option key={tt.id} value={tt.id}>
-                {tt.name}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
     );
@@ -569,19 +455,21 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
     ? ACHIEVEMENTS.filter((a) => a.title.toLowerCase().includes(q) || a.id.toLowerCase().includes(q))
     : ACHIEVEMENTS;
 
-  const byTier = new Map<string, typeof ACHIEVEMENTS>();
-  for (const a of filtered) {
-    const tierId = tierOf(a);
-    if (!byTier.has(tierId)) byTier.set(tierId, []);
-    byTier.get(tierId)!.push(a);
+  const pinned = filtered.filter((a) => config.achievementDefault[a.id] === true);
+  const rest = filtered.filter((a) => config.achievementDefault[a.id] !== true);
+  const byCategory = new Map<AchievementCategory, typeof ACHIEVEMENTS>();
+  for (const a of rest) {
+    if (!byCategory.has(a.category)) byCategory.set(a.category, []);
+    byCategory.get(a.category)!.push(a);
   }
 
   return (
     <div>
       <p className="text-sm text-slate-400">
-        Which tier each achievement is grouped and gated under — grouped by tier below, then by category. Pin the
-        odds and ends that don&apos;t belong to any one category (resizing the window, an old cheat code) to{" "}
-        <span aria-hidden="true">{"\u{1F4CC}"}</span> Default, and they&apos;ll show first in their tier instead.
+        Every achievement, by category — all of them are listed in the Outpost&apos;s gallery from the start (secret
+        ones stay masked until earned). Pin the odds and ends that don&apos;t belong to any one category (resizing
+        the window, an old cheat code) to <span aria-hidden="true">{"\u{1F4CC}"}</span> Default, and they&apos;ll
+        show first instead.
       </p>
       <input
         value={query}
@@ -590,94 +478,64 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
         className="mt-3 w-full rounded-md border border-white/15 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/30"
       />
       <div className="mt-3 max-h-[32rem] space-y-2 overflow-y-auto pr-1">
-        {tiers.map((t) => {
-          const items = byTier.get(t.id) ?? [];
-          if (q && items.length === 0) return null;
-
-          const pinned = items.filter((a) => config.achievementDefault[a.id] === true);
-          const rest = items.filter((a) => config.achievementDefault[a.id] !== true);
-
-          const byCategory = new Map<AchievementCategory, typeof ACHIEVEMENTS>();
-          for (const a of rest) {
-            if (!byCategory.has(a.category)) byCategory.set(a.category, []);
-            byCategory.get(a.category)!.push(a);
-          }
-
-          return (
-            <CollapsibleSection key={t.id} title={t.name} count={items.length}>
-              {items.length === 0 ? (
-                <p className="text-xs text-white/30">Nothing assigned here.</p>
-              ) : (
-                <>
-                  {pinned.length > 0 && (
-                    <div>
-                      <h5 className="mb-1.5 flex items-center gap-1 text-[0.65rem] font-bold uppercase tracking-wider text-white/40">
-                        <span aria-hidden="true">{"\u{1F4CC}"}</span> Default
-                      </h5>
-                      <div className="space-y-1.5">
-                        {pinned.map((a) => (
-                          <AchievementRow key={a.id} a={a} tierId={t.id} />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((c) => (
-                    <div key={c}>
-                      <h5 className="mb-1.5 text-[0.65rem] font-bold uppercase tracking-wider text-white/40">
-                        {CATEGORY_LABELS[c]}
-                      </h5>
-                      <div className="space-y-1.5">
-                        {byCategory.get(c)!.map((a) => (
-                          <AchievementRow key={a.id} a={a} tierId={t.id} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
-            </CollapsibleSection>
-          );
-        })}
+        {pinned.length > 0 && (
+          <div>
+            <h5 className="mb-1.5 flex items-center gap-1 text-[0.65rem] font-bold uppercase tracking-wider text-white/40">
+              <span aria-hidden="true">{"\u{1F4CC}"}</span> Default
+            </h5>
+            <div className="space-y-1.5">
+              {pinned.map((a) => (
+                <AchievementRow key={a.id} a={a} />
+              ))}
+            </div>
+          </div>
+        )}
+        {CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((c) => (
+          <CollapsibleSection key={c} title={CATEGORY_LABELS[c]} count={byCategory.get(c)!.length}>
+            {byCategory.get(c)!.map((a) => (
+              <AchievementRow key={a.id} a={a} />
+            ))}
+          </CollapsibleSection>
+        ))}
       </div>
     </div>
   );
 }
 
 function TipsTab({ config, update }: { config: AdminConfig; update: Update }) {
-  // Creation order, not threshold order — see TiersTab's comment.
-  const tiers = config.tiers;
+  const tiers = STAGE_LIST;
 
-  function tipsFor(tierId: string): string[] {
-    return config.tierTips[tierId] ?? [];
+  function tipsFor(stage: string): string[] {
+    return config.stageTips[Number(stage)] ?? [];
   }
 
   function addTip(tierId: string) {
     update((prev) => ({
       ...prev,
-      tierTips: { ...prev.tierTips, [tierId]: [...(prev.tierTips[tierId] ?? []), ""] },
+      stageTips: { ...prev.stageTips, [Number(tierId)]: [...(prev.stageTips[Number(tierId)] ?? []), ""] },
     }));
   }
 
   function setTip(tierId: string, index: number, text: string) {
     update((prev) => {
-      const next = [...(prev.tierTips[tierId] ?? [])];
+      const next = [...(prev.stageTips[Number(tierId)] ?? [])];
       next[index] = text;
-      return { ...prev, tierTips: { ...prev.tierTips, [tierId]: next } };
+      return { ...prev, stageTips: { ...prev.stageTips, [Number(tierId)]: next } };
     });
   }
 
   function removeTip(tierId: string, index: number) {
     update((prev) => {
-      const next = (prev.tierTips[tierId] ?? []).filter((_, i) => i !== index);
-      return { ...prev, tierTips: { ...prev.tierTips, [tierId]: next } };
+      const next = (prev.stageTips[Number(tierId)] ?? []).filter((_, i) => i !== index);
+      return { ...prev, stageTips: { ...prev.stageTips, [Number(tierId)]: next } };
     });
   }
 
   return (
     <div>
       <p className="text-sm text-slate-400">
-        Shown in the small Tier Tip box on the live Outpost, for whichever tier a visitor has currently reached.
-        Add more than one entry and they rotate every minute.
+        Shown in the small Tip box on the live Outpost, for whichever stage the Engine has reached. Add more than
+        one entry and they rotate every minute.
       </p>
       <div className="mt-3 space-y-2">
         {tiers.map((t) => {
@@ -685,7 +543,7 @@ function TipsTab({ config, update }: { config: AdminConfig; update: Update }) {
           return (
             <CollapsibleSection key={t.id} title={t.name} count={tips.length}>
               {tips.length === 0 ? (
-                <p className="text-xs text-white/30">No tips set — the Tier Tip box stays hidden for this tier.</p>
+                <p className="text-xs text-white/30">No tips set — the Tip box stays hidden at this stage.</p>
               ) : (
                 tips.map((tip, i) => (
                   <div key={i} className="flex items-start gap-2">
@@ -721,17 +579,15 @@ function TipsTab({ config, update }: { config: AdminConfig; update: Update }) {
   );
 }
 
-// Modules, Achievements, and Tips are all fundamentally "what's assigned to
-// each tier", so they live as sub-tabs under Tiers rather than as siblings
-// of it — Tools is the one genuinely separate concept (gated by level, not
-// tier membership) and stays its own top-level tab.
-function TiersSection({ config, update }: { config: AdminConfig; update: Update }) {
-  const [subTab, setSubTab] = useState<TierSubTab>("list");
+// What each Engine stage brings: the cards it reveals, the tips shown at it,
+// plus the achievement gallery's Default pins.
+function StagesSection({ config, update }: { config: AdminConfig; update: Update }) {
+  const [subTab, setSubTab] = useState<StageSubTab>("modules");
 
   return (
     <div>
       <div className="flex flex-wrap gap-1.5">
-        {(Object.keys(TIER_SUB_TAB_LABELS) as TierSubTab[]).map((t) => (
+        {(Object.keys(STAGE_SUB_TAB_LABELS) as StageSubTab[]).map((t) => (
           <button
             key={t}
             type="button"
@@ -740,12 +596,11 @@ function TiersSection({ config, update }: { config: AdminConfig; update: Update 
               subTab === t ? "bg-[var(--outpost-accent-soft)] text-white" : "text-slate-400 hover:text-white"
             }`}
           >
-            {TIER_SUB_TAB_LABELS[t]}
+            {STAGE_SUB_TAB_LABELS[t]}
           </button>
         ))}
       </div>
       <div className="mt-4">
-        {subTab === "list" && <TiersTab config={config} update={update} />}
         {subTab === "modules" && <ModulesTab config={config} update={update} />}
         {subTab === "achievements" && <AchievementsTab config={config} update={update} />}
         {subTab === "tips" && <TipsTab config={config} update={update} />}
@@ -1075,16 +930,15 @@ function FeatureRow({
   onToggle,
   tierId,
   onTierChange,
-  tiers,
   extra,
 }: {
   title: string;
   description: string;
   enabled?: boolean;
   onToggle?: (next: boolean) => void;
+  /** Engine stage this feature appears at (as a string), with its picker. */
   tierId?: string;
   onTierChange?: (tierId: string) => void;
-  tiers?: TierDef[];
   /** Extra control slotted in before the tier picker/switch — e.g. a
    * MechanicSettingsMenu gear for a feature that also has tunable numeric
    * settings (Upgrades/Prestige, moved here from the Modules tab). */
@@ -1099,7 +953,7 @@ function FeatureRow({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {extra}
-        {tierId !== undefined && tiers && onTierChange && (
+        {tierId !== undefined && onTierChange && (
           <label className="flex items-center gap-1.5 text-xs text-white/50">
             Unlocks at
             <select
@@ -1108,7 +962,7 @@ function FeatureRow({
               onChange={(e) => onTierChange(e.target.value)}
               className="rounded-md border border-white/15 bg-[#241a12] px-2 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
             >
-              {tiers.map((t) => (
+              {STAGE_LIST.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                 </option>
@@ -1140,8 +994,6 @@ function FeatureRow({
 }
 
 function FeaturesTab({ config, update }: { config: AdminConfig; update: Update }) {
-  // Creation order, not threshold order — see TiersTab's comment.
-  const tiers = config.tiers;
   const features = config.features;
 
   function setFeature<K extends keyof FeaturesConfig>(key: K, value: FeaturesConfig[K]) {
@@ -1151,25 +1003,22 @@ function FeaturesTab({ config, update }: { config: AdminConfig; update: Update }
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-400">
-        Whole mechanics, switched on/off — several can also be pushed behind a later tier instead of being available
-        from the start. Everything here defaults to matching today&apos;s actual behavior. Day/Night Cycle, Stars,
-        Hunting, Mining, and Snow live in the Upgrades tab now — each is its own shop entry with its own cost and
-        tier there instead of an admin toggle here.
+        Whole mechanics, switched on/off. Day/Night Cycle, Stars, Hunting, Mining, and Snow live in the Upgrades
+        tab — each is its own shop entry with its own cost and Engine stage there.
       </p>
 
       <FeatureRow
         title="Upgrades"
-        description="A Skill Points shop for small permanent capability unlocks — a badge in the Outpost header (top-left, next to Prestige) instead of a card. Individual upgrades still keep their own tier in upgrade-catalog.ts."
+        description="A Skill Points shop for small permanent capability unlocks — a badge in the Outpost header (top-left, next to Prestige) instead of a card. Individual upgrades keep their own stage (Upgrades tab)."
         enabled={features.upgradesEnabled}
         onToggle={(v) => setFeature("upgradesEnabled", v)}
-        tierId={features.upgradesTierId}
-        onTierChange={(v) => setFeature("upgradesTierId", v)}
-        tiers={tiers}
+        tierId={String(features.upgradesStage)}
+        onTierChange={(v) => setFeature("upgradesStage", Number(v))}
         extra={<MechanicSettingsMenu moduleId="upgrades" config={config} update={update} />}
       />
       <FeatureRow
         title="Prestige"
-        description="Resets the resource/tool loop for permanent Legacy perks — a badge in the Outpost header instead of a card. Reveals once the Outpost's own top configured tier (Tier List tab) is reached, same as before; there's no separate tier picker here."
+        description="Resets the resource/tool loop for permanent Legacy perks — a badge in the Outpost header instead of a card. Opens once the Engine reaches Stage 8, alongside the Engine's own Mark rebuild."
         enabled={features.prestigeEnabled}
         onToggle={(v) => setFeature("prestigeEnabled", v)}
         extra={<MechanicSettingsMenu moduleId="prestige" config={config} update={update} />}
@@ -1179,16 +1028,13 @@ function FeaturesTab({ config, update }: { config: AdminConfig; update: Update }
 }
 
 // The Skill Points shop's catalog (upgrade-catalog.ts) — one entry per
-// purchasable upgrade, grouped by the tier it becomes buyable at (same
-// grouped-by-tier layout as ModulesTab, for the same reason: an admin
-// changing a tier's threshold on the Tier List tab shouldn't reshuffle this
-// list's groups, only which tier each already-assigned entry belongs to).
-// Name/icon/description stay fixed in the catalog itself; cost and tier are
+// purchasable upgrade, grouped by the Engine stage it becomes buyable at.
+// Name/icon/description stay fixed in the catalog itself; cost and stage are
 // the two things worth tuning per-browser without touching code.
 function UpgradesTab({ config, update }: { config: AdminConfig; update: Update }) {
-  const tiers = config.tiers;
+  const tiers = STAGE_LIST;
 
-  function setUpgradeEdit(id: UpgradeId, patch: { cost?: number; tierId?: string }) {
+  function setUpgradeEdit(id: UpgradeId, patch: { cost?: number; stage?: number }) {
     update((prev) => ({
       ...prev,
       upgradeEdits: { ...prev.upgradeEdits, [id]: { ...prev.upgradeEdits[id], ...patch } },
@@ -1198,15 +1044,16 @@ function UpgradesTab({ config, update }: { config: AdminConfig; update: Update }
   const resolved = resolvedUpgrades(config);
   const byTier = new Map<string, typeof resolved>();
   for (const u of resolved) {
-    if (!byTier.has(u.tierId)) byTier.set(u.tierId, []);
-    byTier.get(u.tierId)!.push(u);
+    const key = String(u.stage);
+    if (!byTier.has(key)) byTier.set(key, []);
+    byTier.get(key)!.push(u);
   }
 
   return (
     <div>
       <p className="text-sm text-slate-400">
-        Every purchasable upgrade in the header&apos;s Upgrades shop, grouped by the tier it becomes buyable at — set
-        each one&apos;s Skill Point cost and move it to a different tier.
+        Every purchasable upgrade in the header&apos;s Upgrades shop, grouped by the Engine stage it becomes buyable
+        at — set each one&apos;s Skill Point cost and move it to a different stage.
       </p>
       <div className="mt-3 space-y-2">
         {tiers.map((t) => {
@@ -1244,7 +1091,7 @@ function UpgradesTab({ config, update }: { config: AdminConfig; update: Update }
                       <div className="relative shrink-0">
                         <select
                           value={t.id}
-                          onChange={(e) => setUpgradeEdit(u.id, { tierId: e.target.value })}
+                          onChange={(e) => setUpgradeEdit(u.id, { stage: Number(e.target.value) })}
                           className="appearance-none rounded-md border border-white/15 bg-[#241a12] py-1.5 pl-2 pr-6 text-xs font-semibold text-white"
                         >
                           {tiers.map((tt) => (
@@ -1393,7 +1240,7 @@ function ResetControl({ onReset }: { onReset: () => void }) {
 export default function AdminPanel() {
   const [config, setConfig] = useState<AdminConfig>(defaultAdminConfig());
   const [mounted, setMounted] = useState(false);
-  const [tab, setTab] = useState<Tab>("tiers");
+  const [tab, setTab] = useState<Tab>("stages");
 
   useEffect(() => {
     setConfig(loadAdminConfig());
@@ -1427,8 +1274,8 @@ export default function AdminPanel() {
               </span>
               <h1 className="mt-3 font-heading text-2xl font-extrabold text-white">Customize the Outpost</h1>
               <p className="mt-1 max-w-xl text-sm text-slate-400">
-                Personal, saved only in this browser — decide which tier each card, achievement, and tool belongs to,
-                and add your own tiers or tool ranks. Nothing here changes what anyone else sees; changes apply next
+                Personal, saved only in this browser — decide which Engine stage reveals each card, tune tools and
+                upgrades, and add your own tool ranks. Nothing here changes what anyone else sees; changes apply next
                 time you open the Outpost.
               </p>
             </div>
@@ -1462,7 +1309,7 @@ export default function AdminPanel() {
               </div>
 
               <div className="mt-5">
-                {tab === "tiers" && <TiersSection config={config} update={update} />}
+                {tab === "stages" && <StagesSection config={config} update={update} />}
                 {tab === "resources" && <ResourcesTab config={config} update={update} />}
                 {tab === "tools" && <ToolsTab config={config} update={update} />}
                 {tab === "features" && <FeaturesTab config={config} update={update} />}

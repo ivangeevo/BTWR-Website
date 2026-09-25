@@ -2,8 +2,8 @@
 // passively, +1 per achievement unlocked, see AchievementsProvider's
 // unlock()) on permanent capability unlocks, not just number-tuning perks
 // (that's Legacy's job, see legacy.ts). Deliberately small today: this is
-// the seed of a much bigger "the Outpost becomes a real game at higher
-// tiers" direction, so new upgrades get added here over time rather than
+// the seed of a much bigger "the Outpost becomes a real game later on"
+// direction, so new upgrades get added here over time rather than
 // this being a one-shot finished list.
 export type UpgradeId = "card-reorder" | "day-night-cycle" | "stars" | "hunting" | "mining" | "snow";
 
@@ -13,8 +13,8 @@ export type UpgradeDef = {
   icon: string;
   description: string;
   cost: number;
-  /** Tier required before this upgrade can even be purchased, separate from affording its cost. */
-  tierId: string;
+  /** Engine stage required before this upgrade can be bought, separate from affording its cost. */
+  stage: number;
 };
 
 export const UPGRADES: UpgradeDef[] = [
@@ -24,7 +24,7 @@ export const UPGRADES: UpgradeDef[] = [
     icon: "\u{1F9ED}",
     description: "Drag the Outpost's cards into whatever order suits you.",
     cost: 5,
-    tierId: "tier1",
+    stage: 2,
   },
   {
     id: "day-night-cycle",
@@ -32,7 +32,7 @@ export const UPGRADES: UpgradeDef[] = [
     icon: "\u{1F317}",
     description: "Sun/moon arcing across the top of every page, cycling the site's light/dark theme to match.",
     cost: 8,
-    tierId: "tier1",
+    stage: 2,
   },
   {
     id: "stars",
@@ -40,7 +40,7 @@ export const UPGRADES: UpgradeDef[] = [
     icon: "✨",
     description: "Twinkling stars in the night sky, on top of the Day/Night Cycle upgrade above.",
     cost: 3,
-    tierId: "tier1",
+    stage: 2,
   },
   {
     id: "hunting",
@@ -48,7 +48,7 @@ export const UPGRADES: UpgradeDef[] = [
     icon: "\u{1F3F9}",
     description: "Unlocks the Hunting activity in the Gathering card. Campfire cooking needs Food, so it unlocks with this too.",
     cost: 5,
-    tierId: "tier2",
+    stage: 3,
   },
   {
     id: "mining",
@@ -56,7 +56,7 @@ export const UPGRADES: UpgradeDef[] = [
     icon: "⛏️",
     description: "Unlocks the Mining activity in the Gathering card.",
     cost: 5,
-    tierId: "tier2",
+    stage: 3,
   },
   {
     id: "snow",
@@ -64,7 +64,7 @@ export const UPGRADES: UpgradeDef[] = [
     icon: "❄️",
     description: "Falling snow and accumulating piles in the homepage hero, above the Outpost.",
     cost: 4,
-    tierId: "tier1",
+    stage: 2,
   },
 ];
 

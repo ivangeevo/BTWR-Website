@@ -33,7 +33,7 @@ export default function PatchNotes({
 }: {
   mods: Mod[];
   packReleases: PackRelease[];
-  /** "card": self-contained panel (tier-1 grid). "flat": no outer chrome (tier-2 dashboard tab). */
+  /** "card": self-contained panel (the card grid). "flat": no outer chrome. */
   variant?: "card" | "flat";
 }) {
   const { unlock, bumpPatchNotesSwitch, recordPatchNotesOpen } = useAchievements();

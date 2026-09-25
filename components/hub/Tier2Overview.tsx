@@ -1,6 +1,6 @@
 "use client";
 
-import { TIER2_IDS } from "./achievements-catalog";
+import { ACHIEVEMENTS } from "./achievements-catalog";
 import { useAchievements } from "./AchievementsProvider";
 import { findToolTier, RESOURCE_IDS, type ResourceState, type ToolTier } from "./resources";
 import { rankIconForLevel, rankTitleForLevel } from "./tier2";
@@ -62,7 +62,6 @@ function relativeTime(iso: string): string {
 export default function Tier2Overview() {
   const { tier2, xpInfo, unlocked, quiz, visits, ledgerProgress, resources, tools, toolTiersList } =
     useAchievements();
-  const tier2UnlockedCount = TIER2_IDS.filter((id) => unlocked.has(id)).length;
   const accuracy = quiz.totalAnswered > 0 ? Math.round((quiz.totalCorrect / quiz.totalAnswered) * 100) : 0;
 
   return (
@@ -99,7 +98,7 @@ export default function Tier2Overview() {
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Tier II unlocked" value={`${tier2UnlockedCount}/${TIER2_IDS.length}`} />
+        <StatTile label="Achievements" value={`${unlocked.size}/${ACHIEVEMENTS.length}`} />
         <StatTile label="Quiz accuracy" value={`${accuracy}%`} />
         <StatTile label="Visit streak" value={`${visits.streakDays}d`} />
         <StatTile label="Ledger Entries" value={`${ledgerProgress.unlockedCount}/${ledgerProgress.total}`} />

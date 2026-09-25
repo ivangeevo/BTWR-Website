@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ACHIEVEMENTS, TIER1_IDS } from "./achievements-catalog";
+import { ACHIEVEMENTS } from "./achievements-catalog";
 import { defaultState, loadState, saveState, type HubState } from "./hub-storage";
-import { defaultAdminConfig, loadAdminConfig, tierThreshold, type AdminConfig } from "./admin-config";
 import OutpostCorners from "./OutpostCorners";
 import { clearEngineSideKeys } from "./engine/bridge-storage";
 import { isPhoneDevice } from "./device";
@@ -17,7 +16,6 @@ const RESET_CONFIRM_WINDOW_MS = 4000;
 // show toasts, it just flips the switch that lets the homepage render it.
 export default function OutpostControlPanel() {
   const [state, setState] = useState<HubState>(defaultState());
-  const [adminConfig, setAdminConfig] = useState<AdminConfig>(defaultAdminConfig());
   const [mounted, setMounted] = useState(false);
   const [confirmingReset, setConfirmingReset] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -27,7 +25,6 @@ export default function OutpostControlPanel() {
 
   useEffect(() => {
     setState(loadState());
-    setAdminConfig(loadAdminConfig());
     setPhone(isPhoneDevice());
     setMounted(true);
     return () => {
@@ -63,15 +60,8 @@ export default function OutpostControlPanel() {
   }
 
   const isEnabled = mounted && state.enabled && !phone;
-  // Tier 2's existence is itself a secret — this pill must never hint at a
-  // bigger pool of achievements beyond 12 before it's actually unlocked.
-  // Mirrors AchievementsProvider's tier2Unlocked: reaching the ladder's
-  // tier2 threshold, not any one specific achievement.
-  const tier2Unlocked = Object.keys(state.unlocked).length >= tierThreshold(adminConfig, "tier2");
-  const visibleTotal = tier2Unlocked ? ACHIEVEMENTS.length : TIER1_IDS.length;
-  const visibleUnlockedCount = Object.keys(state.unlocked).filter(
-    (id) => tier2Unlocked || TIER1_IDS.includes(id as (typeof TIER1_IDS)[number])
-  ).length;
+  const visibleTotal = ACHIEVEMENTS.length;
+  const visibleUnlockedCount = Object.keys(state.unlocked).length;
 
   const enableSwitch = (
     <button

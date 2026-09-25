@@ -18,8 +18,7 @@ import Ponder from "./Ponder";
 import PrestigeBadge from "./PrestigeBadge";
 import GuessTheMod from "./GuessTheMod";
 import ResourceToolStrip from "./ResourceToolStrip";
-import TierRevealNotice from "./TierRevealNotice";
-import TierTip from "./TierTip";
+import StageTip from "./StageTip";
 import UpgradesBadge from "./UpgradesBadge";
 import YourProgressSection from "./YourProgressSection";
 import { type ModuleId } from "./module-registry";
@@ -29,16 +28,12 @@ import { SKINS_BY_ID } from "./tier2";
 import { END_KEY, useCardReorder, type CardReorder } from "./use-card-reorder";
 import { useReducedMotion } from "./engine/ui/use-reduced-motion";
 
-// Gates a module's visibility by its admin-configured tier assignment
-// (default placement lives in module-registry.ts's DEFAULT_MODULE_TIER) —
-// the one, single place this decision gets made, instead of a scattered
-// `{tier2Unlocked && <X/>}` per module. Not used for the tier-1-only
-// Achievement Gallery preview (its rule is inverted — hidden once a LATER
-// tier unlocks, not shown once ITS tier unlocks) or TierRevealNotice (fires
-// generically off its own tier-transition detection, not a module gate).
+// Shows a module once the Engine reaches the stage that reveals it
+// (module-registry.ts's DEFAULT_MODULE_STAGE, admin-overridable) — the one
+// place this decision gets made.
 function ModuleGate({ id, children }: { id: ModuleId; children: React.ReactNode }) {
-  const { isTierUnlocked, moduleTierId } = useAchievements();
-  if (!isTierUnlocked(moduleTierId(id))) return null;
+  const { isModuleRevealed } = useAchievements();
+  if (!isModuleRevealed(id)) return null;
   return <>{children}</>;
 }
 
@@ -46,7 +41,7 @@ function ModuleGate({ id, children }: { id: ModuleId; children: React.ReactNode 
 // needs — kept as one lookup rather than a component-id map so the
 // mods/packReleases props each card needs individually stay simple to
 // thread through. Only covers ids that appear in DEFAULT_CARD_ORDER
-// (module-registry.ts) — the full-width utility rows (tier-tip,
+// (module-registry.ts) — the full-width utility rows (stage-tip,
 // resource-tool-strip) and the two full-width sections below the grid are
 // rendered separately in HubBody/OutpostFrame, never through this.
 function renderCard(id: ModuleId, mods: Mod[], packReleases: PackRelease[]): React.ReactNode {
@@ -240,12 +235,7 @@ function CardCell({
 }
 
 function HubBody({ mods, packReleases }: { mods: Mod[]; packReleases: PackRelease[] }) {
-  // Guess the Mod and Patch Notes are permanent cards here regardless of
-  // tier — the old tier-2 side menu that used to take over Guess the Mod's
-  // spot is gone, so nothing else duplicates or replaces it. Only the
-  // Achievements gallery still steps aside once tier 2 unlocks, since the
-  // full catalog moves into its own Accomplishments section below.
-  const { tier2Unlocked, cardOrder, reorderCard, upgrades } = useAchievements();
+  const { cardOrder, reorderCard, upgrades } = useAchievements();
   const reorderEnabled = upgrades.purchased.includes("card-reorder");
   const reducedMotion = useReducedMotion();
   const drag = useCardReorder({ order: cardOrder, commit: reorderCard, reducedMotion });
@@ -253,20 +243,11 @@ function HubBody({ mods, packReleases }: { mods: Mod[]; packReleases: PackReleas
 
   return (
     <div
-      className={`mx-auto grid max-w-5xl gap-6 sm:grid-cols-2 ${
-        tier2Unlocked ? "rounded-xl border p-4 sm:p-6" : ""
-      }`}
-      style={
-        tier2Unlocked
-          ? ({
-              borderColor: "var(--outpost-accent-soft)",
-              backgroundColor: "rgba(0, 0, 0, 0.12)",
-            } as React.CSSProperties)
-          : undefined
-      }
+      className="mx-auto grid max-w-5xl gap-6 rounded-xl border p-4 sm:grid-cols-2 sm:p-6"
+      style={{ borderColor: "var(--outpost-accent-soft)", backgroundColor: "rgba(0, 0, 0, 0.12)" }}
     >
-      <ModuleGate id="tier-tip">
-        <TierTip />
+      <ModuleGate id="stage-tip">
+        <StageTip />
       </ModuleGate>
       <ModuleGate id="resource-tool-strip">
         <ResourceToolStrip />
@@ -288,13 +269,11 @@ function HubBody({ mods, packReleases }: { mods: Mod[]; packReleases: PackReleas
 }
 
 // The whole card's accent (header tag, corners, progress bar, every shared
-// panel's hover glow) follows whichever skin is picked in the Tier 2 panel
-// once tier 2 is unlocked — before that, .outpost-frame's own CSS defaults
-// (fixed amber) apply untouched, so a tier-1-only visitor sees no change.
+// panel's hover glow) follows whichever skin is picked in the Progress tab.
 function OutpostFrame({ mods, packReleases }: { mods: Mod[]; packReleases: PackRelease[] }) {
-  const { tier2Unlocked, tier2, settings } = useAchievements();
+  const { tier2, settings } = useAchievements();
   const tabs = useOutpostTabs();
-  const skin = tier2Unlocked ? SKINS_BY_ID[tier2.skin] ?? SKINS_BY_ID.iron : null;
+  const skin = SKINS_BY_ID[tier2.skin] ?? SKINS_BY_ID.campfire;
   const style = skin
     ? ({
         "--outpost-accent": skin.accent,
@@ -328,7 +307,6 @@ function OutpostFrame({ mods, packReleases }: { mods: Mod[]; packReleases: PackR
           <AccomplishmentsSection />
         </OutpostTabPanel>
       )}
-      <TierRevealNotice />
       <EngineToasts />
       <EurekaLayer />
       <AchievementToastStack />

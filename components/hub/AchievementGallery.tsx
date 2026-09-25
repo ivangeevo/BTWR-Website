@@ -319,11 +319,10 @@ export default function AchievementGallery({
   /** "card": collapsible card. "flat": always-open, no outer chrome (the Achievements tab). */
   variant?: "card" | "flat";
 }) {
-  const { unlocked, mounted, tier2Unlocked, isTierUnlocked, achievementTierId } = useAchievements();
+  const { unlocked, mounted } = useAchievements();
   const [open, setOpen] = useState(false);
   const [naturalHeight, setNaturalHeight] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
-  const showTier2 = tier2Unlocked;
 
   useIsomorphicLayoutEffect(() => {
     const el = contentRef.current;
@@ -332,17 +331,11 @@ export default function AchievementGallery({
     recompute();
     window.addEventListener("resize", recompute);
     return () => window.removeEventListener("resize", recompute);
-  }, [open, showTier2, unlocked.size]);
+  }, [open, unlocked.size]);
 
-  // Tier 2's existence is itself a secret — its achievements aren't just
-  // masked as "???", they're not listed at all until tier 2 unlocks.
-  // Visibility now routes through the admin-overridable tier assignment
-  // (achievementTierId) rather than the catalog's hardcoded field directly,
-  // so reassigning an achievement in the admin panel actually moves it.
-  const visible = ACHIEVEMENTS.filter((a) => {
-    const tierId = achievementTierId(a.id);
-    return isTierUnlocked(tierId);
-  });
+  // Every achievement is listed from the start; secret ones stay masked
+  // as "???" until earned (see GalleryContent).
+  const visible = ACHIEVEMENTS;
   const visibleUnlockedCount = visible.filter((a) => unlocked.has(a.id)).length;
 
   if (variant === "flat") {
@@ -355,7 +348,7 @@ export default function AchievementGallery({
         </div>
         <div className="mt-4 space-y-4">
           <GalleryContent visible={visible} unlocked={unlocked} />
-          {showTier2 && <LedgerSection />}
+          <LedgerSection />
         </div>
       </div>
     );
@@ -398,7 +391,7 @@ export default function AchievementGallery({
       <div className="category-panel overflow-hidden" style={{ maxHeight: `${panelHeight}px` }}>
         <div ref={contentRef} className="space-y-4 px-5 pb-5">
           <GalleryContent visible={visible} unlocked={unlocked} />
-          {showTier2 && <LedgerSection />}
+          <LedgerSection />
         </div>
       </div>
     </div>

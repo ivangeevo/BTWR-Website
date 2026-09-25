@@ -6,31 +6,31 @@ import { useAchievements } from "./AchievementsProvider";
 const ROTATE_MS = 60_000;
 
 // Thin bar, sitting above the Resources & Tool strip — shows whatever
-// tip(s) the admin set for the visitor's current tier (Tiers tab in
-// /outpost-admin). Renders nothing if that tier has no tips configured.
+// tip(s) are set for the Engine's current stage (Stages tab in
+// /outpost-admin). Renders nothing if that stage has no tips.
 // Multiple entries rotate on a 1-minute timer; a single entry just sits.
-export default function TierTip() {
-  const { tierTips } = useAchievements();
+export default function StageTip() {
+  const { stageTips } = useAchievements();
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     setIndex(0);
-    if (tierTips.length <= 1) return;
+    if (stageTips.length <= 1) return;
     const id = window.setInterval(() => {
-      setIndex((i) => (i + 1) % tierTips.length);
+      setIndex((i) => (i + 1) % stageTips.length);
     }, ROTATE_MS);
     return () => window.clearInterval(id);
-  }, [tierTips]);
+  }, [stageTips]);
 
-  if (tierTips.length === 0) return null;
+  if (stageTips.length === 0) return null;
 
   return (
-    <div className="outpost-tip-box sm:col-span-2" title={tierTips[index]}>
+    <div className="outpost-tip-box sm:col-span-2" title={stageTips[index]}>
       <span className="shrink-0 text-sm leading-none" aria-hidden="true">
         {"\u{1F4A1}"}
       </span>
       <p key={index} className="outpost-tip-text">
-        {tierTips[index]}
+        {stageTips[index]}
       </p>
     </div>
   );

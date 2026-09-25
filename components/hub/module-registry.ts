@@ -1,10 +1,7 @@
 // Every card/section the Outpost can show, as data — lets the admin panel
 // (and AchievementsProvider's gating) reason about "what shows up" without
-// hand-editing JSX. Two modules are deliberately left OUT of this registry:
-// the tier-1-only Achievement Gallery preview (hidden once tier 2 unlocks,
-// the inverse of every other module's "shows once its tier unlocks" rule)
-// and TierRevealNotice (its own generic tier-transition detection, not a
-// module gate) — both stay hardcoded in HubSection.tsx exactly as before.
+// hand-editing JSX. Each one is revealed by the Engine (the Ponder card)
+// reaching a stage — see DEFAULT_MODULE_STAGE below.
 
 // "prestige" and "upgrades" are no longer main-grid cards (see the Feature
 // toggles upgradesEnabled/prestigeEnabled in admin-config.ts — they now
@@ -21,7 +18,7 @@ export type ModuleId =
   | "patch-notes"
   | "crafting"
   | "guess-the-mod"
-  | "tier-tip"
+  | "stage-tip"
   | "resource-tool-strip"
   | "your-progress"
   | "accomplishments"
@@ -54,14 +51,14 @@ export const MODULES: ModuleDef[] = [
   { id: "crafting", label: "Crafting", description: "Spend resources on better tools." },
   { id: "guess-the-mod", label: "Guess the Mod", description: "Quiz card." },
   {
-    id: "tier-tip",
-    label: "Tier Tip",
-    description: "Small square tip box for whatever tier the visitor is currently at — set its text per tier in the Tiers tab.",
+    id: "stage-tip",
+    label: "Tip",
+    description: "Small tip box for whichever Engine stage the visitor is at — set its text per stage in the Stages tab.",
   },
   {
     id: "resource-tool-strip",
     label: "Resources & Tool",
-    description: "Full-width readout of collected resources and the current tool tier.",
+    description: "Full-width readout of collected resources and the current tool.",
   },
   { id: "your-progress", label: "Progress tab", description: "The Outpost's Progress tab — Overview + Progression." },
   { id: "accomplishments", label: "Achievements tab", description: "The Outpost's Achievements tab — the full achievement gallery." },
@@ -69,26 +66,27 @@ export const MODULES: ModuleDef[] = [
   // comment above. They're configured from the Features tab now, not here.
 ];
 
-// Reproduces exactly today's hardcoded placement — admin overrides layer on
-// top of this, so a fresh visitor with no saved admin config sees the site
-// completely unchanged. prestige/upgrades keep an (unused) entry only
-// because this is a total Record over ModuleId, not a Partial one — neither
-// is read anywhere anymore; their real tier gating lives in
-// FeaturesConfig.upgradesTierId and the existing canPrestige logic instead.
-export const DEFAULT_MODULE_TIER: Record<ModuleId, string> = {
-  ponder: "tier1",
-  "daily-briefing": "tier1",
-  campfire: "tier1",
-  gathering: "tier1",
-  "patch-notes": "tier1",
-  crafting: "tier1",
-  "guess-the-mod": "tier1",
-  "tier-tip": "tier1",
-  "resource-tool-strip": "tier1",
-  "your-progress": "tier2",
-  accomplishments: "tier2",
-  prestige: "tier1",
-  upgrades: "tier1",
+// Which Engine stage reveals each card (admin-overridable, Stages tab). The
+// Engine is the Outpost's spine: Day One is Ponder alone, Day Two brings the
+// day's reading, The Stump opens the camp (fire, gathering, crafting), and
+// First Iron adds the quiz. The Progress and Achievements tabs are there
+// from the start. prestige/upgrades are here only because this is a total
+// Record over ModuleId; Prestige opens at Stage 8 and the Upgrades badge
+// uses FeaturesConfig.upgradesStage.
+export const DEFAULT_MODULE_STAGE: Record<ModuleId, number> = {
+  ponder: 1,
+  "stage-tip": 1,
+  "daily-briefing": 2,
+  "patch-notes": 2,
+  campfire: 3,
+  gathering: 3,
+  crafting: 3,
+  "resource-tool-strip": 3,
+  "guess-the-mod": 4,
+  "your-progress": 1,
+  accomplishments: 1,
+  prestige: 8,
+  upgrades: 2,
 };
 
 // Default order for the main card grid (see HubSection.tsx) — a single flat

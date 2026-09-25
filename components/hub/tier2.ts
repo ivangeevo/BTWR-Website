@@ -93,7 +93,7 @@ export function rankIconForLevel(level: number): string {
 // Level at which the player can start prestiging (see AchievementsProvider).
 export const PRESTIGE_LEVEL = 20;
 
-export type SkinId = "iron" | "copper" | "gold" | "diamond" | "soulforged-steel";
+export type SkinId = "campfire" | "iron" | "copper" | "gold" | "diamond" | "soulforged-steel";
 
 export type Skin = {
   id: SkinId;
@@ -104,11 +104,12 @@ export type Skin = {
   accentDark: string;
 };
 
-// Real material-tier names instead of generic color labels — Iron stays
-// the starting skin, the rest climb in ascending prestige order. The top
+// Campfire is the Outpost's own amber (the look every Outpost starts in);
+// the rest are real material names, climbing in ascending prestige order. The top
 // tier is named for the Outpost's own Soul Forge lore rather than plain
 // "Netherite", matching the rank ladder's late-game vocabulary.
 export const SKINS: Skin[] = [
+  { id: "campfire", name: "Campfire", unlockLevel: 1, accent: "#d98a4a", accentSoft: "rgba(217,138,74,0.3)", accentDark: "#5c3d1f" },
   { id: "iron", name: "Iron", unlockLevel: 1, accent: "#5b9bd5", accentSoft: "rgba(91,155,213,0.35)", accentDark: "#1c3a52" },
   { id: "copper", name: "Copper", unlockLevel: 5, accent: "#b87333", accentSoft: "rgba(184,115,51,0.35)", accentDark: "#4a2c14" },
   { id: "gold", name: "Gold", unlockLevel: 10, accent: "#d4af37", accentSoft: "rgba(212,175,55,0.35)", accentDark: "#4a3c14" },

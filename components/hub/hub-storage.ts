@@ -173,7 +173,7 @@ export function defaultState(): HubState {
     tier2: {
       xp: 0,
       prestigeCount: 0,
-      skin: "iron",
+      skin: "campfire",
       loreRevealedLevel: 0,
       themeToggleClicks: 0,
       windowResizeCount: 0,

@@ -57,7 +57,6 @@ import {
   type ResourceState,
 } from "./resources";
 import {
-  currentTierId,
   defaultAdminConfig,
   isAchievementDefault,
   loadAdminConfig,
@@ -65,18 +64,15 @@ import {
   resolvedCraftCost,
   resolvedFeatures,
   resolvedMechanic,
-  resolvedModuleTier,
+  resolvedModuleStage,
   resolvedResourceMeta,
-  resolvedTierTips,
-  resolvedTiers,
+  resolvedStageTips,
   resolvedToolOrder,
   resolvedToolTiers,
   resolvedUpgrade,
   resolvedUpgrades,
-  tierThreshold,
   type AdminConfig,
   type FeaturesConfig,
-  type TierDef,
 } from "./admin-config";
 import type {
   CampfireMechanic,
@@ -84,7 +80,7 @@ import type {
   PrestigeMechanic,
   UpgradesMechanic,
 } from "./mechanics";
-import { DEFAULT_CARD_ORDER, DEFAULT_MODULE_TIER, type ModuleId } from "./module-registry";
+import { DEFAULT_CARD_ORDER, type ModuleId } from "./module-registry";
 import type { UpgradeDef, UpgradeId } from "./upgrade-catalog";
 import {
   computeLedgerProgress,
@@ -120,8 +116,6 @@ type AchievementsContextValue = {
   quiz: QuizStats;
   updateQuiz: (updater: (prev: QuizStats) => QuizStats) => void;
   visits: HubState["visits"];
-  /** True once unlockedCount reaches the ladder's tier2 threshold — see admin-config.ts's defaultTiers(). */
-  tier2Unlocked: boolean;
   tier2: Tier2State;
   xpInfo: ReturnType<typeof xpProgress>;
   ledgerProgress: LedgerProgress;
@@ -165,19 +159,18 @@ type AchievementsContextValue = {
   completeHunting: () => void;
   completeMining: () => Partial<ResourceState>;
   craftTool: (tier: string) => boolean;
-  /** Resolved (default + admin-override) tier list, ascending by threshold. */
-  tiers: TierDef[];
-  isTierUnlocked: (tierId: string) => boolean;
-  moduleTierId: (id: ModuleId) => string;
-  achievementTierId: (id: AchievementId) => string;
-  /** Whether an achievement is pinned to its tier's "Default" group, ahead of every category — see admin-config.ts's achievementDefault. */
+  /** The Engine stage that reveals a card (default + admin override). */
+  moduleStage: (id: ModuleId) => number;
+  /** Whether the Engine has reached the stage that reveals this card. */
+  isModuleRevealed: (id: ModuleId) => boolean;
+  /** Whether an achievement is pinned to the gallery's "Default" group, ahead of every category — see admin-config.ts's achievementDefault. */
   achievementIsDefault: (id: AchievementId) => boolean;
   toolTiersList: ReturnType<typeof resolvedToolTiers>;
   craftCostFor: (tierId: string) => Partial<ResourceState>;
   resourceMeta: ReturnType<typeof resolvedResourceMeta>;
-  /** Tip strings for whichever tier the visitor has currently reached — empty if none set. */
-  tierTips: string[];
-  /** Feature toggles + their tier gates — Features tab in /outpost-admin. */
+  /** Tip strings for the Engine's current stage — empty if none set. */
+  stageTips: string[];
+  /** Feature toggles — Features tab in /outpost-admin. */
   features: FeaturesConfig;
   /** Resolved (class defaults + admin overrides) mechanic settings — Modules tab's per-module gear menu in /outpost-admin. */
   mechanics: {
@@ -186,12 +179,10 @@ type AchievementsContextValue = {
     prestige: PrestigeMechanic;
     upgrades: UpgradesMechanic;
   };
-  /** The most advanced tier the visitor has actually reached, by unlocked-achievement count — drives TierRevealNotice. */
-  currentTierId: string;
   settings: HubState["settings"];
   updateSettings: (patch: Partial<HubState["settings"]>) => void;
   legacy: LegacyState;
-  /** True once the visitor has reached the Outpost's highest configured tier. */
+  /** True once the Engine has reached its final stage (Stage 8). */
   canPrestige: boolean;
   prestigeOutpost: () => boolean;
   buyLegacyPerk: (id: PerkId) => boolean;
@@ -244,8 +235,6 @@ type ExpansionCtx = {
   sessionTabsVisited: Set<Tier2TabId>;
   sessionExported: boolean;
   sessionImported: boolean;
-  /** Achievement-count threshold for the ladder's "tier2" rung — see admin-config.ts's defaultTiers(). */
-  tier2Threshold: number;
 };
 
 const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) => number }[] = [
@@ -356,15 +345,15 @@ const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) 
   ...ENGINE_NUMERIC_RULES,
 ];
 
+const COMMUNITY_EDITION_AT = 10;
+// Achievements without their own XP value (the easy, early ones) still pay a little.
+const DEFAULT_ACHIEVEMENT_XP = 25;
+
 const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }[] = [
-  // A flavor achievement now, same as everything else in this table — it
-  // no longer has any special gating power of its own. What actually
-  // reveals Tier 2's content is unlockedCount crossing the ladder's tier2
-  // threshold directly (see the tier2Unlocked derivation below); this just
-  // happens to fire at the same moment.
+  // A flavor milestone: your first ten achievements.
   {
     id: "community-edition",
-    check: (c) => c.unlockedCount >= c.tier2Threshold,
+    check: (c) => c.unlockedCount >= COMMUNITY_EDITION_AT,
   },
   {
     id: "hh-hemp-fields",
@@ -637,7 +626,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         saveState(next);
         return next;
       });
-      if (def?.xp) addXp(def.xp);
+      if (def) addXp(def.xp ?? DEFAULT_ACHIEVEMENT_XP);
 
       if (settingsRef.current.toastsEnabled) {
         setToasts((prev) => [
@@ -962,9 +951,18 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     resources.food -= campfireMechanic.cookFoodCost;
     resources.cookedFood = (resources.cookedFood ?? 0) + campfireMechanic.cookYield + buffs.millstoneCook;
     resourcesRef.current = resources;
-    if (buffs.millstonePowered) {
-      updateEngine((e) => ({ ...e, counters: { ...e.counters, millstoneMeals: e.counters.millstoneMeals + 1 } }), "soon");
-    }
+    // Every meal counts toward the Engine's stage gates; Millstone-ground ones also count for its commissions.
+    updateEngine(
+      (e) => ({
+        ...e,
+        counters: {
+          ...e.counters,
+          mealsCooked: e.counters.mealsCooked + 1,
+          millstoneMeals: e.counters.millstoneMeals + (buffs.millstonePowered ? 1 : 0),
+        },
+      }),
+      "soon"
+    );
     const gatheringMechanic = resolvedMechanic<GatheringMechanic>(adminConfigRef.current, "gathering");
     const cooldownMs = effectiveCooldownMs(gatheringMechanic.activityCooldownMs, legacyRef.current.perks);
     const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
@@ -1245,7 +1243,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     const def = resolvedUpgrade(adminConfigRef.current, id);
     if (!def) return false;
     if (upgradesRef.current.purchased.includes(id)) return false;
-    if (unlockedRef.current.size < tierThreshold(adminConfigRef.current, def.tierId)) return false;
+    if (liveEngine.current.stage < def.stage) return false;
     if (upgradesRef.current.skillPoints < def.cost) return false;
 
     const upgrades = {
@@ -1377,9 +1375,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     const isDark = document.documentElement.getAttribute("data-theme") === "dark";
     if (hour < 5 && isDark) unlock("hardcore-darkness");
 
-    if (!hadVisitedToday && unlockedRef.current.size >= tierThreshold(loadedAdminConfig, "tier2")) {
-      addXp(XP_PER_DAILY_VISIT);
-    }
+    if (!hadVisitedToday) addXp(XP_PER_DAILY_VISIT);
 
     const loungeTimer = setTimeout(() => unlock("outpost-lounging"), 30_000);
     return () => clearTimeout(loungeTimer);
@@ -1515,7 +1511,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       sessionTabsVisited: sessionTabsVisitedRef.current,
       sessionExported: sessionExportedRef.current,
       sessionImported: sessionImportedRef.current,
-      tier2Threshold: tierThreshold(adminConfigRef.current, "tier2"),
     };
 
     for (const rule of NUMERIC_RULES) {
@@ -1558,34 +1553,16 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
   const ledgerProgress = useMemo(() => computeLedgerProgress(state), [state]);
 
-  const isTierUnlocked = useCallback(
-    (tierId: string): boolean => unlockedRef.current.size >= tierThreshold(adminConfig, tierId),
-    [adminConfig]
-  );
-  // Reaching Tier 2 on the ladder — the one progression system everything
-  // (XP earning, Ponder's Stage 3, skins, the full achievement list
-  // becoming visible) now gates off, same as every later tier. No longer
-  // tied to any one specific achievement — "community-edition" is a plain
-  // flavor achievement that happens to fire at this same moment, not the
-  // thing that causes it (see the CUSTOM_RULES table above).
-  const tier2Unlocked = isTierUnlocked("tier2");
-  const moduleTierId = useCallback(
-    (id: ModuleId): string => resolvedModuleTier(adminConfig, id, DEFAULT_MODULE_TIER[id]),
-    [adminConfig]
-  );
-  const achievementTierId = useCallback(
-    (id: AchievementId): string => {
-      const override = adminConfig.achievementTier[id];
-      if (override) return override;
-      return ACHIEVEMENTS_BY_ID[id]?.tier === 2 ? "tier2" : "tier1";
-    },
-    [adminConfig]
+  const engineStage = state.engine.stage;
+  const moduleStage = useCallback((id: ModuleId): number => resolvedModuleStage(adminConfig, id), [adminConfig]);
+  const isModuleRevealed = useCallback(
+    (id: ModuleId): boolean => engineStage >= resolvedModuleStage(adminConfig, id),
+    [adminConfig, engineStage]
   );
   const achievementIsDefault = useCallback(
     (id: AchievementId): boolean => isAchievementDefault(adminConfig, id),
     [adminConfig]
   );
-  const tiersList = useMemo(() => resolvedTiers(adminConfig), [adminConfig]);
   const toolTiersList = useMemo(() => resolvedToolTiers(adminConfig), [adminConfig]);
   const craftCostFor = useCallback(
     (tierId: string) => resolvedCraftCost(adminConfig, tierId),
@@ -1594,11 +1571,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   const resourceMetaResolved = useMemo(() => resolvedResourceMeta(adminConfig), [adminConfig]);
   const featuresResolved = useMemo(() => resolvedFeatures(adminConfig), [adminConfig]);
   const upgradeCatalogResolved = useMemo(() => resolvedUpgrades(adminConfig), [adminConfig]);
-  const unlockedCount = Object.keys(state.unlocked).length;
-  const currentTierIdValue = useMemo(
-    () => currentTierId(adminConfig, unlockedCount),
-    [adminConfig, unlockedCount]
-  );
   const engineConfig = useMemo(() => resolveEngineConfig(adminConfig.engine), [adminConfig]);
   const engineBuffs = useMemo(
     () => computeBuffs(state.engine, engineConfig, researchEffects(state.engine.research)),
@@ -1633,15 +1605,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     const base = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire").decayMinutes;
     rebaseCampfire(base * prevMult, base * bellowsMult);
   }, [bellowsMult, mounted, rebaseCampfire]);
-  const tierTipsResolved = useMemo(
-    () => resolvedTierTips(adminConfig, currentTierIdValue),
-    [adminConfig, currentTierIdValue]
-  );
-  // Prestige unlocks once the highest CONFIGURED tier (last in the sorted
-  // list, admin-added ones included) has been reached — not the same as
-  // tier2Unlocked, which only reflects the built-in tier1->2 gate.
-  const highestTierId = tiersList.length > 0 ? tiersList[tiersList.length - 1].id : "tier2";
-  const canPrestige = isTierUnlocked(highestTierId);
+  const stageTipsResolved = useMemo(() => resolvedStageTips(adminConfig, engineStage), [adminConfig, engineStage]);
+  const canPrestige = engineStage >= 8;
 
   const value: AchievementsContextValue = {
     mounted,
@@ -1653,7 +1618,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     quiz: state.quiz,
     updateQuiz,
     visits: state.visits,
-    tier2Unlocked,
     tier2: state.tier2,
     xpInfo: xpProgress(state.tier2.xp),
     ledgerProgress,
@@ -1690,20 +1654,17 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     completeHunting,
     completeMining,
     craftTool,
-    tiers: tiersList,
-    isTierUnlocked,
-    moduleTierId,
-    achievementTierId,
+    moduleStage,
+    isModuleRevealed,
     achievementIsDefault,
     toolTiersList,
     craftCostFor,
     resourceMeta: resourceMetaResolved,
-    tierTips: tierTipsResolved,
+    stageTips: stageTipsResolved,
     features: featuresResolved,
     mechanics: mechanicsResolved,
     settings: state.settings,
     updateSettings,
-    currentTierId: currentTierIdValue,
     legacy: state.legacy,
     canPrestige,
     prestigeOutpost,

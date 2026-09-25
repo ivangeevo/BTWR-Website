@@ -209,6 +209,7 @@ export class EngineGateMechanic {
   s3Cost = 75;
   s4ModFacts = 10;
   s4Hoppers = 5;
+  s4Meals = 1;
   s4Cost = 1_000;
   s5CorePU = 1;
   s5ComponentTypes = 3;
@@ -219,8 +220,10 @@ export class EngineGateMechanic {
   s6Cost = 2_500_000;
   s7DetectorUses = 3;
   s7Components = 25;
+  s7Meals = 25;
   s7Cost = 150_000_000;
   s8CorePU = 10;
+  s8QuizCorrect = 50;
   s8Cost = 10_000_000_000;
 
   static readonly configFields: MechanicConfigField[] = [
@@ -234,6 +237,7 @@ export class EngineGateMechanic {
     field("s3Cost", "→3 insight cost", "Insight spent to advance.", 0, 1e12, 1),
     field("s4ModFacts", "→4 mod facts", "Mod-fact sentences solved.", 0, 200, 1),
     field("s4Hoppers", "→4 hoppers", "Hoppers owned.", 0, 200, 1),
+    field("s4Meals", "→4 meals", "Meals cooked at the Campfire.", 0, 200, 1),
     field("s4Cost", "→4 insight cost", "Insight spent to advance.", 0, 1e12, 1),
     field("s5CorePU", "→5 cranked power", "Core power while cranking.", 0, 20, 1, "PU"),
     field("s5ComponentTypes", "→5 component types", "Different components owned.", 0, 9, 1),
@@ -244,8 +248,10 @@ export class EngineGateMechanic {
     field("s6Cost", "→6 insight cost", "Insight spent to advance.", 0, 1e13, 1),
     field("s7DetectorUses", "→7 detector uses", "Detector Block uses.", 0, 100, 1),
     field("s7Components", "→7 components", "Components owned in total.", 0, 1000, 1),
+    field("s7Meals", "→7 meals", "Meals cooked at the Campfire, lifetime.", 0, 1000, 1),
     field("s7Cost", "→7 insight cost", "Insight spent to advance.", 0, 1e15, 1),
     field("s8CorePU", "→8 idle power", "Idle core power on the 5×5 grid.", 0, 100, 1, "PU"),
+    field("s8QuizCorrect", "→8 quiz answers", "Correct Guess the Mod answers, lifetime.", 0, 2000, 1),
     field("s8Cost", "→8 insight cost", "Insight spent to advance.", 0, 1e18, 1),
   ];
 }

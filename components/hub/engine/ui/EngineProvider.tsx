@@ -71,7 +71,8 @@ import type {
 } from "../types";
 import { LiveStore } from "./live-store";
 
-export type CeremonyView = { kind: "stage"; stage: EngineStage } | { kind: "mark"; mark: number };
+/** replay: shown again from the Logbook, so it doesn't re-announce the cards it revealed. */
+export type CeremonyView = { kind: "stage"; stage: EngineStage; replay?: boolean } | { kind: "mark"; mark: number };
 export type EngineToast = { id: string; text: string; tone: "info" | "good" | "warn" };
 
 type EngineCtx = {
@@ -341,17 +342,11 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted]);
 
-  // --- The Engine narrates new cards as the Outpost reveals them ---
-  // Tier thresholds are untouched (admin-config.ts); this just gives each
-  // reveal a line in the Engine's voice and a brief glow on the new card.
-  const prevTierRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!mounted) return;
-    const tierId = a.currentTierId;
-    const prev = prevTierRef.current;
-    prevTierRef.current = tierId;
-    if (prev === null || prev === tierId) return;
-    const newCards = MODULES.filter((m) => m.id !== "ponder" && a.moduleTierId(m.id) === tierId);
+  // --- The Engine narrates the cards each new stage reveals ---
+  // Runs as a stage's ceremony closes (not on a Logbook replay): a line in
+  // the Engine's voice and a brief glow on each card that stage revealed.
+  const narrateReveals = (stage: number) => {
+    const newCards = MODULES.filter((m) => m.id !== "ponder" && a.moduleStage(m.id) === stage);
     newCards.forEach((m, i) => {
       const line = revealLine(m.id);
       window.setTimeout(() => {
@@ -361,10 +356,11 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
           el.classList.add("engine-reveal-glow");
           window.setTimeout(() => el.classList.remove("engine-reveal-glow"), 2600);
         }
-      }, 900 + i * 1400);
+      }, 600 + i * 1400);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a.currentTierId, mounted]);
+  };
+  const narrateRef = useRef(narrateReveals);
+  narrateRef.current = narrateReveals;
 
   // --- Drain events from outside the Outpost (Mods page, header gear, sky) ---
   const drainRef = useRef<() => void>(() => {});
@@ -717,8 +713,8 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     return {
       daysVisited: a.tier2.totalDaysVisited,
       unlockedCount: a.unlocked.size,
-      isTierUnlocked: a.isTierUnlocked,
-      isModuleRevealed: (id: string) => a.isTierUnlocked(a.moduleTierId(id as Parameters<typeof a.moduleTierId>[0])),
+      achieved: (id: string) => a.unlocked.has(id as Parameters<typeof a.unlock>[0]),
+      mealsCooked: e.counters.mealsCooked,
       toolIndex: Math.max(0, order.indexOf(a.tools.tier)),
       toolIndexOf: (id: string) => order.indexOf(id),
       toolNameOf: (id: string) => a.toolTiersList.find((t) => t.id === id)?.name ?? id,
@@ -726,7 +722,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
       quizCorrect: a.quiz.totalCorrect,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a.toolTiersList, a.tier2.totalDaysVisited, a.unlocked.size, a.isTierUnlocked, a.moduleTierId, a.tools.tier, a.resources.iron, a.quiz.totalCorrect]);
+  }, [a.toolTiersList, a.tier2.totalDaysVisited, a.unlocked, a.unlocked.size, e.counters.mealsCooked, a.tools.tier, a.resources.iron, a.quiz.totalCorrect]);
 
   const gate = useMemo(
     () => (e.stage < 8 ? evaluateGate((e.stage + 1) as EngineStage, e, cfg.gates, site) : null),
@@ -1145,6 +1141,10 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
         updateEngine((s) => (s.ceremoniesSeen.includes(100 + c.mark) ? s : { ...s, ceremoniesSeen: [...s.ceremoniesSeen, 100 + c.mark] }));
       } else if (c?.kind === "stage") {
         updateEngine((s) => (s.ceremoniesSeen.includes(c.stage) ? s : { ...s, ceremoniesSeen: [...s.ceremoniesSeen, c.stage] }));
+        if (!c.replay) {
+          const stage = c.stage;
+          window.setTimeout(() => narrateRef.current(stage), 0);
+        }
       }
       return null;
     });

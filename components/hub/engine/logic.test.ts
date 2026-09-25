@@ -15,8 +15,8 @@ function site(over: Partial<GateSite> = {}): GateSite {
   return {
     daysVisited: 1,
     unlockedCount: 0,
-    isTierUnlocked: () => false,
-    isModuleRevealed: () => false,
+    achieved: () => false,
+    mealsCooked: 0,
     toolIndex: 0,
     toolIndexOf: (id) => order.indexOf(id),
     toolNameOf: (id) => id,
@@ -38,16 +38,17 @@ describe("stage gates", () => {
 
   it("each requirement toggles independently (The Stump)", () => {
     const e: EngineState = { ...defaultEngineState(), stage: 2, choicesMade: 6, askAnswers: { a: "x", b: "y", c: "z" }, modsRead: ["1", "2", "3", "4", "5"] };
-    const ok = site({ isTierUnlocked: (t) => t === "tier3" });
+    const ok = site({ achieved: (id) => id === "mod-of-day-viewed" || id === "patch-notes-opened" });
     expect(evaluateGate(3, e, cfg.gates, ok).met).toBe(true);
     expect(evaluateGate(3, { ...e, choicesMade: 5 }, cfg.gates, ok).met).toBe(false);
     expect(evaluateGate(3, { ...e, askAnswers: { a: "x" } }, cfg.gates, ok).met).toBe(false);
     expect(evaluateGate(3, { ...e, modsRead: ["1"] }, cfg.gates, ok).met).toBe(false);
     expect(evaluateGate(3, e, cfg.gates, site()).met).toBe(false);
-    expect(evaluateGate(3, e, cfg.gates, ok).reqs.filter((r) => r.site)).toHaveLength(2);
+    expect(evaluateGate(3, e, cfg.gates, { ...ok, achieved: (id) => id === "mod-of-day-viewed" }).met).toBe(false);
+    expect(evaluateGate(3, e, cfg.gates, ok).reqs.filter((r) => r.site)).toHaveLength(3);
   });
 
-  it("First Iron needs the crank blueprint, mod facts, hoppers, Gathering and a stone tool", () => {
+  it("First Iron needs the crank blueprint, mod facts, hoppers, a cooked meal and a stone tool", () => {
     const e: EngineState = {
       ...defaultEngineState(),
       stage: 3,
@@ -55,9 +56,10 @@ describe("stage gates", () => {
       solvesByKind: { tiles: 0, fork: 0, modFact: 10, live: 0, paragraph: 0 },
       components: { hopper: 5 },
     };
-    const ok = site({ isModuleRevealed: (m) => m === "gathering", toolIndex: 1 });
+    const ok = site({ mealsCooked: 1, toolIndex: 1 });
     expect(evaluateGate(4, e, cfg.gates, ok).met).toBe(true);
     expect(evaluateGate(4, e, cfg.gates, { ...ok, toolIndex: 0 }).met).toBe(false);
+    expect(evaluateGate(4, e, cfg.gates, { ...ok, mealsCooked: 0 }).met).toBe(false);
     expect(evaluateGate(4, { ...e, blueprints: [] }, cfg.gates, ok).met).toBe(false);
   });
 

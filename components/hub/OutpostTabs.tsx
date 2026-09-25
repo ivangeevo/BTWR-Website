@@ -5,11 +5,10 @@ import { useAchievements } from "./AchievementsProvider";
 
 // The Outpost's top-level tabs, under the header's rank bar: Basecamp (the
 // card grid), Progress (level/XP, skins, logbook) and Achievements (the full
-// gallery). Progress and Achievements appear only once their own tier
-// unlocks them (module-registry's "your-progress" / "accomplishments"), and
-// the bar itself stays hidden while Basecamp is the only tab, so a new
-// visitor still meets just the one Ponder card. A newly revealed tab carries
-// an accent dot until it's first opened. The picked tab is remembered per
+// gallery). Progress and Achievements appear once the Engine stage set for
+// them is reached (module-registry's "your-progress" / "accomplishments",
+// Stage 1 by default), and the bar stays hidden while Basecamp is the only
+// tab. A tab carries an accent dot until it's first opened. The picked tab is remembered per
 // browser (a convenience only, so storage failures just fall back).
 
 export type OutpostTabId = "basecamp" | "progress" | "achievements";
@@ -54,11 +53,11 @@ function tabButtonId(id: OutpostTabId) {
 
 /** Which tabs exist right now, plus the selected one (falls back to Basecamp). */
 export function useOutpostTabs() {
-  const { mounted, isTierUnlocked, moduleTierId } = useAchievements();
+  const { mounted, isModuleRevealed } = useAchievements();
   const available = TABS.filter(
     (t) =>
       t.id === "basecamp" ||
-      (mounted && isTierUnlocked(moduleTierId(t.id === "progress" ? "your-progress" : "accomplishments")))
+      (mounted && isModuleRevealed(t.id === "progress" ? "your-progress" : "accomplishments"))
   ).map((t) => t.id);
   const [stored, setStored] = useState<Stored>({ tab: "basecamp", opened: [] });
   const loaded = useRef(false);

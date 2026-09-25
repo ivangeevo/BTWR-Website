@@ -26,10 +26,10 @@ export default function GuessTheMod({
   variant = "card",
 }: {
   mods: Mod[];
-  /** "card": self-contained panel (tier-1 grid). "flat": no outer chrome (tier-2 dashboard tab). */
+  /** "card": self-contained panel (the card grid). "flat": no outer chrome. */
   variant?: "card" | "flat";
 }) {
-  const { quiz, updateQuiz, unlock, tier2Unlocked, addXp, markQuizPlayedToday, recordModGuessCorrect, engineBuffs } =
+  const { quiz, updateQuiz, unlock, addXp, markQuizPlayedToday, recordModGuessCorrect, engineBuffs } =
     useAchievements();
   // The Engine's Detector Block (a powered attachment on its gear grid)
   // can strike one wrong answer per charge — see engine/buffs.ts.
@@ -133,7 +133,7 @@ export default function GuessTheMod({
       if (nextStreak === 5) unlock("quiz-streak-5");
       if (nextStreak === 10) unlock("no-compass-needed");
       recordModGuessCorrect(mod.projectId);
-      if (tier2Unlocked) addXp(XP_PER_CORRECT_ANSWER);
+      addXp(XP_PER_CORRECT_ANSWER);
     }
   }
 

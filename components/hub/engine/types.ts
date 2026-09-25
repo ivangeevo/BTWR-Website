@@ -108,6 +108,7 @@ export type EngineCounterKey =
   | "commissionsDone"
   | "sawChops"
   | "millstoneMeals"
+  | "mealsCooked"
   | "asksAnswered"
   | "engages"
   | "cleanEngages"

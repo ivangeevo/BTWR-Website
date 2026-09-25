@@ -7,10 +7,7 @@ import { insightPrestigeBonus, nextPerkCost, perkLevel, pointsForPrestige, PERKS
 
 // Moved out of the main-grid card layout into a header badge+dropdown — see
 // admin-config.ts's FeaturesConfig.prestigeEnabled. Hidden entirely until
-// canPrestige (the existing "reached the highest configured tier" gate) is
-// true, same as the old card's locked-teaser state used to require — except
-// now there's no teaser at all pre-unlock, just nothing, same as Hunting/
-// Mining not rendering pre-tier.
+// canPrestige (the Engine reaching Stage 8) is true — no teaser before then.
 export default function PrestigeBadge() {
   const {
     canPrestige,

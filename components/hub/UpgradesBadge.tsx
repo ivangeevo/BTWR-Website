@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAchievements } from "./AchievementsProvider";
+import { STAGES } from "./engine/stages";
+import type { EngineStage } from "./engine/types";
 
-// Moved out of the main-grid card layout into a header badge+dropdown — see
-// admin-config.ts's FeaturesConfig.upgradesEnabled/upgradesTierId. Hidden
-// entirely (not just disabled) until that feature's tier is reached, same
-// as Hunting/Mining not rendering pre-tier.
+// A header badge+dropdown — see admin-config.ts's FeaturesConfig
+// .upgradesEnabled/upgradesStage. Hidden entirely until the Engine reaches
+// that stage; each upgrade inside shows its own stage until it's buyable.
 export default function UpgradesBadge() {
-  const { upgrades, upgradeCatalog, buyUpgrade, tiers, isTierUnlocked, features } = useAchievements();
+  const { upgrades, upgradeCatalog, buyUpgrade, engine, features } = useAchievements();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -28,7 +29,7 @@ export default function UpgradesBadge() {
     };
   }, [open]);
 
-  if (!features.upgradesEnabled || !isTierUnlocked(features.upgradesTierId)) return null;
+  if (!features.upgradesEnabled || engine.stage < features.upgradesStage) return null;
 
   return (
     <div ref={containerRef} className="relative">
@@ -53,8 +54,8 @@ export default function UpgradesBadge() {
           <div className="mt-2.5 space-y-2">
             {upgradeCatalog.map((u) => {
               const owned = upgrades.purchased.includes(u.id);
-              const tierMet = isTierUnlocked(u.tierId);
-              const tierName = tiers.find((t) => t.id === u.tierId)?.name ?? u.tierId;
+              const stageMet = engine.stage >= u.stage;
+              const stageName = STAGES[u.stage as EngineStage]?.chapter ?? `Stage ${u.stage}`;
               const canAfford = upgrades.skillPoints >= u.cost;
 
               return (
@@ -63,7 +64,7 @@ export default function UpgradesBadge() {
                   className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 p-2"
                 >
                   <div className="flex min-w-0 items-center gap-2">
-                    <span aria-hidden="true">{tierMet ? u.icon : "\u{1F512}"}</span>
+                    <span aria-hidden="true">{stageMet ? u.icon : "\u{1F512}"}</span>
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-white">{u.name}</p>
                       <p className="text-[0.65rem] normal-case text-white/40">{u.description}</p>
@@ -73,8 +74,10 @@ export default function UpgradesBadge() {
                     <span className="shrink-0 text-[0.65rem] font-semibold text-[var(--outpost-accent)]">
                       Owned
                     </span>
-                  ) : !tierMet ? (
-                    <span className="shrink-0 text-[0.65rem] text-white/30">{tierName}</span>
+                  ) : !stageMet ? (
+                    <span className="shrink-0 text-[0.65rem] text-white/30" title="Reached as the Engine grows">
+                      {stageName}
+                    </span>
                   ) : (
                     <button
                       type="button"

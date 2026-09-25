@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { CEREMONIES, markCeremony } from "../../content/ceremonies";
+import { useAchievements } from "../../../AchievementsProvider";
+import { MODULES } from "../../../module-registry";
 import { STAGES } from "../../stages";
 import { useEngine } from "../EngineProvider";
 import { useReducedMotion } from "../use-reduced-motion";
@@ -12,10 +14,17 @@ import EngineSvg from "../visuals/EngineSvg";
 // Shown once per stage; replayable from the Logbook.
 export default function CeremonyOverlay() {
   const { ceremony, dismissCeremony, e } = useEngine();
+  const { moduleStage } = useAchievements();
   const reduced = useReducedMotion();
   const [shown, setShown] = useState(0);
 
-  const c = ceremony ? (ceremony.kind === "stage" ? CEREMONIES[ceremony.stage] : markCeremony(ceremony.mark)) : null;
+  const base = ceremony ? (ceremony.kind === "stage" ? CEREMONIES[ceremony.stage] : markCeremony(ceremony.mark)) : null;
+  // A stage also lists the Outpost cards it reveals (module-registry.ts).
+  const revealed =
+    ceremony?.kind === "stage"
+      ? MODULES.filter((m) => m.id !== "ponder" && moduleStage(m.id) === ceremony.stage).map((m) => m.label)
+      : [];
+  const c = base ? { ...base, unlocks: [...revealed, ...base.unlocks] } : null;
   const allText = c ? c.lines.join("\n") : "";
 
   useEffect(() => {
@@ -23,10 +32,10 @@ export default function CeremonyOverlay() {
   }, [ceremony, reduced]);
 
   useEffect(() => {
-    if (!c || shown >= allText.length) return;
+    if (!ceremony || shown >= allText.length) return;
     const id = window.setTimeout(() => setShown((n) => n + 1), allText[shown] === "\n" ? 380 : 28);
     return () => window.clearTimeout(id);
-  }, [c, shown, allText]);
+  }, [ceremony, shown, allText]);
 
   if (!ceremony || !c) return null;
   const typing = shown < allText.length;

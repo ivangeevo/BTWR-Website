@@ -56,8 +56,10 @@ export function stageTitle(stage: EngineStage, mark: number): string {
 export type GateSite = {
   daysVisited: number;
   unlockedCount: number;
-  isTierUnlocked: (tierId: string) => boolean;
-  isModuleRevealed: (moduleId: string) => boolean;
+  /** Whether an Outpost achievement has been earned. */
+  achieved: (achievementId: string) => boolean;
+  /** Meals cooked at the Campfire, lifetime. */
+  mealsCooked: number;
   /** Index of the visitor's current tool in the tool ladder. */
   toolIndex: number;
   toolIndexOf: (tierId: string) => number;
@@ -137,7 +139,8 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
     case 3:
       reqs.push(count("forks", "Choose how sentences end", e.choicesMade, g.s3Choices));
       reqs.push(count("asks", "Answer the Engine's questions", Object.keys(e.askAnswers).length, g.s3Asks));
-      reqs.push(flag("tier3", "Make camp (reach Outpost Tier 3)", site.isTierUnlocked("tier3"), true));
+      reqs.push(flag("motd", "Read today's Mod of the Day", site.achieved("mod-of-day-viewed"), true));
+      reqs.push(flag("patch", "Open the Patch Notes", site.achieved("patch-notes-opened"), true));
       reqs.push(count("mods", "Let it read mods on the Mods page", e.modsRead.length, g.s3ModsRead, true));
       cost = g.s3Cost;
       break;
@@ -145,7 +148,7 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
       reqs.push(flag("bp-crank", "Decode the Hand Crank blueprint", e.blueprints.includes("handCrank")));
       reqs.push(count("modfacts", "Solve sentences about mods", e.solvesByKind.modFact, g.s4ModFacts));
       reqs.push(count("hoppers", "Own Hoppers", e.components.hopper ?? 0, g.s4Hoppers));
-      reqs.push(flag("gathering", "Start Gathering at the Outpost", site.isModuleRevealed("gathering"), true));
+      reqs.push(count("meals", "Cook a meal at the Campfire", site.mealsCooked, g.s4Meals, true));
       reqs.push(toolReq(site, "stone"));
       cost = g.s4Cost;
       break;
@@ -165,7 +168,6 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
       reqs.push(flag("windmill", "Run the Engine on a windmill", engaged && hasSource(e.solved?.idle, "windmill")));
       reqs.push(flag("attach", "Power a Saw or Millstone", types.includes("saw") || types.includes("millstone")));
       reqs.push(count("caesar", "Decode dial ciphers", caesar, g.s6Caesar));
-      reqs.push(flag("quiz", "Find Guess the Mod at the Outpost", site.isModuleRevealed("guess-the-mod"), true));
       reqs.push(count("quiz-correct", "Guess mods correctly", site.quizCorrect, g.s6QuizCorrect, true));
       cost = g.s6Cost;
       break;
@@ -175,7 +177,7 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
       reqs.push(count("detector", "Use the Detector Block in Guess the Mod", e.counters.detectorUses, g.s7DetectorUses));
       reqs.push(flag("spec", "Choose what the Engine becomes", e.specialization !== null));
       reqs.push(count("components", "Own components in total", componentTotal(e), g.s7Components));
-      reqs.push(flag("tier7", "Reach Outpost Tier 7", site.isTierUnlocked("tier7"), true));
+      reqs.push(count("meals7", "Cook meals at the Campfire", site.mealsCooked, g.s7Meals, true));
       reqs.push(toolReq(site, "iron"));
       cost = g.s7Cost;
       break;
@@ -183,7 +185,7 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
       reqs.push(count("soulforged", "Forge a soulforged part", e.counters.soulforged, 1));
       reqs.push(count("idle", "Steady power into the core", engaged ? e.solved!.idle.corePU : 0, g.s8CorePU));
       reqs.push(flag("bp-final", "Decode the last blueprint", e.ciphers.solved.includes("bp-final")));
-      reqs.push(flag("tier9", "Reach Outpost Tier 9", site.isTierUnlocked("tier9"), true));
+      reqs.push(count("quiz50", "Guess mods correctly", site.quizCorrect, g.s8QuizCorrect, true));
       reqs.push(toolReq(site, "diamond"));
       cost = g.s8Cost;
       break;

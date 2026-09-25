@@ -56,14 +56,14 @@ function def(
   title: string,
   description: string,
   icon: string,
-  opts: { secret?: boolean; tier?: 1 | 2; xp?: number } = {}
+  opts: { secret?: boolean; xp?: number } = {}
 ): AchievementDef {
-  return { id, title, description, icon, secret: opts.secret, tier: opts.tier ?? 2, category: "engine", xp: opts.xp };
+  return { id, title, description, icon, secret: opts.secret, category: "engine", xp: opts.xp };
 }
 
 export const ENGINE_ACHIEVEMENT_DEFS: AchievementDef[] = [
-  def("en-day-two", "Day Two", "Ponder made it through its first night.", "\u{1F305}", { tier: 1 }),
-  def("en-first-ask", "It Asked You Something", "Answered one of the Engine's questions.", "\u{2753}", { tier: 1 }),
+  def("en-day-two", "Day Two", "Ponder made it through its first night.", "\u{1F305}"),
+  def("en-first-ask", "It Asked You Something", "Answered one of the Engine's questions.", "\u{2753}"),
   def("en-believer", "Confidant", "Answered 10 of the Engine's questions.", "\u{1F5E3}\u{FE0F}", { xp: 75 }),
   def("en-true-believer", "Consistent", "Answered six questions in a row the same way at heart.", "\u{1F9ED}", { secret: true, xp: 150 }),
   def("en-stump", "The Stump", "Ponder found a page in its head it didn't write.", "\u{1FAB5}", { xp: 75 }),
@@ -101,48 +101,6 @@ export const ENGINE_ACHIEVEMENT_DEFS: AchievementDef[] = [
   def("en-sky-held", "Hold the Sky", "Asked the Engine to hold the sky still — and it did.", "\u{1F30D}", { secret: true, xp: 250 }),
 ];
 
-// Where each Engine achievement sits on the Outpost's tier ladder (gallery
-// grouping — admin-config.ts spreads this into its defaults): roughly the
-// tier a visitor is at when the Engine reaches that stage.
-export const ENGINE_ACHIEVEMENT_TIERS: Record<EngineAchievementId, string> = {
-  "en-day-two": "tier1",
-  "en-first-ask": "tier1",
-  "en-believer": "tier2",
-  "en-true-believer": "tier3",
-  "en-stump": "tier3",
-  "en-first-cipher": "tier3",
-  "en-first-hopper": "tier3",
-  "en-well-read": "tier4",
-  "en-librarian": "tier6",
-  "en-first-iron": "tier4",
-  "en-crank-100": "tier4",
-  "en-first-pop": "tier4",
-  "en-clean-engage": "tier4",
-  "en-mid-game": "tier4",
-  "en-windmill": "tier4",
-  "en-caesar": "tier4",
-  "en-sawmill": "tier5",
-  "en-thrive": "tier5",
-  "en-water-wheel": "tier5",
-  "en-frozen": "tier5",
-  "en-detector-10": "tier6",
-  "en-full-drum": "tier5",
-  "en-crucible": "tier7",
-  "en-soulforged": "tier7",
-  "en-starlight": "tier8",
-  "en-eureka-50": "tier7",
-  "en-companion": "tier7",
-  "en-wither-end": "tier9",
-  "en-letter": "tier9",
-  "en-commissions-7": "tier9",
-  "en-first-gold": "tier9",
-  "en-billion": "tier10",
-  "en-mark-ii": "tier10",
-  "en-mark-v": "tier10",
-  "en-all-gold": "tier10",
-  "en-all-specs": "tier10",
-  "en-sky-held": "tier10",
-};
 
 type Ctx = { state: HubState };
 

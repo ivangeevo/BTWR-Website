@@ -27,6 +27,7 @@ const COUNTER_KEYS: EngineCounterKey[] = [
   "commissionsDone",
   "sawChops",
   "millstoneMeals",
+  "mealsCooked",
   "asksAnswered",
   "engages",
   "cleanEngages",

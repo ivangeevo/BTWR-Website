@@ -97,7 +97,7 @@ export default function LogbookTab() {
               <button
                 key={s}
                 type="button"
-                onClick={() => showCeremony({ kind: "stage", stage: s })}
+                onClick={() => showCeremony({ kind: "stage", stage: s, replay: true })}
                 className="rounded-md border border-white/15 px-2 py-0.5 text-[0.7rem] text-slate-300 hover:border-[var(--outpost-accent)]"
               >
                 {STAGES[s].chapter}
