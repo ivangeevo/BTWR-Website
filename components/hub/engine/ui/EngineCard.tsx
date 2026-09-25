@@ -133,10 +133,13 @@ export default function EngineCard() {
       <WhileAwaySummary />
 
       {e.stage >= 3 && (
-        <div className="mt-2 flex items-center gap-3">
+        <div className="relative mt-2 flex items-center gap-3">
           <EngineSvg stage={e.stage} size={e.stage >= 4 ? 64 : 52} spinning={!reduced && (corePU > 0 || e.stage < 4)} corePU={corePU} dust={dust} />
           <div className="min-w-0 flex-1">
-            <InsightCounter />
+            {/* Only the counter keeps clear of the frenzy badge in the corner; the Core line runs under it. */}
+            <div className={frenzyOn ? "pr-24" : undefined}>
+              <InsightCounter />
+            </div>
             {e.stage >= 4 && (
               <p className="text-[0.65rem] text-slate-400">
                 Core: <span className="text-white">{corePU} PU</span>
@@ -144,6 +147,11 @@ export default function EngineCard() {
               </p>
             )}
           </div>
+          {frenzyOn && (
+            <span className="absolute right-0 top-0 whitespace-nowrap text-[0.7rem] font-semibold text-[var(--outpost-accent)]">
+              Eureka frenzy ×{formatInsight(e.frenzy!.mult)}
+            </span>
+          )}
         </div>
       )}
 
@@ -174,14 +182,16 @@ export default function EngineCard() {
 
       <StageGatePanel />
 
-      {((e.stage >= 8 && fx.governsSky) || frenzyOn) && (
+      {/* A frenzy shows at the top right of the insight row above; only a
+          stage too early for that row (Eurekas can be set that early) puts it here. */}
+      {((e.stage >= 8 && fx.governsSky) || (frenzyOn && e.stage < 3)) && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {e.stage >= 8 && fx.governsSky && (
             <button type="button" onClick={holdSky} className="text-xs text-[var(--outpost-accent)] hover:underline" data-no-drag>
               Hold the sky
             </button>
           )}
-          {frenzyOn && (
+          {frenzyOn && e.stage < 3 && (
             <span className="ml-auto text-[0.7rem] font-semibold text-[var(--outpost-accent)]">
               Eureka frenzy ×{formatInsight(e.frenzy!.mult)}
             </span>
