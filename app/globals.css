@@ -148,8 +148,9 @@ html.daynight-theme-transition *::after {
     linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bg-blend) 100%);
   transition: height 400ms ease, filter 320ms ease-out, --sky-top 1100ms linear,
     --sky-bg-blend 1100ms linear, --sky-glow 1100ms linear, --sky-wash-left 1100ms linear,
-    --sky-wash-right 1100ms linear, --sky-ray 1100ms linear, --sky-body-x 1100ms linear,
-    --sky-body-y 1100ms linear;
+    --sky-wash-right 1100ms linear, --sky-ray 1100ms linear;
+  /* No transition on --sky-body-x/y: DayNightSky.tsx sets them every frame,
+     so the rays stay exactly on the sun/moon instead of trailing it. */
 }
 
 html[data-daynight-active="true"] .day-night-sky,
@@ -204,16 +205,20 @@ html[data-daynight-active="true"] .day-night-sky,
   }
 }
 
+/* Placed every frame by DayNightSky.tsx with a sub-pixel transform from the
+   band's top-left corner, so it glides instead of stepping. */
 .day-night-body {
   position: absolute;
+  left: 0;
+  top: 0;
   transform: translate(-50%, -50%);
+  will-change: transform;
   font-size: 1.9rem;
   line-height: 1;
   filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.6));
   /* Fades out as it sets and back in as the next body rises (see the
-     twilight gap in day-night-cycle.ts) — slower than the 1s position/top
-     tween so the fade reads as its own beat, not just part of the motion. */
-  transition: left 1000ms linear, top 1000ms linear, opacity 1800ms ease;
+     twilight gap in day-night-cycle.ts), as its own beat. */
+  transition: opacity 1800ms ease;
 }
 
 .day-night-sky[data-phase="night"] .day-night-body {

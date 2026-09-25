@@ -38,6 +38,17 @@ const THEME_TRANSITION_MS = THEME_FLIP_LEAD_MS * 2;
 // trailing color, which a same-phase clamp can't reach.
 const WASH_LOOKAHEAD_MS = 10_000;
 
+// Where the sun/moon sits along its parabolic arc, as percentages of the
+// band: rises from the horizon at the edges to its peak at the midpoint of
+// the visible arc, same shape sunrise-to-sunset would trace. Driven by
+// bodyProgress (arc-only), not progress (the full segment including the
+// trailing twilight gap) — the body holds at the set position
+// (bodyProgress 1) through the gap while its opacity fades out.
+function bodyPosition(phase: CyclePhase) {
+  const heightFactor = 1 - Math.pow(2 * phase.bodyProgress - 1, 2);
+  return { x: phase.bodyProgress * 100, y: 88 - heightFactor * 78, heightFactor };
+}
+
 // A custom-property-only extension of React's own style type — see the big
 // comment on .day-night-sky in globals.css for why these have to be CSS
 // custom properties (registered there via @property) rather than just
@@ -51,8 +62,6 @@ type SkyStyle = React.CSSProperties & {
   "--sky-wash-left"?: string;
   "--sky-wash-right"?: string;
   "--sky-ray"?: string;
-  "--sky-body-x"?: string;
-  "--sky-body-y"?: string;
 };
 
 // Fixed, hand-placed star positions (percent of the band's width/height) —
@@ -113,6 +122,8 @@ export default function DayNightSky() {
   const startedAtRef = useRef<number | null>(null);
   const prevBodyVisibleRef = useRef<boolean | null>(null);
   const themeTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skyRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function tick() {
@@ -162,16 +173,38 @@ export default function DayNightSky() {
     };
   }, []);
 
-  if (!active || !phase) return <div className="day-night-sky" aria-hidden="true" />;
+  // The sun/moon and the rays centred on it move every frame, not once a
+  // second: the position is worked out fresh from the clock each frame, the
+  // icon is placed by a sub-pixel transform (a tweened left/top snapped to
+  // whole pixels, stepping visibly), and the rays read the very same
+  // --sky-body-x/y straight away, with no transition of their own to lag
+  // behind it. The colours still change on the 1s tick above, tweened.
+  useEffect(() => {
+    if (!active) return;
+    let raf = 0;
+    const frame = () => {
+      const sky = skyRef.current;
+      const body = bodyRef.current;
+      const startedAt = startedAtRef.current;
+      if (sky && startedAt !== null) {
+        const { x, y } = bodyPosition(computeCyclePhase(startedAt, Date.now()));
+        sky.style.setProperty("--sky-body-x", `${x}%`);
+        sky.style.setProperty("--sky-body-y", `${y}%`);
+        if (body) {
+          const px = (x / 100) * sky.clientWidth;
+          const py = (y / 100) * sky.clientHeight;
+          body.style.transform = `translate3d(${px}px, ${py}px, 0) translate(-50%, -50%)`;
+        }
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [active]);
 
-  // Parabolic arc: rises from the horizon at the edges to its peak at the
-  // midpoint of the visible arc, same shape sunrise-to-sunset would trace.
-  // Driven by bodyProgress (arc-only), not progress (the full segment
-  // including the trailing twilight gap) — the body holds at the set
-  // position (bodyProgress 1) through the gap while its opacity fades out.
-  const leftPercent = phase.bodyProgress * 100;
-  const heightFactor = 1 - Math.pow(2 * phase.bodyProgress - 1, 2);
-  const topPercent = 88 - heightFactor * 78;
+  if (!active || !phase) return <div ref={skyRef} className="day-night-sky" aria-hidden="true" />;
+
+  const { heightFactor } = bodyPosition(phase);
   const { top, horizon } = skyColors(phase);
   const bgBlend = siteBgBlend(phase);
 
@@ -207,8 +240,6 @@ export default function DayNightSky() {
     "--sky-wash-left": rgbToCss(leftTop, 0.5),
     "--sky-wash-right": rgbToCss(rightTop, 0.5),
     "--sky-ray": rgbToCss(horizon, glowStrength * 0.16),
-    "--sky-body-x": `${leftPercent}%`,
-    "--sky-body-y": `${topPercent}%`,
     transitionProperty: justRose
       ? "height, filter, --sky-top, --sky-bg-blend, --sky-glow, --sky-wash-left, --sky-wash-right, --sky-ray"
       : undefined,
@@ -226,6 +257,7 @@ export default function DayNightSky() {
 
   return (
     <div
+      ref={skyRef}
       className="day-night-sky"
       data-active="true"
       data-phase={phase.isDay ? "day" : "night"}
@@ -265,10 +297,9 @@ export default function DayNightSky() {
         </div>
       )}
       <div
+        ref={bodyRef}
         className="day-night-body"
         style={{
-          left: `${leftPercent}%`,
-          top: `${topPercent}%`,
           opacity: phase.bodyVisible ? 1 : 0,
           transitionProperty: justRose ? "opacity" : undefined,
         }}
