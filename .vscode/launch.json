@@ -4,6 +4,22 @@
     {
       "type": "msedge",
       "request": "launch",
+      "name": "Dev server in Edge (updates on save)",
+      "url": "http://localhost:3000/",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "dev"
+    },
+    {
+      "type": "firefox",
+      "request": "launch",
+      "name": "Dev server in Firefox (updates on save)",
+      "url": "http://localhost:3000/",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "dev"
+    },
+    {
+      "type": "msedge",
+      "request": "launch",
       "name": "Launch Edge (Live Server)",
       "url": "http://127.0.0.1:5500/",
       "webRoot": "${workspaceFolder}"
