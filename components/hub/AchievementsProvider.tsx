@@ -1651,9 +1651,15 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     };
   }, [adminConfig, bellowsMult]);
   // Bellows started/stopped: keep the fire's visible stage where it is.
-  const prevBellowsMultRef = useRef(1);
+  const prevBellowsMultRef = useRef<number | null>(null);
   useEffect(() => {
     if (!mounted) return;
+    // The first pass after load just records the rate the save was already
+    // living under — only a change during this session re-anchors the fire.
+    if (prevBellowsMultRef.current === null) {
+      prevBellowsMultRef.current = bellowsMult;
+      return;
+    }
     const prevMult = prevBellowsMultRef.current;
     prevBellowsMultRef.current = bellowsMult;
     if (prevMult === bellowsMult) return;

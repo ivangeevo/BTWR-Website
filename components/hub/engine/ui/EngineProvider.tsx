@@ -52,6 +52,9 @@ import {
   readModsRead,
   removeInbox,
   setSkyHold,
+  engineTabId,
+  lockHeldElsewhere,
+  writeEngineLock,
 } from "../bridge-storage";
 import { evaluateGate, stageTitle, type GateResult, type GateSite } from "../stages";
 import { JOURNAL_MAX, publicSnapshot } from "../state";
@@ -87,6 +90,9 @@ type EngineCtx = {
   setWorkshopOpen: (open: boolean) => void;
   /** Whether the card spans both grid columns. */
   wide: boolean;
+  /** Another browser tab is running the Engine; this one is hands-off. */
+  passive: boolean;
+  takeOver: () => void;
   ceremony: CeremonyView | null;
   showCeremony: (c: CeremonyView) => void;
   dismissCeremony: () => void;
@@ -157,6 +163,16 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
   const [toasts, setToasts] = useState<EngineToast[]>([]);
   const [envTick, setEnvTick] = useState(0);
   const [workshopOpen, setWorkshopOpen] = useState(false);
+  // Another tab is running the Engine — this one stays hands-off (no clock,
+  // no offline accrual) until the visitor chooses to run it here instead.
+  const tabIdRef = useRef("");
+  if (typeof window !== "undefined" && !tabIdRef.current) tabIdRef.current = engineTabId();
+  const passiveRef = useRef(false);
+  const [passive, setPassive] = useState(false);
+  const takeOver = useCallback(() => {
+    writeEngineLock(tabIdRef.current);
+    window.location.reload();
+  }, []);
 
   // Always-current copies for the clock and handlers, so callbacks stay stable.
   const cfgRef = useRef(cfg);
@@ -214,7 +230,16 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
           window.setTimeout(() => toast(welcomeBackLine(s.stage, s.specialization === "hardcore"), "good"), 0);
         }
         s = fn(s, now);
-        return { ...s, lastInteractAt: iso(now) };
+        // Keep the snapshot other pages read (Mods page, header gear, sky)
+        // current right away, not just at the next 30s checkpoint.
+        const f = fxOf(s);
+        const pub = publicSnapshot(
+          s,
+          { ips: computeIps(s, c, f, now).ips, corePU: corePUAt(s, c, now) },
+          { governsSky: f.governsSky && s.stage >= 8, keywordHunt: s.ciphers.current?.kind === "keyword" },
+          iso(now)
+        );
+        return { ...s, lastInteractAt: iso(now), public: pub };
       }, mode);
     },
     [updateEngine, toast]
@@ -254,6 +279,12 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
   useEffect(() => {
     if (!mounted || didInitRef.current) return;
     didInitRef.current = true;
+    if (lockHeldElsewhere(tabIdRef.current)) {
+      passiveRef.current = true;
+      setPassive(true);
+      return;
+    }
+    writeEngineLock(tabIdRef.current);
     const now = Date.now();
     const c = cfgRef.current;
     updateEngine((prev) => {
@@ -386,10 +417,21 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
   useEffect(() => {
     if (!mounted) return;
     let lastCheckpoint = Date.now();
+    let lastLock = 0;
     let hiddenAt: number | null = null;
 
     function tick() {
       const now = Date.now();
+      if (passiveRef.current) return;
+      if (lockHeldElsewhere(tabIdRef.current, now)) {
+        passiveRef.current = true;
+        setPassive(true);
+        return;
+      }
+      if (now - lastLock >= 5000) {
+        writeEngineLock(tabIdRef.current);
+        lastLock = now;
+      }
       const s = getEngine();
       const c = cfgRef.current;
       const f = fxOf(s);
@@ -1149,6 +1191,8 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     workshopOpen,
     setWorkshopOpen,
     wide: workshopOpen || e.stage >= 4,
+    passive,
+    takeOver,
     ceremony,
     showCeremony: setCeremony,
     dismissCeremony,

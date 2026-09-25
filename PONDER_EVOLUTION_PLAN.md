@@ -1,3 +1,10 @@
+> **Superseded (2026-09-25).** This plan was replaced by the full 8-stage rework now in
+> `components/hub/engine/` — Ponder grows into The Analytical Engine (word tiles → ciphers →
+> a BTW mechanical-power gear grid → an idle clicker core with components, research, Eureka
+> sparks, prestige Marks, commissions and the Difference Engine). The per-tier ability layer
+> described below (`AnalyticalEngineMechanic`, `mechanicOverridesByTier`) was removed; tunables
+> now live in `engine/config.ts` and the admin panel's Engine tab. Kept for history only.
+
 # Ponder → The Analytical Engine — Evolution Plan
 
 Not started. Planning doc only — no code changed yet. Written after a design

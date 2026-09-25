@@ -28,7 +28,7 @@ const TAB_LABELS: Record<Tab, string> = { mind: "Mind", body: "Body", works: "Wo
 // card opens into a full-width Workshop holding the deeper systems.
 export default function EngineCard() {
   const eng = useEngine();
-  const { e, cfg, title, store, workshopOpen, setWorkshopOpen, holdSky, fx } = eng;
+  const { e, cfg, title, store, workshopOpen, setWorkshopOpen, holdSky, fx, passive, takeOver } = eng;
   const reduced = useReducedMotion();
   const corePU = useLive(store, (s) => s.corePU);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -202,8 +202,26 @@ export default function EngineCard() {
         )}
       </div>
 
-      <CeremonyOverlay />
-      <GuidedHighlight root={rootRef} />
+      {passive ? (
+        <div className="engine-ceremony" role="status" data-no-drag>
+          <div className="engine-ceremony-inner">
+            <p className="text-sm text-white">The Engine is already running in another tab.</p>
+            <p className="mt-1 text-xs text-slate-400">Only one place can run it at a time, so nothing here gets lost.</p>
+            <button
+              type="button"
+              onClick={takeOver}
+              className="mt-3 rounded-md border border-[var(--outpost-accent)] px-3 py-1 text-xs font-semibold text-[var(--outpost-accent)] hover:bg-[var(--outpost-accent-soft)]"
+            >
+              Run it here instead
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <CeremonyOverlay />
+          <GuidedHighlight root={rootRef} />
+        </>
+      )}
     </div>
   );
 }

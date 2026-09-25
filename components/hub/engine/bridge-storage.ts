@@ -108,6 +108,42 @@ export function writeEngineDebug(d: EngineDebug): void {
   write(DEBUG_KEY, d);
 }
 
+// --- One running Engine per browser ---
+// Two homepage tabs would each accrue and save their own copy of the
+// Engine. Whichever tab holds a fresh heartbeat here runs it; any other
+// open Outpost goes passive until the visitor chooses to run it there.
+export const LOCK_KEY = "btwr:hub:engine-lock:v1";
+export const LOCK_STALE_MS = 20_000;
+
+// Per-tab id that survives a reload of the same tab (sessionStorage), so a
+// tab that just took over the Engine still recognizes its own lock.
+export function engineTabId(): string {
+  const fresh = `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  if (typeof window === "undefined") return fresh;
+  try {
+    const existing = window.sessionStorage.getItem("btwr:hub:engine-tab");
+    if (existing) return existing;
+    window.sessionStorage.setItem("btwr:hub:engine-tab", fresh);
+  } catch {
+    // ignore
+  }
+  return fresh;
+}
+
+export function readEngineLock(): { tabId: string; at: number } | null {
+  const v = read<{ tabId?: unknown; at?: unknown }>(LOCK_KEY, {});
+  return typeof v.tabId === "string" && typeof v.at === "number" ? { tabId: v.tabId, at: v.at } : null;
+}
+
+export function writeEngineLock(tabId: string): void {
+  write(LOCK_KEY, { tabId, at: Date.now() });
+}
+
+export function lockHeldElsewhere(tabId: string, now: number = Date.now()): boolean {
+  const lock = readEngineLock();
+  return !!lock && lock.tabId !== tabId && now - lock.at < LOCK_STALE_MS;
+}
+
 // --- The Engine's public snapshot, for pages outside the provider ---
 
 export function readEnginePublic(): EnginePublic | null {
@@ -118,7 +154,7 @@ export function readEnginePublic(): EnginePublic | null {
 
 export function clearEngineSideKeys(): void {
   if (typeof window === "undefined") return;
-  for (const key of [MODS_READ_KEY, INBOX_KEY, HOLD_KEY, DEBUG_KEY]) {
+  for (const key of [MODS_READ_KEY, INBOX_KEY, HOLD_KEY, DEBUG_KEY, LOCK_KEY]) {
     try {
       window.localStorage.removeItem(key);
     } catch {

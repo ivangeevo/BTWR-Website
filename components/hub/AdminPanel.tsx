@@ -31,19 +31,23 @@ import { DEFAULT_MODULE_TIER, MODULES, type ModuleId } from "./module-registry";
 import OutpostCorners from "./OutpostCorners";
 import { RESOURCE_IDS, TOOL_ORDER, type ResourceId, type ToolTier } from "./resources";
 import type { UpgradeId } from "./upgrade-catalog";
+import EngineAdminTab from "./engine/ui/admin/EngineAdminTab";
+import EngineDebugPanel from "./engine/ui/admin/EngineDebugPanel";
 
 // Same measure-then-position recipe as AchievementGallery.tsx's tile
 // tooltip — see MechanicSettingsMenu below.
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-type Tab = "tiers" | "resources" | "tools" | "features" | "upgrades";
+type Tab = "tiers" | "resources" | "tools" | "features" | "upgrades" | "engine" | "engine-debug";
 const TAB_LABELS: Record<Tab, string> = {
   tiers: "Tiers",
   resources: "Resources",
   tools: "Tools",
   features: "Features",
   upgrades: "Upgrades",
+  engine: "Engine",
+  "engine-debug": "Engine Debug",
 };
 
 type TierSubTab = "list" | "modules" | "achievements" | "tips";
@@ -1463,6 +1467,8 @@ export default function AdminPanel() {
                 {tab === "tools" && <ToolsTab config={config} update={update} />}
                 {tab === "features" && <FeaturesTab config={config} update={update} />}
                 {tab === "upgrades" && <UpgradesTab config={config} update={update} />}
+                {tab === "engine" && <EngineAdminTab config={config} update={update} />}
+                {tab === "engine-debug" && <EngineDebugPanel />}
               </div>
 
               <div className="mt-6 space-y-4 border-t border-white/10 pt-4">

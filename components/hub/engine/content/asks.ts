@@ -177,9 +177,13 @@ export const ASKS: AskDef[] = [
 
 export const ASKS_BY_ID: Record<string, AskDef> = Object.fromEntries(ASKS.map((a) => [a.id, a]));
 
-// The Engine asks roughly every fourth solve from Day Two, while unanswered questions remain.
+// The Engine asks one question per four sentences solved, from Day Two on,
+// while unanswered questions remain — counted against answers already given
+// (not "solvedCount % 4"), so answering never re-triggers another question.
 export function nextAsk(answered: Record<string, string>, solvedCount: number, stage: number): AskDef | null {
-  if (stage < 2 || solvedCount === 0 || solvedCount % 4 !== 0) return null;
+  if (stage < 2) return null;
+  const due = Math.floor(solvedCount / 4) - Object.keys(answered).length;
+  if (due <= 0) return null;
   return ASKS.find((a) => !answered[a.id]) ?? null;
 }
 

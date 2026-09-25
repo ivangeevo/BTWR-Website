@@ -69,10 +69,13 @@ function useEngineReading(): EngineReading {
       window.removeEventListener(EVT_MODS_READ, sync);
     };
   }, []);
-  const active = !!pub && pub.stage >= 2;
+  // Reading counts whenever the Outpost is on; the "read" ticks only show
+  // once the Engine has reached Day Two and can make sense of them.
+  const active = !!pub;
+  const showTicks = !!pub && pub.stage >= 2;
   const huntOn = !!pub && pub.keywordHunt && !pub.fragments.includes("frag-page");
   return {
-    active,
+    active: showTicks,
     read,
     onRead: (slug) => {
       if (active && markModRead(slug)) setRead((prev) => new Set([...prev, slug]));
