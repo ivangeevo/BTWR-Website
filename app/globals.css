@@ -1635,12 +1635,14 @@ html.daynight-fighting .outpost-zone::after {
   animation: engine-caret-blink 900ms steps(1) infinite;
 }
 
+/* Sized and rounded to its target's own outline by GuidedHighlight.tsx —
+   border-box, so the 2px ring sits exactly on the target's edge. */
 .engine-guide-ring {
   position: absolute;
   z-index: 20;
+  box-sizing: border-box;
   pointer-events: none;
   border: 2px solid var(--outpost-accent, #d98a4a);
-  border-radius: 0.6rem;
   box-shadow: 0 0 0 4px rgba(217, 138, 74, 0.18);
   animation: outpost-pulse 1.8s ease-in-out infinite;
 }
