@@ -55,6 +55,8 @@ export type AdminConfig = {
   version: 1;
   /** Overrides the Engine stage that reveals a card (module-registry.ts's DEFAULT_MODULE_STAGE). */
   moduleStage: Partial<Record<ModuleId, number>>;
+  /** Cards/sections switched off entirely — never shown, whatever the Engine's stage. */
+  moduleDisabled: Partial<Record<ModuleId, boolean>>;
   /** Achievements pinned to a "Default" group shown first in the gallery,
    * ahead of every category — for the odds and ends (window resizing, an
    * old cheat code) that don't really belong to any one category. */
@@ -88,6 +90,7 @@ export function defaultAdminConfig(): AdminConfig {
   return {
     version: 1,
     moduleStage: {},
+    moduleDisabled: {},
     // The two obvious "doesn't belong to any category" odds and ends
     // — resizing the window, and the old Konami-style cheat code — pinned
     // out of the box so the Default group isn't an empty, opt-in-only
@@ -137,6 +140,7 @@ function normalizeAdminConfig(parsed: Partial<AdminConfig>): AdminConfig {
     ...base,
     ...parsed,
     moduleStage: { ...base.moduleStage, ...parsed.moduleStage },
+    moduleDisabled: { ...base.moduleDisabled, ...parsed.moduleDisabled },
     achievementDefault: { ...base.achievementDefault, ...parsed.achievementDefault },
     toolTierEdits: { ...base.toolTierEdits, ...parsed.toolTierEdits },
     customToolTiers: Array.isArray(parsed.customToolTiers) ? parsed.customToolTiers : [],
@@ -193,6 +197,11 @@ export function importAdminConfig(raw: string): AdminConfig | null {
 
 export function resolvedModuleStage(config: AdminConfig, moduleId: ModuleId): number {
   return config.moduleStage[moduleId] ?? DEFAULT_MODULE_STAGE[moduleId];
+}
+
+// Ponder is the Engine itself (it holds every stage gate), so it can't be switched off.
+export function isModuleDisabled(config: AdminConfig, moduleId: ModuleId): boolean {
+  return moduleId !== "ponder" && config.moduleDisabled[moduleId] === true;
 }
 
 export function isAchievementDefault(config: AdminConfig, id: AchievementId): boolean {

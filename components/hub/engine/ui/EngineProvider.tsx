@@ -346,7 +346,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
   // Runs as a stage's ceremony closes (not on a Logbook replay): a line in
   // the Engine's voice and a brief glow on each card that stage revealed.
   const narrateReveals = (stage: number) => {
-    const newCards = MODULES.filter((m) => m.id !== "ponder" && a.moduleStage(m.id) === stage);
+    const newCards = MODULES.filter((m) => m.id !== "ponder" && a.isModuleEnabled(m.id) && a.moduleStage(m.id) === stage);
     newCards.forEach((m, i) => {
       const line = revealLine(m.id);
       window.setTimeout(() => {
@@ -715,6 +715,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
       unlockedCount: a.unlocked.size,
       achieved: (id: string) => a.unlocked.has(id as Parameters<typeof a.unlock>[0]),
       mealsCooked: e.counters.mealsCooked,
+      cardEnabled: (id: string) => a.isModuleEnabled(id as Parameters<typeof a.isModuleEnabled>[0]),
       toolIndex: Math.max(0, order.indexOf(a.tools.tier)),
       toolIndexOf: (id: string) => order.indexOf(id),
       toolNameOf: (id: string) => a.toolTiersList.find((t) => t.id === id)?.name ?? id,
@@ -722,7 +723,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
       quizCorrect: a.quiz.totalCorrect,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a.toolTiersList, a.tier2.totalDaysVisited, a.unlocked, a.unlocked.size, e.counters.mealsCooked, a.tools.tier, a.resources.iron, a.quiz.totalCorrect]);
+  }, [a.toolTiersList, a.tier2.totalDaysVisited, a.unlocked, a.unlocked.size, e.counters.mealsCooked, a.isModuleEnabled, a.tools.tier, a.resources.iron, a.quiz.totalCorrect]);
 
   const gate = useMemo(
     () => (e.stage < 8 ? evaluateGate((e.stage + 1) as EngineStage, e, cfg.gates, site) : null),

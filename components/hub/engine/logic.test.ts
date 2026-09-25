@@ -17,6 +17,7 @@ function site(over: Partial<GateSite> = {}): GateSite {
     unlockedCount: 0,
     achieved: () => false,
     mealsCooked: 0,
+    cardEnabled: () => true,
     toolIndex: 0,
     toolIndexOf: (id) => order.indexOf(id),
     toolNameOf: (id) => id,
@@ -60,6 +61,10 @@ describe("stage gates", () => {
     expect(evaluateGate(4, e, cfg.gates, ok).met).toBe(true);
     expect(evaluateGate(4, e, cfg.gates, { ...ok, toolIndex: 0 }).met).toBe(false);
     expect(evaluateGate(4, e, cfg.gates, { ...ok, mealsCooked: 0 }).met).toBe(false);
+    // A switched-off Campfire drops the cooking requirement instead of stalling the Engine.
+    const noFire = { ...ok, mealsCooked: 0, cardEnabled: (id: string) => id !== "campfire" };
+    expect(evaluateGate(4, e, cfg.gates, noFire).met).toBe(true);
+    expect(evaluateGate(4, e, cfg.gates, noFire).reqs.some((r) => r.id === "meals")).toBe(false);
     expect(evaluateGate(4, { ...e, blueprints: [] }, cfg.gates, ok).met).toBe(false);
   });
 

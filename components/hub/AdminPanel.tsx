@@ -13,6 +13,7 @@ import {
 import {
   defaultAdminConfig,
   importAdminConfig,
+  isModuleDisabled,
   loadAdminConfig,
   resolvedCraftCost,
   resolvedMechanic,
@@ -62,6 +63,7 @@ const STAGE_SUB_TAB_LABELS: Record<StageSubTab, string> = {
 // appear" picker below uses (ids are the stage number as a string, since
 // that's what a <select> hands back).
 const STAGE_LIST = ENGINE_STAGES.map((n) => ({ id: String(n), name: `Stage ${n} · ${STAGES[n].chapter}` }));
+const DISABLED_GROUP = { id: "disabled", name: "Disabled" };
 
 type Update = (updater: (prev: AdminConfig) => AdminConfig) => void;
 
@@ -70,10 +72,13 @@ type Update = (updater: (prev: AdminConfig) => AdminConfig) => void;
 function CollapsibleSection({
   title,
   count,
+  danger,
   children,
 }: {
   title: string;
   count: number;
+  /** Red title — for the Modules tab's "Disabled" group. */
+  danger?: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(true);
@@ -85,7 +90,7 @@ function CollapsibleSection({
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left"
       >
-        <span className="flex items-center gap-2 text-sm font-semibold text-white">
+        <span className={`flex items-center gap-2 text-sm font-semibold ${danger ? "text-red-400" : "text-white"}`}>
           {title}
           <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[0.65rem] font-semibold text-white/50">
             {count}
@@ -258,15 +263,24 @@ function MechanicSettingsMenu({ moduleId, config, update }: { moduleId: ModuleId
 }
 
 function ModulesTab({ config, update }: { config: AdminConfig; update: Update }) {
-  const tiers = STAGE_LIST;
+  // "Disabled" sits below every stage: a switched-off card never shows at all.
+  const tiers = [...STAGE_LIST, DISABLED_GROUP];
 
   function setModuleTier(id: ModuleId, stage: string) {
-    update((prev) => ({ ...prev, moduleStage: { ...prev.moduleStage, [id]: Number(stage) } }));
+    update((prev) => {
+      const moduleDisabled = { ...prev.moduleDisabled };
+      if (stage === DISABLED_GROUP.id) {
+        moduleDisabled[id] = true;
+        return { ...prev, moduleDisabled };
+      }
+      delete moduleDisabled[id];
+      return { ...prev, moduleDisabled, moduleStage: { ...prev.moduleStage, [id]: Number(stage) } };
+    });
   }
 
   const byTier = new Map<string, typeof MODULES>();
   for (const m of MODULES) {
-    const tierId = String(resolvedModuleStage(config, m.id));
+    const tierId = isModuleDisabled(config, m.id) ? DISABLED_GROUP.id : String(resolvedModuleStage(config, m.id));
     if (!byTier.has(tierId)) byTier.set(tierId, []);
     byTier.get(tierId)!.push(m);
   }
@@ -275,15 +289,18 @@ function ModulesTab({ config, update }: { config: AdminConfig; update: Update })
     <div>
       <p className="text-sm text-slate-400">
         Which Engine stage reveals each card/section, grouped by stage — use a module&apos;s dropdown to move it to a
-        different one.
+        different one, or to <span className="font-semibold text-red-400">Disabled</span> to hide it altogether. An
+        Engine gate step that happens on a disabled card is skipped. Ponder can&apos;t be disabled — it is the Engine.
       </p>
       <div className="mt-3 space-y-2">
         {tiers.map((t) => {
           const items = byTier.get(t.id) ?? [];
           return (
-            <CollapsibleSection key={t.id} title={t.name} count={items.length}>
+            <CollapsibleSection key={t.id} title={t.name} count={items.length} danger={t.id === DISABLED_GROUP.id}>
               {items.length === 0 ? (
-                <p className="text-xs text-white/30">Nothing assigned here.</p>
+                <p className="text-xs text-white/30">
+                  {t.id === DISABLED_GROUP.id ? "Nothing disabled — every card shows at its stage." : "Nothing assigned here."}
+                </p>
               ) : (
                 items.map((m) => (
                   <div
@@ -300,13 +317,21 @@ function ModulesTab({ config, update }: { config: AdminConfig; update: Update })
                         <select
                           value={t.id}
                           onChange={(e) => setModuleTier(m.id, e.target.value)}
-                          className="appearance-none rounded-md border border-white/15 bg-[#241a12] py-1.5 pl-2 pr-6 text-xs font-semibold text-white"
+                          className={`appearance-none rounded-md border border-white/15 bg-[#241a12] py-1.5 pl-2 pr-6 text-xs font-semibold ${
+                            t.id === DISABLED_GROUP.id ? "text-red-400" : "text-white"
+                          }`}
                         >
-                          {tiers.map((tt) => (
-                            <option key={tt.id} value={tt.id}>
-                              {tt.name}
-                            </option>
-                          ))}
+                          {tiers
+                            .filter((tt) => m.id !== "ponder" || tt.id !== DISABLED_GROUP.id)
+                            .map((tt) => (
+                              <option
+                                key={tt.id}
+                                value={tt.id}
+                                className={tt.id === DISABLED_GROUP.id ? "text-red-400" : "text-white"}
+                              >
+                                {tt.name}
+                              </option>
+                            ))}
                         </select>
                         <svg
                           aria-hidden="true"
@@ -1162,7 +1187,7 @@ function ExportImportControl({ config, update }: { config: AdminConfig; update: 
       <div className="min-w-0">
         <p className="text-sm font-semibold text-white">Export / import settings</p>
         <p className="mt-0.5 text-xs text-slate-400">
-          Save this customization (tiers, module placement, resources, tools, features) to a file, or load one you
+          Save this customization (card stages, resources, tools, features) to a file, or load one you
           saved earlier. Doesn&apos;t touch your actual progress.
         </p>
         {importError && <p className="mt-1 text-xs text-red-400">{importError}</p>}
@@ -1218,7 +1243,7 @@ function ResetControl({ onReset }: { onReset: () => void }) {
       <div className="min-w-0">
         <p className="text-sm font-semibold text-white">Reset customization</p>
         <p className="mt-0.5 text-xs text-slate-400">
-          Restores tiers, module placement, achievement tiers, resource names/costs, tools, and feature toggles to
+          Restores card stages and disabled cards, resource names/costs, tools, and feature toggles to
           the defaults. Doesn&apos;t touch your actual progress (achievements, resources collected, XP).
         </p>
       </div>

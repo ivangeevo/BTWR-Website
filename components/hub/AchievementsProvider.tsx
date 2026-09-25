@@ -59,6 +59,7 @@ import {
 import {
   defaultAdminConfig,
   isAchievementDefault,
+  isModuleDisabled,
   loadAdminConfig,
   resolvedCollectAmounts,
   resolvedCraftCost,
@@ -161,7 +162,9 @@ type AchievementsContextValue = {
   craftTool: (tier: string) => boolean;
   /** The Engine stage that reveals a card (default + admin override). */
   moduleStage: (id: ModuleId) => number;
-  /** Whether the Engine has reached the stage that reveals this card. */
+  /** False when the card is switched off in /outpost-admin (never shown at all). */
+  isModuleEnabled: (id: ModuleId) => boolean;
+  /** Whether the card is enabled and the Engine has reached the stage that reveals it. */
   isModuleRevealed: (id: ModuleId) => boolean;
   /** Whether an achievement is pinned to the gallery's "Default" group, ahead of every category — see admin-config.ts's achievementDefault. */
   achievementIsDefault: (id: AchievementId) => boolean;
@@ -1555,8 +1558,9 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
   const engineStage = state.engine.stage;
   const moduleStage = useCallback((id: ModuleId): number => resolvedModuleStage(adminConfig, id), [adminConfig]);
+  const isModuleEnabled = useCallback((id: ModuleId): boolean => !isModuleDisabled(adminConfig, id), [adminConfig]);
   const isModuleRevealed = useCallback(
-    (id: ModuleId): boolean => engineStage >= resolvedModuleStage(adminConfig, id),
+    (id: ModuleId): boolean => !isModuleDisabled(adminConfig, id) && engineStage >= resolvedModuleStage(adminConfig, id),
     [adminConfig, engineStage]
   );
   const achievementIsDefault = useCallback(
@@ -1655,6 +1659,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     completeMining,
     craftTool,
     moduleStage,
+    isModuleEnabled,
     isModuleRevealed,
     achievementIsDefault,
     toolTiersList,

@@ -14,7 +14,7 @@ import EngineSvg from "../visuals/EngineSvg";
 // Shown once per stage; replayable from the Logbook.
 export default function CeremonyOverlay() {
   const { ceremony, dismissCeremony, e } = useEngine();
-  const { moduleStage } = useAchievements();
+  const { moduleStage, isModuleEnabled } = useAchievements();
   const reduced = useReducedMotion();
   const [shown, setShown] = useState(0);
 
@@ -22,7 +22,7 @@ export default function CeremonyOverlay() {
   // A stage also lists the Outpost cards it reveals (module-registry.ts).
   const revealed =
     ceremony?.kind === "stage"
-      ? MODULES.filter((m) => m.id !== "ponder" && moduleStage(m.id) === ceremony.stage).map((m) => m.label)
+      ? MODULES.filter((m) => m.id !== "ponder" && isModuleEnabled(m.id) && moduleStage(m.id) === ceremony.stage).map((m) => m.label)
       : [];
   const c = base ? { ...base, unlocks: [...revealed, ...base.unlocks] } : null;
   const allText = c ? c.lines.join("\n") : "";

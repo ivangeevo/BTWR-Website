@@ -60,6 +60,8 @@ export type GateSite = {
   achieved: (achievementId: string) => boolean;
   /** Meals cooked at the Campfire, lifetime. */
   mealsCooked: number;
+  /** False for a card switched off in /outpost-admin — requirements on it are dropped. */
+  cardEnabled: (moduleId: string) => boolean;
   /** Index of the visitor's current tool in the tool ladder. */
   toolIndex: number;
   toolIndexOf: (tierId: string) => number;
@@ -119,8 +121,33 @@ function toolReq(site: GateSite, tierId: string): GateReq {
   };
 }
 
+// Which Outpost card each site requirement is done on. If that card is
+// switched off in /outpost-admin, the requirement is left out, so a
+// disabled card can never stall the Engine.
+const REQ_CARD: Record<string, string> = {
+  motd: "daily-briefing",
+  patch: "patch-notes",
+  meals: "campfire",
+  meals7: "campfire",
+  iron: "gathering",
+  quiz: "guess-the-mod",
+  "quiz-correct": "guess-the-mod",
+  detector: "guess-the-mod",
+  quiz50: "guess-the-mod",
+  "tool-stone": "crafting",
+  "tool-copper": "crafting",
+  "tool-iron": "crafting",
+  "tool-diamond": "crafting",
+};
+
 export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMechanic, site: GateSite): GateResult {
-  const reqs: GateReq[] = [];
+  const all: GateReq[] = [];
+  const reqs = {
+    push: (r: GateReq) => {
+      const card = REQ_CARD[r.id];
+      if (!card || site.cardEnabled(card)) all.push(r);
+    },
+  };
   let cost = 0;
   const engaged = e.grid.clutch && !!e.solved;
   switch (next) {
@@ -192,5 +219,5 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
     default:
       break;
   }
-  return { stage: next, reqs, cost, met: reqs.every((r) => r.done) };
+  return { stage: next, reqs: all, cost, met: all.every((r) => r.done) };
 }
