@@ -7,6 +7,13 @@
       "name": "Launch Edge (Live Server)",
       "url": "http://127.0.0.1:5500/",
       "webRoot": "${workspaceFolder}"
+    },
+    {
+      "type": "firefox",
+      "request": "launch",
+      "name": "Launch Firefox (Live Server)",
+      "url": "http://127.0.0.1:5500/",
+      "webRoot": "${workspaceFolder}"
     }
   ]
 }
