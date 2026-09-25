@@ -23,6 +23,7 @@ import YourProgressSection from "./YourProgressSection";
 import { type ModuleId } from "./module-registry";
 import { EngineProvider, useEngine } from "./engine/ui/EngineProvider";
 import { EngineToasts, EurekaLayer } from "./engine/ui/overlays/EngineOverlays";
+import { OUTPOST_VERSION } from "./outpost-version";
 import { SKINS_BY_ID } from "./tier2";
 import { END_KEY, useCardReorder, type CardReorder } from "./use-card-reorder";
 import { useReducedMotion } from "./engine/ui/use-reduced-motion";
@@ -407,6 +408,9 @@ function OutpostFrame({ mods, packReleases }: { mods: Mod[]; packReleases: PackR
           <AccomplishmentsSection />
         </OutpostTabPanel>
       )}
+      <span className="pointer-events-none absolute bottom-1 right-3 z-10 select-none text-[10px] text-slate-500">
+        v{OUTPOST_VERSION}
+      </span>
       <EngineToasts />
       <EurekaLayer />
       <AchievementToastStack />
