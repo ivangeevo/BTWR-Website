@@ -327,28 +327,37 @@ function Basecamp({ mods, packReleases }: { mods: Mod[]; packReleases: PackRelea
   // room while its Workshop is open (or when there are no cards yet).
   const wideEngine = workshopOpen || !hasMiddle;
 
+  const centred = !hasMiddle && !workshopOpen ? "mx-auto w-full max-w-2xl" : "";
+
   return (
     <div className="flex flex-col gap-4 p-3 sm:p-4 lg:absolute lg:inset-0 lg:flex-row">
-      <div
-        data-outpost-scroll
-        className={`outpost-engine-col flex flex-col gap-3 lg:h-full lg:overflow-y-auto ${
-          wideEngine ? "lg:min-w-0 lg:flex-1" : "lg:w-[22rem] lg:shrink-0 2xl:w-[26rem]"
-        }`}
-      >
-        <div className={`flex w-full flex-1 flex-col gap-3 ${!hasMiddle && !workshopOpen ? "mx-auto max-w-2xl" : ""}`}>
-          <ModuleGate id="stage-tip">
+      {/* The stage tip runs across the Engine's column and the cards' both,
+          as wide as it gets with the Workshop open, so it always shows in
+          full; the Engine and the cards start below it. */}
+      <div className="flex flex-col gap-3 lg:min-h-0 lg:min-w-0 lg:flex-1">
+        <ModuleGate id="stage-tip">
+          <div className={centred}>
             <StageTip />
-          </ModuleGate>
-          <div data-module-id="ponder" className="flex flex-1 flex-col">
-            <Ponder />
           </div>
+        </ModuleGate>
+        <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:flex-row">
+          <div
+            data-outpost-scroll
+            className={`outpost-engine-col flex flex-col gap-3 lg:h-full lg:overflow-y-auto ${
+              wideEngine ? "lg:min-w-0 lg:flex-1" : "lg:w-[22rem] lg:shrink-0 2xl:w-[26rem]"
+            }`}
+          >
+            <div data-module-id="ponder" className={`flex flex-1 flex-col ${centred}`}>
+              <Ponder />
+            </div>
+          </div>
+          {hasMiddle && (
+            <div hidden={workshopOpen} className="lg:min-w-0 lg:flex-1">
+              <CardColumn ids={cardIds} mods={mods} packReleases={packReleases} />
+            </div>
+          )}
         </div>
       </div>
-      {hasMiddle && (
-        <div hidden={workshopOpen} className="lg:min-w-0 lg:flex-1">
-          <CardColumn ids={cardIds} mods={mods} packReleases={packReleases} />
-        </div>
-      )}
       {hasRight && (
         <aside
           data-outpost-scroll

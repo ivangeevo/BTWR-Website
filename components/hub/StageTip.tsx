@@ -5,7 +5,7 @@ import { useAchievements } from "./AchievementsProvider";
 
 const ROTATE_MS = 60_000;
 
-// Thin bar above the Engine, in the Outpost's left column — shows whatever
+// Thin bar across the top of Basecamp's Engine and cards columns — shows whatever
 // tip(s) are set for the Engine's current stage (Stages tab in
 // /outpost-admin). Renders nothing if that stage has no tips.
 // Multiple entries rotate on a 1-minute timer; a single entry just sits.
