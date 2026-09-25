@@ -47,10 +47,27 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
   // Holds off while a just-decoded cipher page is playing out (CipherPanel),
   // so the next lesson doesn't land on top of the moment it unlocked.
   const [waiting, setWaiting] = useState(false);
+  // A ring on a tab looks just like the tab's own "selected" outline, so it
+  // steps aside once that tab is the open one — the bubble stays put.
+  const [ringOn, setRingOn] = useState(true);
 
   useEffect(() => setStep(0), [tut?.id]);
 
   const target = tut?.steps[step]?.target;
+  const hasNext = !!tut && step < tut.steps.length - 1;
+
+  // Clicking the tab a step points at is the step done: on to the next one.
+  // (On the document, since root.current can still be unattached here — see below.)
+  useEffect(() => {
+    if (!target || !hasNext) return;
+    const onClick = (ev: MouseEvent) => {
+      const hit = (ev.target as Element | null)?.closest(`[data-engine-target="${target}"]`);
+      if (hit && root.current?.contains(hit) && hit.getAttribute("role") === "tab") setStep((s) => s + 1);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [root, target, hasNext]);
+
   useIsoLayout(() => {
     // No bailing out on a missing root.current: this is a child of the card
     // that owns the ref, and on first mount its layout effects run before
@@ -69,6 +86,7 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
       }
       // Relative to the card's padding box, which is what the ring's
       // absolute position is measured from (hence clientTop/clientLeft).
+      setRingOn(!(el.getAttribute("role") === "tab" && el.getAttribute("aria-selected") === "true"));
       const h = host.getBoundingClientRect();
       const o = outlineOf(el);
       setRect({ ...o, top: o.top - h.top - host.clientTop, left: o.left - h.left - host.clientLeft });
@@ -92,7 +110,7 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
 
   return (
     <>
-      {rect && (
+      {rect && ringOn && (
         <div
           className="engine-guide-ring"
           style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height, borderRadius: rect.radius }}
