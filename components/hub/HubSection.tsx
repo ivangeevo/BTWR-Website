@@ -408,7 +408,7 @@ function OutpostFrame({ mods, packReleases }: { mods: Mod[]; packReleases: PackR
           <AccomplishmentsSection />
         </OutpostTabPanel>
       )}
-      <span className="pointer-events-none absolute bottom-1 right-3.5 z-10 select-none text-[14px] leading-none text-slate-500">
+      <span className="pointer-events-none absolute bottom-1 right-2 z-10 select-none whitespace-nowrap text-[14px] leading-none text-slate-500">
         v{OUTPOST_VERSION}
       </span>
       <EngineToasts />
