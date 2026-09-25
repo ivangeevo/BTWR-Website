@@ -18,8 +18,6 @@ export type EngageResult = {
 
 export function solveOptions(e: EngineState, env: EngineEnv, cfg: EngineConfig, fx: ResearchEffects) {
   const base: Omit<SolveOptions, "crankActive" | "crankBoost"> = {
-    winter: env.winter,
-    thawed: fx.thawed,
     power: cfg.power,
     forgeDrawMult: e.specialization === "soulforger" ? 0.5 : 1,
     sourceMult: fx.sourceMult,

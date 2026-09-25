@@ -5,7 +5,7 @@
 // the seed of a much bigger "the Outpost becomes a real game later on"
 // direction, so new upgrades get added here over time rather than
 // this being a one-shot finished list.
-export type UpgradeId = "card-reorder" | "day-night-cycle" | "stars" | "hunting" | "mining" | "snow";
+export type UpgradeId = "card-reorder" | "day-night-cycle" | "stars" | "hunting" | "mining";
 
 export type UpgradeDef = {
   id: UpgradeId;
@@ -57,14 +57,6 @@ export const UPGRADES: UpgradeDef[] = [
     description: "Unlocks the Mining activity in the Gathering card.",
     cost: 5,
     stage: 3,
-  },
-  {
-    id: "snow",
-    name: "Winter Weather",
-    icon: "❄️",
-    description: "Falling snow and accumulating piles in the homepage hero, above the Outpost.",
-    cost: 4,
-    stage: 2,
   },
 ];
 

@@ -15,7 +15,7 @@ const HOLD_MS = 500;
 
 const WARNING_TEXT: Record<SolveWarningCode, string> = {
   obstructed: "A windmill needs every square around it clear, except along its axle.",
-  frozen: "Frozen solid — Winter Weather stops water wheels (research Paddle Scraper).",
+  frozen: "Frozen solid — water wheels can't turn in winter.",
   wrongFace: "Power is reaching the wrong side — turn it so its input faces the power.",
   notWater: "Water wheels only turn on water squares.",
   brownout: "Not enough power left over to run this.",

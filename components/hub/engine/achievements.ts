@@ -29,7 +29,6 @@ export const ENGINE_ACHIEVEMENT_IDS = [
   "en-sawmill",
   "en-thrive",
   "en-water-wheel",
-  "en-frozen",
   "en-detector-10",
   "en-full-drum",
   "en-crucible",
@@ -81,7 +80,6 @@ export const ENGINE_ACHIEVEMENT_DEFS: AchievementDef[] = [
   def("en-sawmill", "Sawmill", "Chopped 25 trees with the Engine's Saw running.", "\u{1FA9A}", { xp: 100 }),
   def("en-thrive", "Beginning to Thrive", "The Engine learned to think while you're away.", "\u{1F331}", { xp: 150 }),
   def("en-water-wheel", "Running Water", "Ran the Engine on a water wheel.", "\u{1F30A}", { xp: 100 }),
-  def("en-frozen", "Frozen Solid", "Watched Winter Weather freeze a water wheel.", "\u{1F9CA}", { secret: true, xp: 75 }),
   def("en-detector-10", "Sixth Sense", "Used the Detector Block 10 times in Guess the Mod.", "\u{1F4E1}", { xp: 100 }),
   def("en-full-drum", "A Full Drum", "Came back to a Ledger Drum filled to capacity.", "\u{1F941}", { xp: 75 }),
   def("en-crucible", "The Crucible", "The Engine reached the forge.", "\u{1F525}", { xp: 200 }),
@@ -183,10 +181,6 @@ export const ENGINE_CUSTOM_RULES: { id: AchievementId; check: (c: Ctx) => boolea
     { id: "en-true-believer", check: (c) => sameAxisStreak(c, askAxis) >= 6 },
     { id: "en-windmill", check: (c) => idleHas(c, "windmill") },
     { id: "en-water-wheel", check: (c) => idleHas(c, "waterWheel") },
-    {
-      id: "en-frozen",
-      check: (c) => !!c.state.engine.solved?.idle.warnings.some((w) => w.code === "frozen"),
-    },
     {
       id: "en-caesar",
       check: (c) => c.state.engine.ciphers.solved.some((id) => id === "bp-saw" || id === "bp-millstone"),

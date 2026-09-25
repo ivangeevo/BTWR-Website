@@ -1079,7 +1079,7 @@ function FeaturesTab({ config, update }: { config: AdminConfig; update: Update }
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-400">
-        Whole mechanics, switched on/off. Day/Night Cycle, Stars, Hunting, Mining, and Snow live in the Upgrades
+        Whole mechanics, switched on/off. Day/Night Cycle, Stars, Hunting, and Mining live in the Upgrades
         tab — each is its own shop entry with its own cost and Engine stage there.
       </p>
 

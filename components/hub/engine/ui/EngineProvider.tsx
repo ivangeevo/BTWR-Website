@@ -183,7 +183,6 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
   const modsRef = useRef(mods);
   modsRef.current = mods;
 
-  const winter = a.upgrades.purchased.includes("snow");
   // Night/full moon only matter as bonus flavour — read off the site's sky
   // cycle (if the visitor owns it) plus any admin debug override.
   const env = useMemo<EngineEnv>(() => {
@@ -195,10 +194,10 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
       night = !phase.isDay;
       fullMoon = phase.moonPhaseIndex === 4;
     }
-    return { winter, night: debug.forceNight ?? night, fullMoon: debug.forceFullMoon ?? fullMoon };
+    return { night: debug.forceNight ?? night, fullMoon: debug.forceFullMoon ?? fullMoon };
     // envTick re-reads the sky every checkpoint.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [winter, envTick]);
+  }, [envTick]);
   const envRef = useRef(env);
   envRef.current = env;
 
@@ -258,8 +257,8 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
 
   const ipsNow = (s: EngineState, now: number) => computeIps(s, cfgRef.current, fxOf(s), now).ips;
 
-  // --- Re-solve the grid when the world changes under it (winter, thaw, spec, research) ---
-  const resolveKey = `${winter}|${fx.thawed}|${fx.sourceMult}|${fx.gearboxCapBonus}|${e.specialization}|${e.stage}`;
+  // --- Re-solve the grid when the world changes under it (spec, research) ---
+  const resolveKey = `${fx.sourceMult}|${fx.gearboxCapBonus}|${e.specialization}|${e.stage}`;
   useEffect(() => {
     if (!mounted) return;
     const s = getEngine();

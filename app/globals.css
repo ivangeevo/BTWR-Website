@@ -301,42 +301,6 @@ h3 {
   box-shadow: 0 8px 20px -6px rgba(34, 211, 238, 0.45);
 }
 
-/* Snowfall — falling frost particles, used behind the Home hero. */
-@keyframes snowfall {
-  0% {
-    top: -5%;
-    opacity: 0;
-    transform: translateX(0);
-  }
-  10% {
-    opacity: 0.85;
-  }
-  50% {
-    transform: translateX(14px);
-  }
-  90% {
-    opacity: 0.85;
-  }
-  100% {
-    top: 105%;
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-}
-
-.snow-dot {
-  position: absolute;
-  border-radius: 9999px;
-  background: radial-gradient(
-    circle,
-    var(--color-frost) 0%,
-    rgba(240, 249, 255, 0.4) 60%,
-    transparent 100%
-  );
-  animation: snowfall linear infinite;
-  will-change: top, opacity, transform;
-}
-
 /* Hero title gradient sweep. */
 @keyframes title-shimmer {
   0% {

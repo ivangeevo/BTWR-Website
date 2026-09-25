@@ -97,10 +97,9 @@ describe("research", () => {
   });
 
   it("aggregates effects", () => {
-    const f = researchEffects(["r-hopper-1", "r-hopper-2", "r-global-1", "r-thaw", "r-crank-1"]);
+    const f = researchEffects(["r-hopper-1", "r-hopper-2", "r-global-1", "r-crank-1"]);
     expect(f.compMult.hopper).toBe(4);
     expect(f.globalPct).toBeCloseTo(0.1);
-    expect(f.thawed).toBe(true);
     expect(f.clickFrac).toBeCloseTo(0.01);
     expect(researchEffects([]).compMult.dispenser).toBe(1);
   });
@@ -149,7 +148,7 @@ describe("commissions", () => {
 });
 
 describe("eureka", () => {
-  const env = { winter: false, night: false, fullMoon: false };
+  const env = { night: false, fullMoon: false };
   it("comes sooner at night and at full moon", () => {
     const day = nextEurekaDelayMs(cfg, fx, env, () => 0.5);
     const night = nextEurekaDelayMs(cfg, fx, { ...env, night: true }, () => 0.5);

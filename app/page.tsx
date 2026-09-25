@@ -2,7 +2,6 @@ import Link from "next/link";
 import CountUp from "@/components/CountUp";
 import HeroSlideshow from "@/components/HeroSlideshow";
 import Reveal from "@/components/Reveal";
-import SnowGate from "@/components/SnowGate";
 import OutpostGate from "@/components/hub/OutpostGate";
 import modsData from "@/data/mods.json";
 import roadmapData from "@/data/roadmap.json";
@@ -34,7 +33,6 @@ export default function Home() {
       <div className="relative isolate flex min-h-[76.5vh] items-center justify-center overflow-hidden bg-chrome-dark px-6 text-center">
         <HeroSlideshow />
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-chrome-dark/70 via-chrome-dark/50 to-chrome-dark/90" />
-        <SnowGate />
 
         <div className="relative mx-auto max-w-3xl py-[5.4rem]">
           <h1 className="title-shimmer font-heading text-6xl font-extrabold tracking-wide sm:text-7xl">

@@ -17,8 +17,6 @@ export type AchievementId =
   // Hidden extras — a visitor genuinely might never stumble onto these.
   | "secret-sequence"
   | "secret-logo-clicks"
-  | "snow-pile-10min"
-  | "snow-pile-50min"
   // The Campfire — a small BTW-Beginner's-Guide-inspired widget.
   | "campfire-medium"
   | "campfire-overstoked"
@@ -344,22 +342,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     title: "It Followed You Home",
     description: "Bothered the wolf on the logo one too many times.",
     icon: "\u{1F43A}",
-    secret: true,
-    category: "secrets",
-  },
-  {
-    id: "snow-pile-10min",
-    title: "Snowed In",
-    description: "Let the snow pile up on the homepage for 10 minutes.",
-    icon: "\u{2744}\u{FE0F}",
-    secret: true,
-    category: "secrets",
-  },
-  {
-    id: "snow-pile-50min",
-    title: "Eternal Vigil",
-    description: "Watched the snow pile up for 50 minutes straight.",
-    icon: "\u{1F3D4}\u{FE0F}",
     secret: true,
     category: "secrets",
   },

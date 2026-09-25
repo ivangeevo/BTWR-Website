@@ -20,7 +20,6 @@ export type ResearchEffect =
   | { kind: "eurekaLife"; sec: number }
   | { kind: "frenzyLength"; sec: number }
   | { kind: "offlineEff"; add: number }
-  | { kind: "thaw" }
   | { kind: "sourcePct"; pct: number }
   | { kind: "gearboxCap"; add: number }
   | { kind: "sawPct"; pct: number }
@@ -85,7 +84,6 @@ const SPECIALS: ResearchDef[] = [
   { id: "r-offline-2", name: "Unattended Gears", description: "+10% insight earned while away.", cost: 1e7, stage: 6, effect: { kind: "offlineEff", add: 0.1 } },
   { id: "r-offline-3", name: "Dreaming Machine", description: "+10% insight earned while away.", cost: 1e9, stage: 7, effect: { kind: "offlineEff", add: 0.1 } },
   { id: "r-offline-4", name: "It Never Sleeps", description: "+10% insight earned while away.", cost: 1e11, stage: 8, effect: { kind: "offlineEff", add: 0.1 } },
-  { id: "r-thaw", name: "Paddle Scraper", description: "Water wheels keep turning through Winter Weather.", cost: 2e6, stage: 6, effect: { kind: "thaw" } },
   // Power
   { id: "r-source-1", name: "Canvas Sails", description: "Windmills and water wheels give 25% more power.", cost: 200_000, stage: 5, effect: { kind: "sourcePct", pct: 25 } },
   { id: "r-source-2", name: "Soulforged Bearings", description: "Windmills and water wheels give 25% more power.", cost: 5e9, stage: 7, effect: { kind: "sourcePct", pct: 25 } },
@@ -123,7 +121,6 @@ export type ResearchEffects = {
   eurekaLifeSec: number;
   frenzyBonusSec: number;
   offlineEffBonus: number;
-  thawed: boolean;
   sourceMult: number;
   gearboxCapBonus: number;
   sawMult: number;
@@ -148,7 +145,6 @@ export function researchEffects(owned: readonly string[]): ResearchEffects {
     eurekaLifeSec: 0,
     frenzyBonusSec: 0,
     offlineEffBonus: 0,
-    thawed: false,
     sourceMult: 1,
     gearboxCapBonus: 0,
     sawMult: 1,
@@ -196,9 +192,6 @@ export function researchEffects(owned: readonly string[]): ResearchEffects {
         break;
       case "offlineEff":
         fx.offlineEffBonus += e.add;
-        break;
-      case "thaw":
-        fx.thawed = true;
         break;
       case "sourcePct":
         fx.sourceMult += e.pct / 100;

@@ -1422,23 +1422,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     return () => window.removeEventListener("btwr-secret-logo", onSecretLogo);
   }, [unlock]);
 
-  // Easter eggs 3 & 4: the hero's snow pile effect (components/SnowPile.tsx)
-  // dispatches these once it's been accumulating for 10 / 50 minutes.
-  useEffect(() => {
-    function onSnow10() {
-      unlock("snow-pile-10min");
-    }
-    function onSnow50() {
-      unlock("snow-pile-50min");
-    }
-    window.addEventListener("btwr-secret-snow-10", onSnow10);
-    window.addEventListener("btwr-secret-snow-50", onSnow50);
-    return () => {
-      window.removeEventListener("btwr-secret-snow-10", onSnow10);
-      window.removeEventListener("btwr-secret-snow-50", onSnow50);
-    };
-  }, [unlock]);
-
   // Tier 2 egg: the theme toggle lives in Header.tsx, outside this
   // provider's subtree — same decoupled dispatch pattern as the logo click.
   useEffect(() => {

@@ -29,8 +29,8 @@ export type CustomToolTier = ToolTier & {
 
 export type ResourceMetaEdit = { name?: string; icon?: string };
 
-// Whole-mechanic on/off switches. Day/Night Cycle, Stars, Hunting, Mining,
-// and Snow used to live here as admin toggles/tier pickers, but have moved
+// Whole-mechanic on/off switches. Day/Night Cycle, Stars, Hunting and Mining
+// used to live here as admin toggles/tier pickers, but have moved
 // to the Upgrades shop (upgrade-catalog.ts) as purchasable unlocks instead —
 // each keeps its own Engine stage there. What's left here is just the header
 // badges, which stay admin-controlled since they're not something a visitor

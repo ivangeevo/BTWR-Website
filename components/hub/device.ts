@@ -2,8 +2,8 @@
 // no hover and a coarse primary pointer (phones, tablets), or a mobile user
 // agent — NOT a narrow window: a desktop browser resized small is still a
 // desktop (and resizing the window is even one of the Outpost's secrets).
-// Every Outpost-driven effect (the homepage section, the sky cycle, snow,
-// the header gear) treats a phone as "Outpost off", whatever the save says.
+// Every Outpost-driven effect (the Outpost page, the sky cycle, the header
+// gear) treats a phone as "Outpost off", whatever the save says.
 export const TOUCH_FIRST_QUERY = "(hover: none) and (pointer: coarse)";
 const MOBILE_UA = /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle|BlackBerry|Opera Mini|IEMobile/i;
 

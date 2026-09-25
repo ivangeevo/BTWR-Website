@@ -14,7 +14,8 @@
 // - Attachments/consumers only accept power on their input face and don't
 //   pass it on. The hand crank only works pointed into a gearbox's input.
 // - Windmills need every neighbouring cell clear except their two axis ends;
-//   water wheels must sit on water and freeze in winter unless thawed.
+//   water wheels must sit on water and freeze in winter unless thawed
+//   (only the Difference Engine's winter puzzle sets winter).
 // Pops are applied all at once per pass, then the grid is re-solved, until
 // nothing else pops.
 import type { EnginePowerMechanic } from "../config";
@@ -40,8 +41,8 @@ export function opp(d: Dir): Dir {
 export type SolveOptions = {
   crankActive: boolean;
   crankBoost: boolean;
-  winter: boolean;
-  thawed: boolean;
+  winter?: boolean;
+  thawed?: boolean;
   power: EnginePowerMechanic;
   /** Multiplier on Bellows/Hibachi draw (Soulforger specialization). */
   forgeDrawMult?: number;

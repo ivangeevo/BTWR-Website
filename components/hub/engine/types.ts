@@ -236,8 +236,6 @@ export type EngineState = {
 
 /** Environment facts the pure logic needs but can't read itself. */
 export type EngineEnv = {
-  /** Winter Weather upgrade owned (freezes water wheels unless thawed). */
-  winter: boolean;
   /** Site sky cycle active and currently night (bonus flavour only). */
   night: boolean;
   /** Site sky cycle active and at full moon (phase index 4). */

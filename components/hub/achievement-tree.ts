@@ -49,7 +49,6 @@ const ROWS: Row[] = [
   ["en-sawmill", "en-mid-game"],
   ["en-thrive", "en-mid-game", "goal"],
   ["en-water-wheel", "en-thrive"],
-  ["en-frozen", "en-water-wheel"],
   ["en-detector-10", "en-thrive"],
   ["en-full-drum", "en-thrive"],
   ["en-crucible", "en-thrive", "goal"],
@@ -98,8 +97,6 @@ const ROWS: Row[] = [
   // Secrets — each its own find, drawn only once earned
   ["secret-sequence", null],
   ["secret-logo-clicks", null],
-  ["snow-pile-10min", null],
-  ["snow-pile-50min", "snow-pile-10min"],
   ["campfire-overstoked", null],
   ["hand-cranked", null],
   ["windmill-watcher", null],
