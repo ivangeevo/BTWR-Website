@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { CooldownNotice, HoldButton, LoadingBarButton, useCooldownRemaining } from "./activity-common";
+import { CooldownNotice, LoadingBarButton, useCooldownRemaining } from "./activity-common";
 import { useAchievements } from "./AchievementsProvider";
 import { findToolTier, type ResourceId, type ResourceState } from "./resources";
 
@@ -143,7 +143,7 @@ export default function Gathering() {
       {active === "mining" && (
         <div className="mt-2.5">
           <p className="text-xs text-slate-300">
-            Hold to break rock. Yields Stone, Coal, Copper, and Iron — a better tool finds more of each.
+            Break rock for Stone, Coal, Copper, and Iron — a better tool finds more of each.
           </p>
           {tool.miningMs === null ? (
             <p className="mt-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-white/50">
@@ -152,11 +152,11 @@ export default function Gathering() {
           ) : (
             <>
               <div className="mt-2">
-                <HoldButton
+                <LoadingBarButton
                   durationMs={tool.miningMs}
                   disabled={remainingMs > 0}
-                  idleLabel="Hold to mine"
-                  holdingLabel="Mining..."
+                  idleLabel="Mine"
+                  runningLabel="Mining..."
                   onComplete={handleMiningComplete}
                 />
               </div>
