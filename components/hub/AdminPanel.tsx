@@ -16,7 +16,6 @@ import {
   loadAdminConfig,
   resolvedCraftCost,
   resolvedMechanic,
-  resolvedMechanicForTier,
   resolvedModuleTier,
   resolvedResourceMeta,
   resolvedToolTiers,
@@ -27,7 +26,7 @@ import {
   type FeaturesConfig,
   type TierDef,
 } from "./admin-config";
-import { mechanicConfigFields, perTierMechanicConfigFields, PER_TIER_MODULE_MECHANICS } from "./mechanics";
+import { mechanicConfigFields } from "./mechanics";
 import { DEFAULT_MODULE_TIER, MODULES, type ModuleId } from "./module-registry";
 import OutpostCorners from "./OutpostCorners";
 import { RESOURCE_IDS, TOOL_ORDER, type ResourceId, type ToolTier } from "./resources";
@@ -207,13 +206,7 @@ function MechanicSettingsMenu({ moduleId, config, update }: { moduleId: ModuleId
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  // A module registered in PER_TIER_MODULE_MECHANICS (currently just Ponder/
-  // The Analytical Engine) gets a tier picker and a per-tier settings path
-  // instead of the flat one below — everything else (Campfire/Gathering/
-  // Prestige/Upgrades) keeps today's flat gear menu completely unchanged.
-  const isPerTier = moduleId in PER_TIER_MODULE_MECHANICS;
-  const fields = isPerTier ? perTierMechanicConfigFields(moduleId) : mechanicConfigFields(moduleId);
-  const [selectedTierId, setSelectedTierId] = useState(config.tiers[0]?.id ?? "tier1");
+  const fields = mechanicConfigFields(moduleId);
   // The button's own rect at the moment the panel opens — recomputed into a
   // panel position below rather than used directly, since which side it
   // opens on can flip after mount (see the layout effect below).
@@ -285,24 +278,9 @@ function MechanicSettingsMenu({ moduleId, config, update }: { moduleId: ModuleId
 
   if (fields.length === 0) return null;
 
-  const resolved = isPerTier
-    ? resolvedMechanicForTier<Record<string, number>>(config, moduleId, selectedTierId)
-    : resolvedMechanic<Record<string, number>>(config, moduleId);
+  const resolved = resolvedMechanic<Record<string, number>>(config, moduleId);
 
   function setField(key: string, value: number) {
-    if (isPerTier) {
-      update((prev) => ({
-        ...prev,
-        mechanicOverridesByTier: {
-          ...prev.mechanicOverridesByTier,
-          [moduleId]: {
-            ...prev.mechanicOverridesByTier[moduleId],
-            [selectedTierId]: { ...prev.mechanicOverridesByTier[moduleId]?.[selectedTierId], [key]: value },
-          },
-        },
-      }));
-      return;
-    }
     update((prev) => ({
       ...prev,
       mechanicOverrides: {
@@ -332,24 +310,6 @@ function MechanicSettingsMenu({ moduleId, config, update }: { moduleId: ModuleId
       {open && (
         <div className="outpost-settings-dropdown" role="menu">
           <p className="text-xs font-bold uppercase tracking-wider text-white/40">Mechanic Settings</p>
-          {isPerTier && (
-            <label className="mt-2 block">
-              <span className="text-[0.65rem] font-semibold uppercase tracking-wider text-white/40">
-                Ability tier
-              </span>
-              <select
-                value={selectedTierId}
-                onChange={(e) => setSelectedTierId(e.target.value)}
-                className="mt-1 w-full appearance-none rounded-md border border-white/15 bg-[#241a12] px-2 py-1 text-xs font-semibold text-white"
-              >
-                {config.tiers.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
           <div className="mt-2.5 space-y-3">
             {fields.map((f) => (
               <label key={f.key} className="block">

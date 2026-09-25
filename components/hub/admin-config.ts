@@ -6,7 +6,8 @@
 // override here is additive on top of that.
 import type { AchievementId } from "./achievements-catalog";
 import type { ModuleId } from "./module-registry";
-import { MODULE_MECHANICS, PER_TIER_MODULE_MECHANICS } from "./mechanics";
+import { MODULE_MECHANICS } from "./mechanics";
+import type { EngineAdminOverrides } from "./engine/config";
 import { UPGRADES, type UpgradeDef, type UpgradeId } from "./upgrade-catalog";
 import {
   RESOURCE_IDS,
@@ -134,12 +135,8 @@ export type AdminConfig = {
   upgradeEdits: Partial<Record<UpgradeId, { cost?: number; tierId?: string }>>;
   /** Overrides for a module's mechanic class fields (see mechanics.ts) — keyed by module id, then by field key. */
   mechanicOverrides: Partial<Record<string, Partial<Record<string, number>>>>;
-  /** Sibling to mechanicOverrides, one level deeper — per-tier ability profiles
-   * for modules registered in PER_TIER_MODULE_MECHANICS (currently just
-   * Ponder/The Analytical Engine). Keyed by module id, then tier id, then
-   * field key. Empty by default, so a visitor who's never opened the admin
-   * panel sees identical behavior at every tier. */
-  mechanicOverridesByTier: Partial<Record<string, Partial<Record<string, Partial<Record<string, number>>>>>>;
+  /** Ponder / The Analytical Engine's tunables (engine/config.ts) — the admin panel's Engine tab. */
+  engine: EngineAdminOverrides;
 };
 
 // A visitor who's never opened /outpost-admin sees this designed curve:
@@ -398,7 +395,7 @@ export function defaultAdminConfig(): AdminConfig {
       mining: { tierId: "tier4" },
     },
     mechanicOverrides: {},
-    mechanicOverridesByTier: {},
+    engine: {},
   };
 }
 
@@ -425,7 +422,10 @@ function normalizeAdminConfig(parsed: Partial<AdminConfig>): AdminConfig {
     features: { ...base.features, ...parsed.features },
     upgradeEdits: { ...base.upgradeEdits, ...parsed.upgradeEdits },
     mechanicOverrides: { ...base.mechanicOverrides, ...parsed.mechanicOverrides },
-    mechanicOverridesByTier: { ...base.mechanicOverridesByTier, ...parsed.mechanicOverridesByTier },
+    engine: {
+      mechanic: { ...base.engine.mechanic, ...parsed.engine?.mechanic },
+      components: { ...base.engine.components, ...parsed.engine?.components },
+    },
   };
 }
 
@@ -548,23 +548,6 @@ export function resolvedMechanic<T extends object>(config: AdminConfig, moduleId
   if (!Mechanic) return {} as T;
   const instance = new Mechanic() as T;
   const overrides = config.mechanicOverrides[moduleId];
-  if (overrides) Object.assign(instance, overrides);
-  return instance;
-}
-
-// Same idea as resolvedMechanic, one level deeper — a fresh instance of a
-// per-tier module's mechanic class (its own defaults, i.e. tier 1's
-// baseline) with that specific tier's admin overrides applied on top. Only
-// meaningful for modules registered in PER_TIER_MODULE_MECHANICS.
-export function resolvedMechanicForTier<T extends object>(
-  config: AdminConfig,
-  moduleId: ModuleId,
-  tierId: string
-): T {
-  const Mechanic = PER_TIER_MODULE_MECHANICS[moduleId];
-  if (!Mechanic) return {} as T;
-  const instance = new Mechanic() as T;
-  const overrides = config.mechanicOverridesByTier[moduleId]?.[tierId];
   if (overrides) Object.assign(instance, overrides);
   return instance;
 }

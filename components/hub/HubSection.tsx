@@ -26,6 +26,8 @@ import TierTip from "./TierTip";
 import UpgradesBadge from "./UpgradesBadge";
 import YourProgressSection from "./YourProgressSection";
 import { type ModuleId } from "./module-registry";
+import { EngineProvider, useEngine } from "./engine/ui/EngineProvider";
+import { EngineToasts, EurekaLayer } from "./engine/ui/overlays/EngineOverlays";
 import { SKINS_BY_ID } from "./tier2";
 
 // Gates a module's visibility by its admin-configured tier assignment
@@ -206,6 +208,9 @@ function DraggableSlot({
       data-drag-index={index}
       onPointerDown={(e) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
+        // The Engine's grid, crank and cipher boards need ordinary presses and
+        // holds of their own — never let those start a card drag.
+        if ((e.target as Element | null)?.closest("[data-no-drag]")) return;
         pointerStart.current = { x: e.clientX, y: e.clientY };
         const pointerId = e.pointerId;
         const target = e.currentTarget;
@@ -386,6 +391,18 @@ function HubHeader() {
   );
 }
 
+// Each grid card's cell — carries data-module-id (Eureka sparks land on
+// cards by it) and lets the Engine's card span both columns once it has a
+// body or its Workshop is open.
+function CardCell({ id, children }: { id: ModuleId; children: React.ReactNode }) {
+  const { wide } = useEngine();
+  return (
+    <div data-module-id={id} className={id === "ponder" && wide ? "sm:col-span-2" : undefined}>
+      {children}
+    </div>
+  );
+}
+
 function HubBody({ mods, packReleases }: { mods: Mod[]; packReleases: PackRelease[] }) {
   // Guess the Mod and Patch Notes are permanent cards here regardless of
   // tier — the old tier-2 side menu that used to take over Guess the Mod's
@@ -450,17 +467,19 @@ function HubBody({ mods, packReleases }: { mods: Mod[]; packReleases: PackReleas
           make room. See DraggableSlot/DropzoneEnd above. */}
       {cardOrder.map((id, index) => (
         <ModuleGate key={id} id={id}>
-          <DraggableSlot
-            index={index}
-            enabled={reorderEnabled}
-            isDropTarget={overIndex === index && dragIndex !== index}
-            onBeginDrag={handleBeginDrag}
-            onHover={setOverIndex}
-            onEndDrag={handleEndDrag}
-            onCancelDrag={handleCancelDrag}
-          >
-            {renderCard(id, mods, packReleases)}
-          </DraggableSlot>
+          <CardCell id={id}>
+            <DraggableSlot
+              index={index}
+              enabled={reorderEnabled}
+              isDropTarget={overIndex === index && dragIndex !== index}
+              onBeginDrag={handleBeginDrag}
+              onHover={setOverIndex}
+              onEndDrag={handleEndDrag}
+              onCancelDrag={handleCancelDrag}
+            >
+              {renderCard(id, mods, packReleases)}
+            </DraggableSlot>
+          </CardCell>
         </ModuleGate>
       ))}
       <DropzoneEnd enabled={reorderEnabled} count={cardOrder.length} isDropTarget={overIndex === cardOrder.length} />
@@ -500,6 +519,8 @@ function OutpostFrame({ mods, packReleases }: { mods: Mod[]; packReleases: PackR
         <HubBody mods={mods} packReleases={packReleases} />
       </div>
       <TierRevealNotice />
+      <EngineToasts />
+      <EurekaLayer />
       <ModuleGate id="your-progress">
         <YourProgressSection />
       </ModuleGate>
@@ -520,11 +541,13 @@ export default function HubSection({
 }) {
   return (
     <AchievementsProvider>
-      <Reveal>
-        <section className="outpost-zone relative overflow-hidden px-3 py-10 sm:px-4 sm:py-14">
-          <OutpostFrame mods={mods} packReleases={packReleases} />
-        </section>
-      </Reveal>
+      <EngineProvider mods={mods}>
+        <Reveal>
+          <section className="outpost-zone relative overflow-hidden px-3 py-10 sm:px-4 sm:py-14">
+            <OutpostFrame mods={mods} packReleases={packReleases} />
+          </section>
+        </Reveal>
+      </EngineProvider>
     </AchievementsProvider>
   );
 }

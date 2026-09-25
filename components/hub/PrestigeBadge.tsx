@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAchievements } from "./AchievementsProvider";
 import { findToolTier } from "./resources";
-import { nextPerkCost, perkLevel, pointsForPrestige, PERKS, startingTierIndex } from "./legacy";
+import { insightPrestigeBonus, nextPerkCost, perkLevel, pointsForPrestige, PERKS, startingTierIndex } from "./legacy";
 
 // Moved out of the main-grid card layout into a header badge+dropdown — see
 // admin-config.ts's FeaturesConfig.prestigeEnabled. Hidden entirely until
@@ -22,6 +22,7 @@ export default function PrestigeBadge() {
     resourceMeta,
     mechanics,
     features,
+    engine,
   } = useAchievements();
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -55,11 +56,13 @@ export default function PrestigeBadge() {
   const order = toolTiersList.map((t) => t.id);
   const startIndex = Math.min(Math.max(0, order.length - 1), startingTierIndex(legacy.perks));
   const startTierName = findToolTier(toolTiersList, order[startIndex] ?? order[0]).name;
-  const pointsPreview = pointsForPrestige(Math.max(0, order.indexOf(tools.tier)), mechanics.prestige.pointsPerTier);
-  // Borrowed Insight only shows once the Engine's ability profile at the
-  // visitor's current tier has unlocked it — an earned capstone, not a perk
-  // available from minute one. See mechanics.ts's AnalyticalEngineMechanic.
-  const perksVisible = PERKS.filter((p) => p.id !== "borrowed-insight" || mechanics.ponder.legacyPerkUnlocked > 0);
+  const pointsPreview =
+    pointsForPrestige(Math.max(0, order.indexOf(tools.tier)), mechanics.prestige.pointsPerTier) +
+    insightPrestigeBonus(legacy.perks, engine.lifetimeInsight);
+  // Borrowed Insight only shows once the Engine reaches its final stage (The
+  // Wither & The End) — an earned capstone, not a perk available from minute
+  // one. See engine/stages.ts.
+  const perksVisible = PERKS.filter((p) => p.id !== "borrowed-insight" || engine.stage >= 8);
 
   return (
     <div ref={containerRef} className="relative">

@@ -24,16 +24,21 @@ import {
   applyVisit,
   defaultState,
   loadState,
-  saveState,
+  saveState as saveStateRaw,
   todayUTC,
   type HubState,
   type QuizStats,
   type Tier2State,
 } from "./hub-storage";
 import { currentCampfireStage, type CampfireStage } from "./campfire-stage";
-import { engineLoreRankForInsight, PONDER_JOURNAL_MAX } from "./ponder-content";
 import { PRIORITY_STEPS } from "./priorities-content";
-import { ponderStageFor, type PonderStage } from "./ponder-stage";
+import { computeBuffs, type EngineBuffs } from "./engine/buffs";
+import { researchEffects } from "./engine/catalog/research";
+import { resolveEngineConfig, type EngineConfig } from "./engine/config";
+import { settle } from "./engine/economy";
+import { ENGINE_CUSTOM_RULES, ENGINE_NUMERIC_RULES } from "./engine/achievements";
+import { engineOnPrestige, normalizeEngineState } from "./engine/state";
+import type { EngineState } from "./engine/types";
 import {
   collectBonus,
   craftCostDiscount,
@@ -61,7 +66,6 @@ import {
   resolvedCraftCost,
   resolvedFeatures,
   resolvedMechanic,
-  resolvedMechanicForTier,
   resolvedModuleTier,
   resolvedResourceMeta,
   resolvedTierTips,
@@ -76,7 +80,6 @@ import {
   type TierDef,
 } from "./admin-config";
 import type {
-  AnalyticalEngineMechanic,
   CampfireMechanic,
   GatheringMechanic,
   PrestigeMechanic,
@@ -137,9 +140,20 @@ type AchievementsContextValue = {
   recordPatchNotesOpen: () => void;
   recordExport: () => void;
   importState: (parsed: unknown) => boolean;
-  ponder: HubState["ponder"];
-  ponderStage: PonderStage;
-  recordPonderSolved: (sentence: string, wasChoice: boolean) => void;
+  /** Ponder / The Analytical Engine's slice, as last committed to React state. */
+  engine: EngineState;
+  /** The engine slice as of right now (may be ahead of `engine` between throttled commits). */
+  getEngine: () => EngineState;
+  /** The single way the Engine's state changes — "soon" batches frequent updates (cranking) into one commit. */
+  updateEngine: (fn: (e: EngineState) => EngineState, mode?: "now" | "soon") => void;
+  engineConfig: EngineConfig;
+  /** What the Engine's powered attachments are doing for the rest of the Outpost right now. */
+  engineBuffs: EngineBuffs;
+  /** Spends Outpost resources for the Engine (parts, commissions, feeding the crank). False if unaffordable. */
+  spendResources: (cost: Partial<ResourceState>, logText?: string) => boolean;
+  /** Grants Outpost resources without touching the gathering cooldown. */
+  grantResources: (gain: Partial<ResourceState>, logText?: string) => void;
+  logActivity: (text: string) => void;
   campfire: HubState["campfire"];
   tendCampfire: () => void;
   /** Only succeeds while the fire is at the Medium stage and there's enough Food — see resources.ts. */
@@ -176,8 +190,6 @@ type AchievementsContextValue = {
     gathering: GatheringMechanic;
     prestige: PrestigeMechanic;
     upgrades: UpgradesMechanic;
-    /** Ponder/The Analytical Engine's ability profile, resolved for whichever tier the visitor has currently reached. */
-    ponder: AnalyticalEngineMechanic;
   };
   /** The most advanced tier the visitor has actually reached, by unlocked-achievement count — drives TierRevealNotice. */
   currentTierId: string;
@@ -346,15 +358,9 @@ const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) 
   { id: "campfire-overstoked", at: 4, read: (c) => c.state.campfire.stage },
   { id: "iron-tool-completionist", at: 8, read: (c) => c.state.firstIronTool.triedTools.length },
   { id: "priorities-completionist", at: PRIORITY_STEPS.length, read: (c) => c.state.priorities.checked.length },
-  // Ponder — see ponder-stage.ts for how these same counters derive its own
-  // Create/Choose/Install/Play stage.
-  { id: "pd-first-sentence", at: 1, read: (c) => c.state.ponder.solvedCount },
-  { id: "pd-fluent", at: 10, read: (c) => c.state.ponder.solvedCount },
-  { id: "pd-first-choice", at: 1, read: (c) => c.state.ponder.choicesMade },
-  { id: "pd-insight-1", at: 1, read: (c) => c.state.ponder.insight },
-  { id: "pd-insight-10", at: 10, read: (c) => c.state.ponder.insight },
-  { id: "pd-insight-50", at: 50, read: (c) => c.state.ponder.insight },
-  { id: "pd-insight-200", at: 200, read: (c) => c.state.ponder.insight },
+  // Ponder / The Analytical Engine — its own rules live beside its
+  // definitions in engine/achievements.ts.
+  ...ENGINE_NUMERIC_RULES,
 ];
 
 const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }[] = [
@@ -455,16 +461,20 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
       ALL_HAND_AUTHORED_IDS.filter((id) => id !== "fr-founding-settler").every((id) => c.unlockedSet.has(id)),
   },
   { id: "fr-ledger-100", check: (c) => c.ledger.unlockedCount >= 100 },
-  // Ponder — mirrors ponderStageFor's own Stage 3/Stage 4 gates (reaching
-  // tier2 on the ladder, having prestiged at least once) rather than
-  // inventing new thresholds.
-  { id: "pd-automated", check: (c) => c.unlockedCount >= c.tier2Threshold },
-  { id: "pd-oracle", check: (c) => c.state.legacy.level >= 1 || c.state.ponder.solvedCount >= 40 },
-  {
-    id: "pd-old-friend",
-    check: (c) => c.state.legacy.level >= 1 && c.state.ponder.journal.length >= 20,
-  },
+  ...ENGINE_CUSTOM_RULES,
 ];
+
+// The engine slice's live value, held at module scope (the Outpost only ever
+// mounts one provider) so the save wrapper below can read it without every
+// mutator in the provider having to list it as a hook dependency.
+const liveEngine: { current: EngineState } = { current: defaultState().engine };
+
+// Every save in the provider goes through this, never saveStateRaw
+// directly: it always writes the latest engine slice, so a mutator holding
+// an older copy of HubState can't persist a stale Engine over newer progress.
+function saveState(next: HubState) {
+  saveStateRaw({ ...next, engine: liveEngine.current });
+}
 
 export function AchievementsProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<HubState>(defaultState());
@@ -512,16 +522,67 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // Read synchronously inside unlock() (a [addXp]-only useCallback) to
   // decide whether to push a toast — same reasoning as the other refs.
   const settingsRef = useRef<HubState["settings"]>(defaultState().settings);
-  // Read synchronously by recordPonderSolved (insight award), the idle-gen
-  // tick effect, and prestigeOutpost (Borrowed Insight bonus) — same
-  // reasoning as the other refs.
-  const ponderRef = useRef<HubState["ponder"]>(defaultState().ponder);
   // Admin overrides (tiers/module placement/achievement tiers/tool ladder)
   // load once on mount, same as everything else — the admin panel lives on
   // its own page, so by the time a visitor reaches the homepage again after
   // editing, this is a fresh mount that picks up the new config naturally.
   const [adminConfig, setAdminConfig] = useState<AdminConfig>(defaultAdminConfig());
   const adminConfigRef = useRef<AdminConfig>(defaultAdminConfig());
+
+  // --- Ponder / The Analytical Engine ---
+  // The engine slice's single source of truth is this ref: EngineProvider
+  // (engine/ui) mutates it through updateEngine, and EVERY save below goes
+  // through saveState() here, which always writes the ref's latest engine —
+  // so none of the ~30 other mutators in this file can ever persist a stale
+  // copy of it over newer progress.
+  const engineCfgRef = useRef<EngineConfig>(resolveEngineConfig(undefined));
+  const engineFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentEngineBuffs = useCallback(
+    (): EngineBuffs =>
+      computeBuffs(liveEngine.current, engineCfgRef.current, researchEffects(liveEngine.current.research)),
+    []
+  );
+  const commitEngine = useCallback(() => {
+    if (engineFlushTimerRef.current) {
+      clearTimeout(engineFlushTimerRef.current);
+      engineFlushTimerRef.current = null;
+    }
+    setState((prev) => {
+      if (prev.engine === liveEngine.current) return prev;
+      const next = { ...prev, engine: liveEngine.current };
+      saveStateRaw(next);
+      return next;
+    });
+  }, []);
+  const updateEngine = useCallback(
+    (fn: (e: EngineState) => EngineState, mode: "now" | "soon" = "now") => {
+      const next = fn(liveEngine.current);
+      if (next === liveEngine.current) return;
+      liveEngine.current = next;
+      if (mode === "now") {
+        commitEngine();
+      } else if (!engineFlushTimerRef.current) {
+        engineFlushTimerRef.current = setTimeout(commitEngine, 1500);
+      }
+    },
+    [commitEngine]
+  );
+  const getEngine = useCallback(() => liveEngine.current, []);
+  // A throttled commit must never be lost to a closing tab.
+  useEffect(() => {
+    function flush() {
+      if (engineFlushTimerRef.current) commitEngine();
+    }
+    function onVisibility() {
+      if (document.visibilityState === "hidden") flush();
+    }
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [commitEngine]);
 
   const addXp = useCallback((amount: number) => {
     if (amount <= 0) return;
@@ -784,82 +845,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
-  // Covers both a plain Ponder puzzle and a Stage-2 branch choice — the
-  // journal is capped and newest-first, same shape as tier2.activityLog.
-  // Insight is read from the resolved per-tier mechanic (mechanics.ts's
-  // AnalyticalEngineMechanic) rather than a flat constant, so an admin can
-  // tune the Engine's award rate per ability tier.
-  const recordPonderSolved = useCallback((sentence: string, wasChoice: boolean) => {
-    const mechanic = resolvedMechanicForTier<AnalyticalEngineMechanic>(
-      adminConfigRef.current,
-      "ponder",
-      currentTierId(adminConfigRef.current, unlockedRef.current.size)
-    );
-    const insight = ponderRef.current.insight + mechanic.insightPerSolve;
-    const loreRevealedRank = Math.max(ponderRef.current.loreRevealedRank, engineLoreRankForInsight(insight));
-    const journal = [sentence, ...ponderRef.current.journal].slice(0, PONDER_JOURNAL_MAX);
-    const nextPonder: HubState["ponder"] = {
-      solvedCount: ponderRef.current.solvedCount + 1,
-      choicesMade: ponderRef.current.choicesMade + (wasChoice ? 1 : 0),
-      journal,
-      insight,
-      loreRevealedRank,
-      idleGenSince: ponderRef.current.idleGenSince,
-    };
-    ponderRef.current = nextPonder;
-    setState((prev) => {
-      const next: HubState = { ...prev, ponder: nextPonder };
-      saveState(next);
-      return next;
-    });
-  }, []);
-
-  // Idle generation — once the resolved per-tier mechanic's idleInsightPerMin
-  // is > 0, insight accrues from a stored timestamp the same way Campfire
-  // decay and the day/night cycle derive their state (no ticking server).
-  // Whole minutes only, so a half-elapsed minute carries over to the next
-  // tick instead of being lost.
-  const IDLE_GEN_TICK_MS = 30_000;
-  useEffect(() => {
-    if (!mounted) return;
-    const id = window.setInterval(() => {
-      const mechanic = resolvedMechanicForTier<AnalyticalEngineMechanic>(
-        adminConfigRef.current,
-        "ponder",
-        currentTierId(adminConfigRef.current, unlockedRef.current.size)
-      );
-      if (mechanic.idleInsightPerMin <= 0) return;
-
-      if (!ponderRef.current.idleGenSince) {
-        const nextPonder = { ...ponderRef.current, idleGenSince: new Date().toISOString() };
-        ponderRef.current = nextPonder;
-        setState((prev) => {
-          const next = { ...prev, ponder: nextPonder };
-          saveState(next);
-          return next;
-        });
-        return;
-      }
-
-      const elapsedMin = (Date.now() - new Date(ponderRef.current.idleGenSince).getTime()) / 60_000;
-      const wholeMin = Math.floor(elapsedMin);
-      if (wholeMin < 1) return;
-      const insight = ponderRef.current.insight + wholeMin * mechanic.idleInsightPerMin;
-      const loreRevealedRank = Math.max(ponderRef.current.loreRevealedRank, engineLoreRankForInsight(insight));
-      const idleGenSince = new Date(
-        new Date(ponderRef.current.idleGenSince).getTime() + wholeMin * 60_000
-      ).toISOString();
-      const nextPonder = { ...ponderRef.current, insight, loreRevealedRank, idleGenSince };
-      ponderRef.current = nextPonder;
-      setState((prev) => {
-        const next = { ...prev, ponder: nextPonder };
-        saveState(next);
-        return next;
-      });
-    }, IDLE_GEN_TICK_MS);
-    return () => window.clearInterval(id);
-  }, [mounted]);
-
   // Imports apply in place (no page reload) so same-session achievements
   // like "Round Trip" (export then import) stay detectable. importCount
   // carries forward from THIS browser's current count, not whatever the
@@ -901,7 +886,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
           perks: { ...base.legacy.perks, ...incoming.legacy?.perks },
         },
         upgrades: { ...base.upgrades, ...incoming.upgrades },
-        ponder: { ...base.ponder, ...incoming.ponder },
+        engine: normalizeEngineState(incoming.engine),
         tier2,
         unlocked: { ...incoming.unlocked },
       };
@@ -911,7 +896,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       legacyRef.current = merged.legacy;
       campfireRef.current = merged.campfire;
       upgradesRef.current = merged.upgrades;
-      ponderRef.current = merged.ponder;
+      liveEngine.current = merged.engine;
       saveState(merged);
       return merged;
     });
@@ -931,11 +916,42 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // Advances from wherever the fire *currently* is (after decay), not from
   // its last raw stored value — so tending after a long absence starts
   // from the ember you'd actually see, not a stale high stage.
+  // The Campfire's decay rate as it stands right now — the admin-tuned base,
+  // slowed while the Engine's Bellows are powered (engine/buffs.ts). Every
+  // decay read in this file goes through here so they can never disagree.
+  const campfireDecayMinutes = useCallback(
+    (): number =>
+      resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire").decayMinutes *
+      currentEngineBuffs().bellowsDecayMult,
+    [currentEngineBuffs]
+  );
+
   const tendCampfire = useCallback(() => {
-    const campfireMechanic = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire");
-    const displayedStage = currentCampfireStage(campfireRef.current, campfireMechanic.decayMinutes);
+    const displayedStage = currentCampfireStage(campfireRef.current, campfireDecayMinutes());
     const nextStage = Math.min(4, displayedStage + 1) as CampfireStage;
     const campfire = { stage: nextStage, lastTendedAt: new Date().toISOString() };
+    campfireRef.current = campfire;
+    setState((prev) => {
+      const next = { ...prev, campfire };
+      saveState(next);
+      return next;
+    });
+  }, [campfireDecayMinutes]);
+
+  // When the Bellows start or stop, the decay rate changes — re-anchor the
+  // fire so its visible stage stays put instead of jumping (decay is derived
+  // from elapsed time ÷ rate, so a new rate would reinterpret the past).
+  const rebaseCampfire = useCallback((oldMinutes: number, newMinutes: number) => {
+    const c = campfireRef.current;
+    if (!c.lastTendedAt || oldMinutes === newMinutes) return;
+    const elapsedMin = (Date.now() - new Date(c.lastTendedAt).getTime()) / 60_000;
+    const steps = Math.floor(elapsedMin / oldMinutes);
+    const shown = Math.max(0, c.stage - steps) as CampfireStage;
+    const frac = shown === 0 ? 0 : (elapsedMin - steps * oldMinutes) / oldMinutes;
+    const campfire = {
+      stage: shown,
+      lastTendedAt: new Date(Date.now() - frac * newMinutes * 60_000).toISOString(),
+    };
     campfireRef.current = campfire;
     setState((prev) => {
       const next = { ...prev, campfire };
@@ -950,12 +966,16 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // timer as Tree Mining/Hunting/Mining so it can't be spammed back-to-back.
   const completeCooking = useCallback((): boolean => {
     const campfireMechanic = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire");
-    if (currentCampfireStage(campfireRef.current, campfireMechanic.decayMinutes) !== 3) return false;
+    if (currentCampfireStage(campfireRef.current, campfireDecayMinutes()) !== 3) return false;
     if ((resourcesRef.current.food ?? 0) < campfireMechanic.cookFoodCost) return false;
+    const buffs = currentEngineBuffs();
     const resources = { ...resourcesRef.current };
     resources.food -= campfireMechanic.cookFoodCost;
-    resources.cookedFood = (resources.cookedFood ?? 0) + campfireMechanic.cookYield;
+    resources.cookedFood = (resources.cookedFood ?? 0) + campfireMechanic.cookYield + buffs.millstoneCook;
     resourcesRef.current = resources;
+    if (buffs.millstonePowered) {
+      updateEngine((e) => ({ ...e, counters: { ...e.counters, millstoneMeals: e.counters.millstoneMeals + 1 } }), "soon");
+    }
     const gatheringMechanic = resolvedMechanic<GatheringMechanic>(adminConfigRef.current, "gathering");
     const cooldownMs = effectiveCooldownMs(gatheringMechanic.activityCooldownMs, legacyRef.current.perks);
     const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
@@ -974,7 +994,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       return next;
     });
     return true;
-  }, []);
+  }, [campfireDecayMinutes, currentEngineBuffs, updateEngine]);
 
   // Unlike every other resource mutator here, deliberately NOT gated behind
   // the shared activity cooldown — eating a meal you already cooked should
@@ -1060,19 +1080,79 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
+  // The Engine's Saw / Millstone add to these while powered (engine/buffs.ts).
   const completeTreeMining = useCallback(() => {
     const { wood } = resolvedCollectAmounts(adminConfigRef.current);
-    const amount = wood + collectBonus(legacyRef.current.perks);
+    const buffs = currentEngineBuffs();
+    const amount = wood + collectBonus(legacyRef.current.perks) + buffs.sawWood;
     const meta = resolvedResourceMeta(adminConfigRef.current);
-    applyResourceGain({ wood: amount }, `Tree Mining: +${amount} ${meta.wood.name}`);
-  }, [applyResourceGain]);
+    applyResourceGain({ wood: amount }, `Tree Mining: +${amount} ${meta.wood.name}${buffs.sawPowered ? " (Saw)" : ""}`);
+    if (buffs.sawPowered) {
+      updateEngine((e) => ({ ...e, counters: { ...e.counters, sawChops: e.counters.sawChops + 1 } }), "soon");
+    }
+  }, [applyResourceGain, currentEngineBuffs, updateEngine]);
 
   const completeHunting = useCallback(() => {
     const { food } = resolvedCollectAmounts(adminConfigRef.current);
-    const amount = food + collectBonus(legacyRef.current.perks);
+    const buffs = currentEngineBuffs();
+    const amount = food + collectBonus(legacyRef.current.perks) + buffs.millstoneFood;
     const meta = resolvedResourceMeta(adminConfigRef.current);
     applyResourceGain({ food: amount }, `Hunting: +${amount} ${meta.food.name}`);
-  }, [applyResourceGain]);
+  }, [applyResourceGain, currentEngineBuffs]);
+
+  // Resource bridge for the Engine: spending (parts, commissions, feeding the
+  // crank) and granting (Eureka/commission rewards), without the gathering
+  // cooldown — same synchronous-ref pattern as craftTool below.
+  const spendResources = useCallback((cost: Partial<ResourceState>, logText?: string): boolean => {
+    const entries = (Object.entries(cost) as [ResourceId, number][]).filter(([, n]) => n > 0);
+    if (!entries.every(([id, n]) => (resourcesRef.current[id] ?? 0) >= n)) return false;
+    const resources = { ...resourcesRef.current };
+    for (const [id, n] of entries) resources[id] -= n;
+    resourcesRef.current = resources;
+    setState((prev) => {
+      const activityLog = logText
+        ? [{ ts: new Date().toISOString(), text: logText }, ...prev.tier2.activityLog].slice(0, ACTIVITY_LOG_MAX)
+        : prev.tier2.activityLog;
+      const next: HubState = {
+        ...prev,
+        resources,
+        tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + (logText ? 1 : 0) },
+      };
+      saveState(next);
+      return next;
+    });
+    return true;
+  }, []);
+
+  const grantResources = useCallback((gain: Partial<ResourceState>, logText?: string) => {
+    const resources = { ...resourcesRef.current };
+    for (const [id, n] of Object.entries(gain) as [ResourceId, number][]) resources[id] = (resources[id] ?? 0) + n;
+    resourcesRef.current = resources;
+    setState((prev) => {
+      const activityLog = logText
+        ? [{ ts: new Date().toISOString(), text: logText }, ...prev.tier2.activityLog].slice(0, ACTIVITY_LOG_MAX)
+        : prev.tier2.activityLog;
+      const next: HubState = {
+        ...prev,
+        resources,
+        tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + (logText ? 1 : 0) },
+      };
+      saveState(next);
+      return next;
+    });
+  }, []);
+
+  const logActivity = useCallback((text: string) => {
+    setState((prev) => {
+      const activityLog = [{ ts: new Date().toISOString(), text }, ...prev.tier2.activityLog].slice(0, ACTIVITY_LOG_MAX);
+      const next: HubState = {
+        ...prev,
+        tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
+      };
+      saveState(next);
+      return next;
+    });
+  }, []);
 
   // Rolled off toolsRef (always current) so the caller gets back the exact
   // amounts applied, for its own completion feedback.
@@ -1149,12 +1229,23 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     const order = resolvedToolOrder(adminConfigRef.current);
     const toolIndex = Math.max(0, order.indexOf(toolsRef.current.tier));
     const prestigeMechanic = resolvedMechanic<PrestigeMechanic>(adminConfigRef.current, "prestige");
+    // Bank whatever the Engine earned up to this instant, then dismantle its
+    // body — its mind (and lifetime insight, which Borrowed Insight reads)
+    // survives. See engine/state.ts's engineOnPrestige.
+    const nowMs = Date.now();
+    const settled = settle(
+      liveEngine.current,
+      engineCfgRef.current,
+      researchEffects(liveEngine.current.research),
+      nowMs
+    );
     const pointsEarned =
       pointsForPrestige(toolIndex, prestigeMechanic.pointsPerTier) +
-      insightPrestigeBonus(legacyRef.current.perks, ponderRef.current.insight);
+      insightPrestigeBonus(legacyRef.current.perks, settled.lifetimeInsight);
     const startIndex = Math.min(order.length - 1, startingTierIndex(legacyRef.current.perks));
     const startTier = order[startIndex] ?? order[0];
 
+    liveEngine.current = engineOnPrestige(settled, new Date(nowMs).toISOString());
     resourcesRef.current = defaultState().resources;
     toolsRef.current = { tier: startTier };
     legacyRef.current = {
@@ -1174,6 +1265,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         tools: toolsRef.current,
         activity: { cooldownUntil: null },
         legacy: legacyRef.current,
+        engine: liveEngine.current,
         tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
       };
       saveState(next);
@@ -1293,9 +1385,10 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     campfireRef.current = next.campfire;
     upgradesRef.current = next.upgrades;
     settingsRef.current = next.settings;
-    ponderRef.current = next.ponder;
+    liveEngine.current = next.engine;
     const loadedAdminConfig = loadAdminConfig();
     adminConfigRef.current = loadedAdminConfig;
+    engineCfgRef.current = resolveEngineConfig(loadedAdminConfig.engine);
     setAdminConfig(loadedAdminConfig);
     patchSwitchCountRef.current = loaded.tier2.patchNotesModeSwitchCount;
     themeClicksRef.current = loaded.tier2.themeToggleClicks;
@@ -1539,16 +1632,34 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     () => currentTierId(adminConfig, unlockedCount),
     [adminConfig, unlockedCount]
   );
-  const mechanicsResolved = useMemo(
-    () => ({
-      campfire: resolvedMechanic<CampfireMechanic>(adminConfig, "campfire"),
+  const engineConfig = useMemo(() => resolveEngineConfig(adminConfig.engine), [adminConfig]);
+  const engineBuffs = useMemo(
+    () => computeBuffs(state.engine, engineConfig, researchEffects(state.engine.research)),
+    [state.engine, engineConfig]
+  );
+  const bellowsMult = engineBuffs.bellowsDecayMult;
+  const mechanicsResolved = useMemo(() => {
+    const campfire = resolvedMechanic<CampfireMechanic>(adminConfig, "campfire");
+    // Everything that reads the Campfire's decay (its card, the Engine's
+    // live sentences) sees the Bellows-slowed rate — see campfireDecayMinutes.
+    campfire.decayMinutes *= bellowsMult;
+    return {
+      campfire,
       gathering: resolvedMechanic<GatheringMechanic>(adminConfig, "gathering"),
       prestige: resolvedMechanic<PrestigeMechanic>(adminConfig, "prestige"),
       upgrades: resolvedMechanic<UpgradesMechanic>(adminConfig, "upgrades"),
-      ponder: resolvedMechanicForTier<AnalyticalEngineMechanic>(adminConfig, "ponder", currentTierIdValue),
-    }),
-    [adminConfig, currentTierIdValue]
-  );
+    };
+  }, [adminConfig, bellowsMult]);
+  // Bellows started/stopped: keep the fire's visible stage where it is.
+  const prevBellowsMultRef = useRef(1);
+  useEffect(() => {
+    if (!mounted) return;
+    const prevMult = prevBellowsMultRef.current;
+    prevBellowsMultRef.current = bellowsMult;
+    if (prevMult === bellowsMult) return;
+    const base = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire").decayMinutes;
+    rebaseCampfire(base * prevMult, base * bellowsMult);
+  }, [bellowsMult, mounted, rebaseCampfire]);
   const tierTipsResolved = useMemo(
     () => resolvedTierTips(adminConfig, currentTierIdValue),
     [adminConfig, currentTierIdValue]
@@ -1587,13 +1698,14 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     recordPatchNotesOpen,
     recordExport,
     importState,
-    ponder: state.ponder,
-    ponderStage: ponderStageFor({
-      solvedCount: state.ponder.solvedCount,
-      tier2Unlocked,
-      legacyLevel: state.legacy.level,
-    }),
-    recordPonderSolved,
+    engine: state.engine,
+    getEngine,
+    updateEngine,
+    engineConfig,
+    engineBuffs,
+    spendResources,
+    grantResources,
+    logActivity,
     campfire: state.campfire,
     tendCampfire,
     completeCooking,

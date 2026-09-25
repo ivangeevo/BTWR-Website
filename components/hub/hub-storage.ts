@@ -1,5 +1,8 @@
 import type { Mod } from "@/lib/mods";
 import type { AchievementId } from "./achievements-catalog";
+import { hashString } from "./engine/rng";
+import { defaultEngineState, normalizeEngineState } from "./engine/state";
+import type { EngineState } from "./engine/types";
 import { defaultLegacyState, type LegacyState } from "./legacy";
 import type { ModuleId } from "./module-registry";
 import type { ResourceState } from "./resources";
@@ -109,31 +112,6 @@ export type ToolState = {
   tier: string;
 };
 
-// Ponder's own progression (see ponder-stage.ts's ponderStageFor, which
-// derives its stage from solvedCount/choicesMade + tier2/prestige — nothing
-// here is a stage itself, just the raw counters it's computed from).
-// Deliberately survives prestigeOutpost (which only resets resources/tools/
-// activity/legacy) — Ponder's journal is the one thing meant to persist
-// through a reset.
-export type PonderState = {
-  /** Lifetime puzzles solved — drives stage-ups and pd-first-sentence/pd-fluent. */
-  solvedCount: number;
-  /** Lifetime Stage-2 branch picks — drives pd-first-choice. */
-  choicesMade: number;
-  /** Completed sentences, newest first, capped at PONDER_JOURNAL_MAX (ponder-content.ts). */
-  journal: string[];
-  /** Cumulative "insight" earned from solves (+ later, idle generation) — the
-   * Engine's own resource, and what its pd-insight-* achievement thresholds read. */
-  insight: number;
-  /** High-water mark for lore reveals, same trick as tier2.loreRevealedLevel —
-   * derived content, never stored per-entry. Keyed to insight, not solvedCount,
-   * so idle generation (once unlocked) also feeds the lore thread. */
-  loreRevealedRank: number;
-  /** Elapsed-time anchor for idle insight generation, once an ability tier
-   * enables it — null until first enabled. Same pattern as campfire.lastTendedAt. */
-  idleGenSince: string | null;
-};
-
 // Tree Mining, Hunting, and Mining all share this single cooldown — see
 // mechanics.ts's GatheringMechanic.
 export type ActivityState = {
@@ -173,7 +151,9 @@ export type HubState = {
   tier2: Tier2State;
   legacy: LegacyState;
   upgrades: UpgradesState;
-  ponder: PonderState;
+  /** Ponder / The Analytical Engine — see engine/types.ts and engine/state.ts.
+   * Part of prestige: its mind survives, its body doesn't (engineOnPrestige). */
+  engine: EngineState;
 };
 
 export function defaultState(): HubState {
@@ -205,7 +185,7 @@ export function defaultState(): HubState {
     },
     legacy: defaultLegacyState(),
     upgrades: { skillPoints: 0, purchased: [], cardOrder: null },
-    ponder: { solvedCount: 0, choicesMade: 0, journal: [], insight: 0, loreRevealedRank: 0, idleGenSince: null },
+    engine: defaultEngineState(),
     tier2: {
       xp: 0,
       prestigeCount: 0,
@@ -295,7 +275,7 @@ export function loadState(): HubState {
         perks: { ...base.legacy.perks, ...parsed.legacy?.perks },
       },
       upgrades: { ...base.upgrades, ...parsed.upgrades, cardOrder },
-      ponder: { ...base.ponder, ...parsed.ponder },
+      engine: normalizeEngineState(parsed.engine),
       tier2,
       unlocked: { ...parsed.unlocked },
     };
@@ -342,16 +322,9 @@ export function applyVisit(visits: HubState["visits"]): HubState["visits"] {
   };
 }
 
-// FNV-1a — deterministic, tiny, no dependency. Same date string always
-// hashes the same way, so every visitor sees the same mod-of-the-day.
-function hashString(str: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
+// FNV-1a (engine/rng.ts) — deterministic, tiny, no dependency. Same date
+// string always hashes the same way, so every visitor sees the same
+// mod-of-the-day.
 
 export function pickModOfDay(mods: Mod[], dateStr: string = todayUTC()): Mod | null {
   const pool = mods.filter((m) => !m.disabled && m.iconUrl);
@@ -371,4 +344,4 @@ export function isOutpostEnabled(): boolean {
   return loadState().enabled;
 }
 
-export { STORAGE_KEY, todayUTC };
+export { STORAGE_KEY, todayUTC, hashString };

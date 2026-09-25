@@ -117,49 +117,6 @@ export class UpgradesMechanic {
   ];
 }
 
-// The Analytical Engine's (Ponder's) ability profile — unlike the modules
-// above, this one varies BY TIER (see PER_TIER_MODULE_MECHANICS below and
-// admin-config.ts's resolvedMechanicForTier), so its fields describe one
-// tier's ability profile rather than one flat, global setting. A field's
-// class default here is effectively "tier 1's baseline" — every tier stays
-// at these numbers until an admin sets a per-tier override, so a visitor who
-// never opens the admin panel sees identical behavior at every tier.
-export class AnalyticalEngineMechanic {
-  /** Insight (the Engine's own resource) earned per puzzle solved at this tier. */
-  insightPerSolve = 1;
-  /** Insight generated per real minute while idle, once this tier is reached. 0 keeps idle generation off. */
-  idleInsightPerMin = 0;
-  /** 1 lets this tier's ability profile unlock the "Borrowed Insight" Legacy perk, 0 keeps it locked — see legacy.ts. */
-  legacyPerkUnlocked = 0;
-
-  static readonly configFields: MechanicConfigField[] = [
-    {
-      key: "insightPerSolve",
-      label: "Insight per solve",
-      description: "Insight earned each time a Ponder puzzle is solved, at this tier.",
-      min: 0,
-      max: 50,
-      step: 1,
-    },
-    {
-      key: "idleInsightPerMin",
-      label: "Idle insight / min",
-      description: "Insight generated per real minute while idle, once this tier is reached. 0 keeps idle generation off.",
-      min: 0,
-      max: 20,
-      step: 1,
-    },
-    {
-      key: "legacyPerkUnlocked",
-      label: "Unlocks Borrowed Insight perk",
-      description: "1 to let this tier unlock the Borrowed Insight Legacy perk, 0 to keep it locked.",
-      min: 0,
-      max: 1,
-      step: 1,
-    },
-  ];
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type MechanicClass = new () => Record<string, any>;
 
@@ -172,18 +129,5 @@ export const MODULE_MECHANICS: Partial<Record<ModuleId, MechanicClass>> = {
 
 export function mechanicConfigFields(id: ModuleId): MechanicConfigField[] {
   const Mechanic = MODULE_MECHANICS[id];
-  return Mechanic ? (Mechanic as unknown as { configFields: MechanicConfigField[] }).configFields : [];
-}
-
-// A sibling registry to MODULE_MECHANICS for modules whose mechanic needs a
-// per-tier ability profile rather than one flat setting — currently just
-// Ponder/The Analytical Engine. Kept separate so existing flat-mode modules
-// (Campfire/Gathering/Prestige/Upgrades) are completely unaffected.
-export const PER_TIER_MODULE_MECHANICS: Partial<Record<ModuleId, MechanicClass>> = {
-  ponder: AnalyticalEngineMechanic,
-};
-
-export function perTierMechanicConfigFields(id: ModuleId): MechanicConfigField[] {
-  const Mechanic = PER_TIER_MODULE_MECHANICS[id];
   return Mechanic ? (Mechanic as unknown as { configFields: MechanicConfigField[] }).configFields : [];
 }

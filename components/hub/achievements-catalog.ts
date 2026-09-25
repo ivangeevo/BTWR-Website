@@ -1,3 +1,5 @@
+import { ENGINE_ACHIEVEMENT_DEFS, type EngineAchievementId } from "./engine/achievements";
+
 export type AchievementId =
   // Tier 1 (12) — the original, simple hangout-spot achievements.
   | "first-visit"
@@ -80,11 +82,12 @@ export type AchievementId =
   | "fr-wardrobe-certified" | "fr-all-flair" | "fr-all-categories" | "fr-master-every-trade"
   | "fr-nothing-hidden" | "fr-lifes-work" | "fr-half-year" | "fr-prestige-10"
   | "fr-complete-111" | "fr-founding-settler" | "fr-ledger-100"
-  // Ponder (see ponder-stage.ts/ponder-content.ts) — its own small
-  // Day One/Day Two/mid-game/endgame arc.
+  // Ponder — the Engine's first ten (see engine/achievements.ts for their rules).
   | "pd-first-sentence" | "pd-fluent" | "pd-first-choice"
   | "pd-automated" | "pd-oracle" | "pd-old-friend"
-  | "pd-insight-1" | "pd-insight-10" | "pd-insight-50" | "pd-insight-200";
+  | "pd-insight-1" | "pd-insight-10" | "pd-insight-50" | "pd-insight-200"
+  // The Analytical Engine's own category (engine/achievements.ts).
+  | EngineAchievementId;
 
 // Groups achievements for the gallery. "secrets" is special-cased there:
 // unlocked secrets show normally under this group, but locked ones are
@@ -92,6 +95,7 @@ export type AchievementId =
 // remain — so the true count of hidden achievements is never revealed.
 export type AchievementCategory =
   | "ponder"
+  | "engine"
   | "onboarding"
   | "quiz"
   | "patch-notes"
@@ -110,6 +114,7 @@ export type AchievementCategory =
 
 export const CATEGORY_LABELS: Record<AchievementCategory, string> = {
   ponder: "Ponder",
+  engine: "The Analytical Engine",
   onboarding: "Getting Started",
   quiz: "Guess the Mod",
   "patch-notes": "Patch Notes",
@@ -130,6 +135,7 @@ export const CATEGORY_LABELS: Record<AchievementCategory, string> = {
 // Display order for category sections in the gallery.
 export const CATEGORY_ORDER: AchievementCategory[] = [
   "ponder",
+  "engine",
   "onboarding",
   "quiz",
   "patch-notes",
@@ -231,7 +237,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: "pd-automated",
     title: "Busted Wide Open",
-    description: "Ponder reached its third stage, the moment the Outpost's own automation opened up.",
+    description: "Ponder reached The Stump, and found a blueprint in its own head.",
     icon: "\u{2699}\u{FE0F}",
     tier: 2,
     category: "ponder",
@@ -240,7 +246,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: "pd-oracle",
     title: "Still Here After The End",
-    description: "Ponder reached its final stage.",
+    description: "The Engine reached its final chapter, The Wither & The End.",
     icon: "\u{1F31F}",
     tier: 2,
     category: "ponder",
@@ -249,7 +255,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: "pd-old-friend",
     title: "The One Thing That Remembers",
-    description: "Prestiged with Ponder's journal already full.",
+    description: "Rebuilt the Engine after a prestige, its journal already full.",
     icon: "\u{1F4D3}",
     tier: 2,
     category: "ponder",
@@ -290,6 +296,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     category: "ponder",
     xp: 200,
   },
+  ...ENGINE_ACHIEVEMENT_DEFS,
   {
     id: "first-visit",
     title: "Welcome to the Outpost",

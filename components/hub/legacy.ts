@@ -54,7 +54,7 @@ export const PERKS: PerkDef[] = [
     id: "borrowed-insight",
     name: "Borrowed Insight",
     icon: "\u{1F9E0}",
-    description: "Legacy Points banked per prestige scale with the Engine's total insight.",
+    description: "+1 Legacy Point per prestige for every power of ten of the Engine's lifetime insight, per level.",
     maxLevel: 5,
     costForLevel: (level) => level * 3,
   },
@@ -114,11 +114,10 @@ export function craftCostDiscount(perks: LegacyPerks): number {
   return perkLevel(perks, "master-crafter");
 }
 
-// Every INSIGHT_PER_BONUS_POINT of the Engine's total insight converts to +1
-// extra Legacy Point per prestige, per level of Borrowed Insight owned — the
-// Engine's endgame tie-in to Prestige (see PONDER_EVOLUTION_PLAN.md).
-const INSIGHT_PER_BONUS_POINT = 50;
-
-export function insightPrestigeBonus(perks: LegacyPerks, insight: number): number {
-  return perkLevel(perks, "borrowed-insight") * Math.floor(insight / INSIGHT_PER_BONUS_POINT);
+// The Engine's endgame tie-in to Prestige: each level of Borrowed Insight
+// adds one Legacy Point per order of magnitude of the Engine's lifetime
+// insight — logarithmic, because the Engine's numbers run at clicker scale
+// (a billion lifetime insight at level 5 is 45 extra points, not millions).
+export function insightPrestigeBonus(perks: LegacyPerks, lifetimeInsight: number): number {
+  return perkLevel(perks, "borrowed-insight") * Math.floor(Math.log10(Math.max(10, lifetimeInsight)));
 }
