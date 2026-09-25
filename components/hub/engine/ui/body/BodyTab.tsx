@@ -26,7 +26,7 @@ const ARROWS = ["\u{2191}", "\u{2192}", "\u{2193}", "\u{2190}"];
 // Which way a part "faces", drawn as a bar on that side of its cell: an
 // axle's axis, a gearbox's input face, a crank's output, an attachment's
 // input face.
-function PartGlyph({ part, dim }: { part: PlacedPart; dim?: boolean }) {
+export function PartGlyph({ part, dim }: { part: PlacedPart; dim?: boolean }) {
   const def = PART_DEFS[part.type];
   const axisTypes: GridPartType[] = ["axle", "sfAxle", "windmill", "waterWheel"];
   const isAxis = axisTypes.includes(part.type);

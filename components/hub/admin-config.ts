@@ -8,6 +8,7 @@ import type { AchievementId } from "./achievements-catalog";
 import type { ModuleId } from "./module-registry";
 import { MODULE_MECHANICS } from "./mechanics";
 import type { EngineAdminOverrides } from "./engine/config";
+import { ENGINE_ACHIEVEMENT_TIERS } from "./engine/achievements";
 import { UPGRADES, type UpgradeDef, type UpgradeId } from "./upgrade-catalog";
 import {
   RESOURCE_IDS,
@@ -68,11 +69,13 @@ export function defaultTiers(): TierDef[] {
     { id: "tier3", name: "Making Camp", threshold: 20 },
     { id: "tier4", name: "Working the Land", threshold: 35 },
     { id: "tier5", name: "Keeping Record", threshold: 55 },
-    { id: "tier6", name: "Deep Roots", threshold: 65 },
-    { id: "tier7", name: "The Long Haul", threshold: 80 },
-    { id: "tier8", name: "Under a New Moon", threshold: 95 },
-    { id: "tier9", name: "By the Book", threshold: 112 },
-    { id: "tier10", name: "The Reforging", threshold: 130 },
+    // Retuned for the Engine's 37 extra achievements (catalog ~193): tier1-5
+    // stay put because the Engine's stage gates lean on those card reveals.
+    { id: "tier6", name: "Deep Roots", threshold: 70 },
+    { id: "tier7", name: "The Long Haul", threshold: 88 },
+    { id: "tier8", name: "Under a New Moon", threshold: 106 },
+    { id: "tier9", name: "By the Book", threshold: 125 },
+    { id: "tier10", name: "The Reforging", threshold: 145 },
   ];
 }
 
@@ -168,6 +171,8 @@ export function defaultAdminConfig(): AdminConfig {
       accomplishments: "tier5",
     },
     achievementTier: {
+      // The Analytical Engine's own category — see engine/achievements.ts.
+      ...ENGINE_ACHIEVEMENT_TIERS,
       // Tier 1 — Day One (Ponder + easy onboarding)
       "pd-first-sentence": "tier1",
       "pd-fluent": "tier1",
@@ -185,7 +190,7 @@ export function defaultAdminConfig(): AdminConfig {
       "secret-logo-clicks": "tier1",
 
       // Tier 2 — Word Gets Around (Daily Briefing + Patch Notes + exploration secrets)
-      "pd-automated": "tier2",
+      "pd-automated": "tier3",
       "community-edition": "tier2",
       "mod-of-day-viewed": "tier2",
       "patch-notes-opened": "tier2",

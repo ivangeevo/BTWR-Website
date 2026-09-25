@@ -41,6 +41,7 @@ import {
 } from "../economy";
 import { eurekaLifeMs, luckyAmount, nextEurekaDelayMs, rollEurekaKind } from "../eureka";
 import { engageGrid } from "../grid/engage";
+import { betterResult, DIFF_BY_ID, scoreChallenge, type DiffPart, type DiffScore } from "../grid/difference";
 import { canPlaceOn, layoutFor, remapGrid } from "../grid/layouts";
 import { PART_DEFS, STARTER_BLUEPRINTS } from "../grid/parts";
 import {
@@ -124,6 +125,7 @@ type EngineCtx = {
   claimCommission: (slot: number | "weekly") => boolean;
   deliverCommission: (slot: number | "weekly") => boolean;
   holdSky: () => boolean;
+  submitDifference: (id: string, placed: DiffPart[]) => DiffScore | null;
   markTutorialSeen: (id: string) => void;
   replayTutorial: (id: string) => void;
   dismissAway: () => void;
@@ -1055,6 +1057,28 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     [act, getEngine, spendResources]
   );
 
+  const submitDifference = useCallback(
+    (id: string, placed: DiffPart[]): DiffScore | null => {
+      const c = DIFF_BY_ID[id];
+      if (!c) return null;
+      const score = scoreChallenge(c, placed, cfgRef.current.power);
+      if (score.success && score.medal) {
+        const result = { parts: score.parts, pops: score.pops, medal: score.medal };
+        act((cur) => ({ ...cur, difference: { ...cur.difference, [id]: betterResult(cur.difference[id], result) } }));
+        toast(
+          score.medal === "gold"
+            ? `Gold on "${c.name}". Perfect tolerances.`
+            : `${score.medal === "silver" ? "Silver" : "Bronze"} on "${c.name}" — ${score.parts} parts (gold is ${c.par.gold}).`,
+          "good"
+        );
+      } else {
+        toast(score.pops > 0 ? "Something popped, and not everything's powered." : "Not every target is powered yet.", "warn");
+      }
+      return score;
+    },
+    [act, toast]
+  );
+
   const holdSky = useCallback((): boolean => {
     const s = getEngine();
     if (s.stage < 8 || !fxOf(s).governsSky) return false;
@@ -1158,6 +1182,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     claimCommission,
     deliverCommission,
     holdSky,
+    submitDifference,
     markTutorialSeen,
     replayTutorial,
     dismissAway,

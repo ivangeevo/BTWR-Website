@@ -6,6 +6,7 @@ import { STAGES } from "../stages";
 import { useEngine } from "./EngineProvider";
 import { useLive } from "./live-store";
 import BodyTab from "./body/BodyTab";
+import DifferenceEngine from "./body/DifferenceEngine";
 import LogbookTab from "./LogbookTab";
 import CipherPanel from "./mind/CipherPanel";
 import MindPuzzle from "./mind/MindPuzzle";
@@ -137,7 +138,19 @@ export default function EngineCard() {
             )}
             {tab === "logbook" && <LogbookTab />}
             {tab === "works" && <WorksTab />}
-            {tab === "body" && <BodyTab />}
+            {tab === "body" && (
+              <>
+                <BodyTab />
+                {e.stage >= 8 && (
+                  <section className="mt-4 border-t border-white/10 pt-3">
+                    <h4 className="text-[0.7rem] font-bold uppercase tracking-wider text-white/50">The Difference Engine</h4>
+                    <div className="mt-1.5">
+                      <DifferenceEngine />
+                    </div>
+                  </section>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
