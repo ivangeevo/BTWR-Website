@@ -6,6 +6,8 @@ import { defaultState, loadState, saveState, type HubState } from "./hub-storage
 import { defaultAdminConfig, loadAdminConfig, tierThreshold, type AdminConfig } from "./admin-config";
 import OutpostCorners from "./OutpostCorners";
 import { clearEngineSideKeys } from "./engine/bridge-storage";
+import { isPhoneDevice } from "./device";
+import DesktopOnlyNotice from "./DesktopOnlyNotice";
 
 const RESET_CONFIRM_WINDOW_MS = 4000;
 
@@ -20,9 +22,13 @@ export default function OutpostControlPanel() {
   const [confirmingReset, setConfirmingReset] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Desktop-only (device.ts): on a phone the switch is locked off.
+  const [phone, setPhone] = useState(false);
+
   useEffect(() => {
     setState(loadState());
     setAdminConfig(loadAdminConfig());
+    setPhone(isPhoneDevice());
     setMounted(true);
     return () => {
       if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
@@ -30,6 +36,7 @@ export default function OutpostControlPanel() {
   }, []);
 
   function toggleEnabled() {
+    if (phone) return;
     setState((prev) => {
       const next = { ...prev, enabled: !prev.enabled };
       saveState(next);
@@ -55,7 +62,7 @@ export default function OutpostControlPanel() {
     setState(next);
   }
 
-  const isEnabled = mounted && state.enabled;
+  const isEnabled = mounted && state.enabled && !phone;
   // Tier 2's existence is itself a secret — this pill must never hint at a
   // bigger pool of achievements beyond 12 before it's actually unlocked.
   // Mirrors AchievementsProvider's tier2Unlocked: reaching the ladder's
@@ -71,9 +78,11 @@ export default function OutpostControlPanel() {
       type="button"
       role="switch"
       aria-checked={isEnabled}
-      aria-label="Enable the Outpost"
+      aria-label={phone ? "Enable the Outpost (desktop only)" : "Enable the Outpost"}
+      aria-disabled={phone || undefined}
+      disabled={phone}
       onClick={toggleEnabled}
-      className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors duration-200 [forced-color-adjust:none] ${
+      className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors duration-200 [forced-color-adjust:none] disabled:cursor-not-allowed disabled:opacity-40 ${
         isEnabled
           ? "border-[var(--outpost-accent)] bg-[var(--outpost-accent)] shadow-[0_0_10px_1px_rgba(217,138,74,0.55)]"
           : "border-white/25 bg-white/10"
@@ -116,6 +125,12 @@ export default function OutpostControlPanel() {
               {enableSwitch}
             </div>
           </div>
+
+          {mounted && phone && (
+            <div className="mt-3">
+              <DesktopOnlyNotice compact />
+            </div>
+          )}
 
           <div className={`outpost-panel-collapse ${isEnabled ? "open" : ""}`}>
             <div>

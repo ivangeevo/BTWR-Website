@@ -4,6 +4,7 @@
 // every page. Everything here is a pure function of a stored start
 // timestamp plus the current clock, so nothing needs a ticking React
 // context — each consumer just re-derives on its own interval.
+import { isPhoneDevice } from "./device";
 import { loadState } from "./hub-storage";
 
 const CYCLE_KEY = "btwr:hub:cycle:v1";
@@ -89,7 +90,7 @@ export function isDayNightCycleActive(): boolean {
   if (typeof window === "undefined") return false;
   try {
     const state = loadState();
-    if (!state.enabled || !state.settings.dayNightCycleEnabled) return false;
+    if (!state.enabled || isPhoneDevice() || !state.settings.dayNightCycleEnabled) return false;
     return state.upgrades.purchased.includes("day-night-cycle");
   } catch {
     return false;

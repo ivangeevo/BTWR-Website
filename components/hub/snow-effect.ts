@@ -4,12 +4,15 @@
 // section and renders unconditionally. Same "read localStorage directly"
 // approach as day-night-cycle.ts's isDayNightCycleActive: gated by the
 // "Winter Weather" upgrade (upgrade-catalog.ts) having been purchased.
+import { isPhoneDevice } from "./device";
 import { loadState } from "./hub-storage";
 
 export function isSnowActive(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return loadState().upgrades.purchased.includes("snow");
+    const state = loadState();
+    // Desktop-only, like the rest of the Outpost (device.ts).
+    return !isPhoneDevice() && state.upgrades.purchased.includes("snow");
   } catch {
     return false;
   }

@@ -3,6 +3,7 @@
 // the header companion, the sky, the theme toggle) write small side keys
 // and fire window events instead; the provider drains them. Every helper is
 // SSR-safe (static export) and swallows storage errors.
+import { isPhoneDevice } from "../device";
 import type { EnginePublic } from "./types";
 
 export const MODS_READ_KEY = "btwr:hub:modsread:v1";
@@ -148,7 +149,7 @@ export function lockHeldElsewhere(tabId: string, now: number = Date.now()): bool
 
 export function readEnginePublic(): EnginePublic | null {
   const v = read<{ enabled?: boolean; engine?: { public?: EnginePublic } }>(HUB_KEY, {});
-  if (!v.enabled || !v.engine?.public) return null;
+  if (!v.enabled || isPhoneDevice() || !v.engine?.public) return null;
   return v.engine.public;
 }
 

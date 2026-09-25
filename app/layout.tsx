@@ -68,7 +68,10 @@ const themeBootScript = `
     var hubRaw = localStorage.getItem("btwr:hub:v1");
     var hub = hubRaw ? JSON.parse(hubRaw) : null;
     var purchased = (hub && hub.upgrades && hub.upgrades.purchased) || [];
-    var cycleActive = !!(hub && hub.enabled && hub.settings && hub.settings.dayNightCycleEnabled)
+    // Desktop-only Outpost — keep in sync with components/hub/device.ts.
+    var phone = window.matchMedia("(hover: none) and (pointer: coarse)").matches
+      || /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle|BlackBerry|Opera Mini|IEMobile/i.test(navigator.userAgent);
+    var cycleActive = !phone && !!(hub && hub.enabled && hub.settings && hub.settings.dayNightCycleEnabled)
       && purchased.indexOf("day-night-cycle") !== -1;
     var overrideAllowed = !!(hub && hub.settings && hub.settings.themeOverrideAllowed);
     document.documentElement.setAttribute("data-daynight-active", String(cycleActive));

@@ -1,5 +1,6 @@
 import type { Mod } from "@/lib/mods";
 import type { AchievementId } from "./achievements-catalog";
+import { isPhoneDevice } from "./device";
 import { hashString } from "./engine/rng";
 import { defaultEngineState, normalizeEngineState } from "./engine/state";
 import type { EngineState } from "./engine/types";
@@ -340,7 +341,9 @@ export function pickByDate<T>(pool: readonly T[], dateStr: string = todayUTC()):
   return pool[hashString(dateStr) % pool.length];
 }
 
+// Desktop-only: a phone never counts as enabled (see device.ts).
 export function isOutpostEnabled(): boolean {
+  if (isPhoneDevice()) return false;
   return loadState().enabled;
 }
 
