@@ -5,7 +5,7 @@
 
 // "prestige" and "upgrades" are no longer main-grid cards (see the Feature
 // toggles upgradesEnabled/prestigeEnabled in admin-config.ts — they now
-// surface as header badges instead, see UpgradesBadge.tsx/PrestigeBadge.tsx)
+// surface elsewhere instead, see UpgradesPanel.tsx/PrestigeBadge.tsx)
 // but stay valid ModuleId members purely so mechanics.ts's MODULE_MECHANICS
 // registry (their tunable Skill-Points-per-achievement / Legacy-Points-per-
 // tier settings) can keep using the same ModuleId-keyed lookup as every
@@ -89,7 +89,8 @@ export const DEFAULT_MODULE_STAGE: Record<ModuleId, number> = {
   upgrades: 2,
 };
 
-// Default order for the main card grid (see HubSection.tsx) — a single flat
+// Default order for the card grid (see HubSection.tsx; the Engine, "ponder",
+// has its own column there, so its place in this list is ignored) — a single flat
 // list now that the grid is one modular 2-column layout instead of two
 // independently-stacked columns, laid out row-major (index 0 and 1 share a
 // row, 2 and 3 share the next, etc). This interleaving of the old left/right

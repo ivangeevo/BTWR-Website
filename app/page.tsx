@@ -2,10 +2,9 @@ import Link from "next/link";
 import CountUp from "@/components/CountUp";
 import HeroSlideshow from "@/components/HeroSlideshow";
 import Reveal from "@/components/Reveal";
-import OutpostGate from "@/components/hub/OutpostGate";
+import OutpostTeaser from "@/components/hub/OutpostTeaser";
 import modsData from "@/data/mods.json";
 import roadmapData from "@/data/roadmap.json";
-import type { Mod, PackRelease } from "@/lib/mods";
 import {
   enableRoadmap,
   siteDescription,
@@ -68,10 +67,7 @@ export default function Home() {
         </div>
       </div>
 
-      <OutpostGate
-        mods={modsData.mods as Mod[]}
-        packReleases={modsData.packReleases as PackRelease[]}
-      />
+      <OutpostTeaser />
 
       <Reveal className="mx-auto max-w-4xl px-6 py-16">
         <div

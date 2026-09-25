@@ -19,7 +19,9 @@ import type { ModuleId } from "./module-registry";
 // Hit-testing uses each cell's final layout (not its animated position) and
 // only reacts when the pointer enters a *different* cell, so a slide in
 // progress can never make the order flicker back and forth. Dragging near
-// the top/bottom of the window scrolls the page. Release commits the preview
+// the top/bottom edge scrolls: the grid's own scroll container when it has
+// one that's actually scrolling (the Outpost page's middle column), the
+// window otherwise. Release commits the preview
 // order and the card glides into its cell; Escape puts everything back.
 // Arrow keys on a focused handle move a card one place, for keyboards.
 
@@ -76,14 +78,31 @@ function cancelAnimations(el: HTMLElement | undefined) {
 
 export type CardReorder = ReturnType<typeof useCardReorder>;
 
+// The scroller only counts while it really scrolls: in the stacked layout
+// (narrow windows) it's a plain box and the page scrolls instead.
+function scrollingEl(el: HTMLElement | null | undefined): HTMLElement | null {
+  if (!el || el.scrollHeight <= el.clientHeight) return null;
+  const o = getComputedStyle(el).overflowY;
+  return o === "auto" || o === "scroll" ? el : null;
+}
+
+// How far the content has scrolled, window and scroller together — adding
+// it turns viewport rects into positions that don't move while scrolling.
+function scrollOffset(el: HTMLElement | null | undefined) {
+  return { x: window.scrollX + (el?.scrollLeft ?? 0), y: window.scrollY + (el?.scrollTop ?? 0) };
+}
+
 export function useCardReorder({
   order,
   commit,
   reducedMotion,
+  scrollRef,
 }: {
   order: ModuleId[];
   commit: (from: number, to: number) => void;
   reducedMotion: boolean;
+  /** The grid's own scroll container, if it has one. */
+  scrollRef?: React.RefObject<HTMLElement | null>;
 }) {
   const cells = useRef(new Map<string, HTMLElement>());
   const cards = useRef(new Map<string, HTMLElement>());
@@ -103,6 +122,8 @@ export function useCardReorder({
   orderRef.current = order;
   const motionRef = useRef(reducedMotion);
   motionRef.current = reducedMotion;
+  const scrollerRef = useRef(scrollRef);
+  scrollerRef.current = scrollRef;
 
   const displayOrder = preview ?? order;
 
@@ -134,12 +155,13 @@ export function useCardReorder({
   // minus any slide still animating), for hit-testing.
   function measure() {
     const next = new Map<string, Rect>();
+    const off = scrollOffset(scrollerRef.current?.current);
     for (const [key, el] of cells.current) {
       const r = el.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
       const t = translateOf(el);
-      const left = r.left - t.x + window.scrollX;
-      const top = r.top - t.y + window.scrollY;
+      const left = r.left - t.x + off.x;
+      const top = r.top - t.y + off.y;
       next.set(key, { left, top, right: left + r.width, bottom: top + r.height });
     }
     layout.current = next;
@@ -166,8 +188,9 @@ export function useCardReorder({
   function hitTest() {
     const s = session.current;
     if (!s) return;
-    const px = s.x + window.scrollX;
-    const py = s.y + window.scrollY;
+    const off = scrollOffset(scrollerRef.current?.current);
+    const px = s.x + off.x;
+    const py = s.y + off.y;
     let hit: string | null = null;
     for (const [key, r] of layout.current) {
       if (key === s.id) continue;
@@ -189,11 +212,13 @@ export function useCardReorder({
   function frame() {
     const s = session.current;
     if (!s) return;
-    const h = window.innerHeight;
+    const scroller = scrollingEl(scrollerRef.current?.current);
+    const box = scroller ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    const edge = Math.min(EDGE_PX, (box.bottom - box.top) / 4);
     let v = 0;
-    if (s.y < EDGE_PX) v = -MAX_SCROLL_PX * Math.min(1, (EDGE_PX - s.y) / EDGE_PX);
-    else if (s.y > h - EDGE_PX) v = MAX_SCROLL_PX * Math.min(1, (s.y - (h - EDGE_PX)) / EDGE_PX);
-    if (v !== 0) window.scrollBy(0, Math.round(v));
+    if (s.y < box.top + edge) v = -MAX_SCROLL_PX * Math.min(1, (box.top + edge - s.y) / edge);
+    else if (s.y > box.bottom - edge) v = MAX_SCROLL_PX * Math.min(1, (s.y - (box.bottom - edge)) / edge);
+    if (v !== 0) (scroller ?? window).scrollBy(0, Math.round(v));
     placeDragged();
     hitTest();
     raf.current = requestAnimationFrame(frame);

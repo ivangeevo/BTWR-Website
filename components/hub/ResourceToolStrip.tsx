@@ -5,10 +5,8 @@ import { useEngineOptional } from "./engine/ui/EngineProvider";
 import InsightCounter from "./engine/ui/visuals/InsightCounter";
 import { findToolTier, RESOURCE_IDS } from "./resources";
 
-// A persistent readout of collected resources + the current tool tier —
-// sits above Tree Mining/Hunting/Mining/Crafting in the main card grid,
-// tier-1 by default (those four cards are all tier-1 too, so this can't be
-// tucked away in the tier-2-only Your Progress panel the way it first was).
+// A persistent readout of collected resources + the current tool tier, at
+// the top of the Outpost's right-hand "store" column.
 export default function ResourceToolStrip() {
   const { resources, resourceMeta, tools, toolTiersList } = useAchievements();
   const collected = RESOURCE_IDS.filter((id) => resources[id] > 0);
@@ -16,7 +14,7 @@ export default function ResourceToolStrip() {
   const engine = useEngineOptional();
 
   return (
-    <div className="outpost-panel rounded-xl p-4 sm:col-span-2">
+    <div className="outpost-panel rounded-xl p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
           {collected.length === 0 ? (

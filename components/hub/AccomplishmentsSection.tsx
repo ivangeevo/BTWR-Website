@@ -19,7 +19,7 @@ export default function AccomplishmentsSection() {
   }, []);
 
   return (
-    <div className="px-6 py-8 sm:py-10">
+    <div className="px-6 py-6">
       <div className="mx-auto max-w-5xl">
         <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-[var(--outpost-accent)]">
           Achievements

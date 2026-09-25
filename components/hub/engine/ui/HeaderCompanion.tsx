@@ -15,7 +15,7 @@ const SPARK_LIFE_MS = 12_000;
 // drains that the next time it's open.
 // - Spins with the power reaching the Engine's core; hover for insight/sec.
 // - Hold it for 3 seconds: the Engine answers (and a keyword piece turns up).
-// - Away from the homepage, Eureka sparks show up here instead of on cards.
+// - Away from the Outpost page, Eureka sparks show up here instead of on cards.
 export default function HeaderCompanion() {
   const [pub, setPub] = useState<EnginePublic | null>(null);
   const [tip, setTip] = useState(false);
@@ -35,7 +35,7 @@ export default function HeaderCompanion() {
     };
   }, []);
 
-  // Off-homepage Eurekas — the homepage's own Engine spawns its sparks on
+  // Off-Outpost Eurekas — the Outpost page's own Engine spawns its sparks on
   // Outpost cards (it marks <html data-engine-live> while mounted).
   useEffect(() => {
     if (!pub?.companion) return;

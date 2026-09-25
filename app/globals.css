@@ -1655,13 +1655,18 @@ html.daynight-fighting .outpost-zone::after {
   animation: outpost-tip-fade-in 200ms ease;
 }
 
+/* Bottom centre, so the Engine's lines never sit on top of its own column
+   (the Outpost page is one screen tall, so the Engine's buttons live down
+   in that corner). */
 .engine-toasts {
   position: fixed;
-  left: 1rem;
+  left: 50%;
   bottom: 1rem;
+  transform: translateX(-50%);
   z-index: 60;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.4rem;
   max-width: min(22rem, calc(100vw - 2rem));
 }
@@ -2198,4 +2203,55 @@ html.outpost-card-dragging * {
   font-family: var(--font-pixel), ui-monospace, monospace;
   font-size: 0.85rem;
   color: #fff;
+}
+
+/* ---------------------------------------------------------------------------
+   The Outpost page (/outpost) is one screen tall, Cookie Clicker style: the
+   page itself never scrolls; the Engine column, the card column, the store
+   column and the Progress/Achievements tabs each scroll inside themselves
+   (see HubSection.tsx). The footer steps aside while it's up. Only from lg
+   (1024px) wide: a narrower desktop window gets the columns stacked and an
+   ordinary scrolling page. */
+@media (min-width: 1024px) {
+  body:has(.outpost-screen) {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  body:has(.outpost-screen) > main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  body:has(.outpost-screen) > footer {
+    display: none;
+  }
+
+  /* The advancement canvas takes whatever height the screen leaves it. */
+  .outpost-screen .adv-canvas {
+    height: clamp(18rem, calc(100dvh - 22rem), 52rem);
+  }
+}
+
+/* The Engine fills its column (it scrolls with the column, not on its own). */
+.outpost-engine-col [data-module-id="ponder"] > .engine-card {
+  flex: 1 1 auto;
+  max-height: none;
+  overflow: visible;
+}
+
+/* An expanded card drops its fixed height and shows everything. */
+.outpost-card-expanded .outpost-card-md,
+.outpost-card-expanded .outpost-card-lg {
+  min-height: 0;
+  max-height: none;
+}
+
+/* Thin, themed scrollbars on the Outpost's scrolling columns. */
+.outpost-screen [data-outpost-scroll],
+.outpost-screen .outpost-tab-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--outpost-accent-soft) transparent;
 }

@@ -19,7 +19,10 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
 
   const target = tut?.steps[step]?.target;
   useIsoLayout(() => {
-    if (!target || !root.current) {
+    // No bailing out on a missing root.current: this is a child of the card
+    // that owns the ref, and on first mount its layout effects run before
+    // that ref is attached — the interval below picks the card up once it is.
+    if (!target) {
       setRect(null);
       return;
     }

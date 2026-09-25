@@ -30,6 +30,8 @@ import { useReducedMotion } from "./engine/ui/use-reduced-motion";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
+// The canvas's height comes from CSS (.adv-canvas — taller on the Outpost's
+// one-screen layout); this is only the first-paint guess before it's measured.
 const CANVAS_H = 440;
 // A grid square and a half, so each node's centre lands in the middle of a square.
 const PAD = TREE_CELL * 1.5;
@@ -119,6 +121,7 @@ function AdvancementCanvas({ category, pan, onPan }: {
   const reduced = useReducedMotion();
   const viewportRef = useRef<HTMLDivElement>(null);
   const [vw, setVw] = useState(0);
+  const [vh, setVh] = useState(CANVAS_H);
   const [hover, setHover] = useState<{ node: LaidOutNode; rect: DOMRect } | null>(null);
   const drag = useRef<{ startX: number; startY: number; from: Pan; moved: boolean } | null>(null);
 
@@ -132,7 +135,10 @@ function AdvancementCanvas({ category, pan, onPan }: {
   useIsomorphicLayoutEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
-    const measure = () => setVw(el.clientWidth);
+    const measure = () => {
+      setVw(el.clientWidth);
+      setVh(el.clientHeight || CANVAS_H);
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -143,14 +149,14 @@ function AdvancementCanvas({ category, pan, onPan }: {
   // Whole pixels, so grid lines and node edges stay crisp.
   function clamp(p: Pan): Pan {
     const x = layerW <= vw ? (vw - layerW) / 2 : Math.min(0, Math.max(vw - layerW, p.x));
-    const y = layerH <= CANVAS_H ? (CANVAS_H - layerH) / 2 : Math.min(0, Math.max(CANVAS_H - layerH, p.y));
+    const y = layerH <= vh ? (vh - layerH) / 2 : Math.min(0, Math.max(vh - layerH, p.y));
     return { x: Math.round(x), y: Math.round(y) };
   }
 
   // Opens with the first root in view (left edge, vertically centred on it).
   function home(): Pan {
     const root = layout.nodes.find((n) => n.depth === 0);
-    return clamp({ x: 0, y: CANVAS_H / 2 - PAD - (root?.y ?? 0) });
+    return clamp({ x: 0, y: vh / 2 - PAD - (root?.y ?? 0) });
   }
 
   const current = vw > 0 ? clamp(pan ?? home()) : { x: 0, y: 0 };
@@ -183,7 +189,7 @@ function AdvancementCanvas({ category, pan, onPan }: {
     if (cx < m) x += m - cx;
     else if (cx > vw - m) x -= cx - (vw - m);
     if (cy < m) y += m - cy;
-    else if (cy > CANVAS_H - m) y -= cy - (CANVAS_H - m);
+    else if (cy > vh - m) y -= cy - (vh - m);
     if (x !== current.x || y !== current.y) onPan(clamp({ x, y }));
   }
 
@@ -195,7 +201,7 @@ function AdvancementCanvas({ category, pan, onPan }: {
       ref={viewportRef}
       className={`adv-canvas adv-tint-${category}`}
       // The grid pans with the tree, so every node stays inside its square.
-      style={{ height: CANVAS_H, backgroundPosition: `0 0, ${current.x}px ${current.y}px, ${current.x}px ${current.y}px` }}
+      style={{ backgroundPosition: `0 0, ${current.x}px ${current.y}px, ${current.x}px ${current.y}px` }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -391,7 +397,7 @@ export default function AchievementGallery() {
             onPan={(p) => update({ ...view, tab, pans: { ...view.pans, [tab]: p } })}
           />
         ) : (
-          <div className="adv-canvas" style={{ height: CANVAS_H }} />
+          <div className="adv-canvas" />
         )}
         <p className="mt-1.5 text-[0.7rem] text-slate-500">Drag to look around. Earn an advancement to see what comes next.</p>
       </div>

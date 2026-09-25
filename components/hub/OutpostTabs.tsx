@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAchievements } from "./AchievementsProvider";
 
-// The Outpost's top-level tabs, under the header's rank bar: Basecamp (the
+// The Outpost's top-level tabs, in the middle of its top bar: Basecamp (the
 // card grid), Progress (level/XP, skins, logbook) and Achievements (the full
 // gallery). Progress and Achievements appear once the Engine stage set for
 // them is reached (module-registry's "your-progress" / "accomplishments",
@@ -105,7 +105,7 @@ export default function OutpostTabs({
   }
 
   return (
-    <div className="mt-6 flex justify-center">
+    <div className="flex justify-center">
       <div role="tablist" aria-label="The Outpost" className="flex rounded-full bg-white/10 p-1 text-sm font-semibold">
         {shown.map((t, i) => {
           const active = tab === t.id;
@@ -148,17 +148,25 @@ export function OutpostTabPanel({
   id,
   active,
   labelled,
+  className,
   children,
 }: {
   id: OutpostTabId;
   active: boolean;
   /** False while the tab bar is hidden (Basecamp alone) — no tab to point at. */
   labelled: boolean;
+  /** Sizing only — never a display class, which would beat the hidden attribute. */
+  className?: string;
   children: React.ReactNode;
 }) {
-  if (!labelled) return <div hidden={!active}>{children}</div>;
+  if (!labelled)
+    return (
+      <div hidden={!active} className={className}>
+        {children}
+      </div>
+    );
   return (
-    <div role="tabpanel" id={tabPanelId(id)} aria-labelledby={tabButtonId(id)} hidden={!active}>
+    <div role="tabpanel" id={tabPanelId(id)} aria-labelledby={tabButtonId(id)} hidden={!active} className={className}>
       {children}
     </div>
   );

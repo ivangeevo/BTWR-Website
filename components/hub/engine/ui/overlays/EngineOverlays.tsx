@@ -78,9 +78,15 @@ export function EurekaLayer() {
       const el = document.querySelector<HTMLElement>(`[data-module-id="${active.cardId}"]`);
       if (btn) {
         // A card on a tab that isn't showing has no box — hide, don't fly to 0,0.
+        // Inside one of the Outpost's scrolling columns, only the part of the
+        // card that's scrolled into view counts, so the spark never floats
+        // over the column's edge or whatever's next to it.
         const r = el?.getBoundingClientRect();
-        if (el && r && r.width > 0) {
-          btn.style.top = `${r.top + r.height * fyr}px`;
+        const col = el?.closest<HTMLElement>("[data-outpost-scroll]")?.getBoundingClientRect();
+        const top = r && col ? Math.max(r.top, col.top) : r?.top ?? 0;
+        const bottom = r && col ? Math.min(r.bottom, col.bottom) : r?.bottom ?? 0;
+        if (el && r && r.width > 0 && bottom - top > 24) {
+          btn.style.top = `${top + (bottom - top) * fyr}px`;
           btn.style.left = `${r.left + r.width * fxr}px`;
           btn.style.visibility = "visible";
         } else {

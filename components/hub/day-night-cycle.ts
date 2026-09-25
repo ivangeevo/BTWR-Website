@@ -1,5 +1,5 @@
 // Site-wide day/night cycle — deliberately independent of AchievementsProvider
-// (which only mounts on the homepage) since the theme toggle in the site
+// (which only mounts on the Outpost page) since the theme toggle in the site
 // header, and the sky band in the root layout, both need to read this on
 // every page. Everything here is a pure function of a stored start
 // timestamp plus the current clock, so nothing needs a ticking React

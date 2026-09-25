@@ -72,7 +72,7 @@ export default function OutpostSettings() {
   // ThemeToggle (site header, outside the Outpost entirely) dispatches this
   // when a click got fought back by the day/night cycle — nudges a visitor
   // toward where they can fix that, but only does anything when this
-  // component happens to be mounted (i.e. they're on the homepage).
+  // component happens to be mounted (i.e. they're on the Outpost page).
   useEffect(() => {
     function handleNudge() {
       setBouncing(false);
@@ -87,7 +87,7 @@ export default function OutpostSettings() {
   }
 
   return (
-    <div ref={containerRef} className="absolute right-4 top-4 sm:right-5 sm:top-5">
+    <div ref={containerRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

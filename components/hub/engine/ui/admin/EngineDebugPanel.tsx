@@ -13,7 +13,7 @@ import { defaultEngineState } from "../../state";
 import { ENGINE_STAGES, type EngineStage, type EngineState } from "../../types";
 
 // Testing tools for a month-long arc. Writes the Outpost save directly, so
-// close (or reload after) any open homepage tab — a live Outpost would
+// close (or reload after) any open Outpost tab — a live Outpost would
 // otherwise save its own copy over these edits.
 export default function EngineDebugPanel() {
   const [state, setState] = useState<HubState | null>(null);
@@ -99,7 +99,7 @@ export default function EngineDebugPanel() {
   return (
     <div className="space-y-5">
       <p className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-2.5 text-xs text-amber-200/80">
-        These edit your Outpost save directly. Close any open homepage tab first (or reload it afterwards) — a running
+        These edit your Outpost save directly. Close any open Outpost tab first (or reload it afterwards) — a running
         Outpost would save over them.
       </p>
 

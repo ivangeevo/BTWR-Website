@@ -91,7 +91,7 @@ export default function ThemeToggle() {
 
       // Nudges the Outpost settings gear (OutpostSettings.tsx) to bounce,
       // if it happens to be mounted — no-op on any page other than the
-      // homepage, where that gear doesn't exist.
+      // Outpost page, where that gear doesn't exist.
       window.dispatchEvent(new Event("btwr-nudge-outpost-settings"));
     } else {
       root.setAttribute("data-theme", opposite);

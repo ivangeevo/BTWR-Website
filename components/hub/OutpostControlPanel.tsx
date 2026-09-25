@@ -4,16 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { ACHIEVEMENTS } from "./achievements-catalog";
 import { defaultState, loadState, saveState, type HubState } from "./hub-storage";
 import OutpostCorners from "./OutpostCorners";
-import { clearEngineSideKeys } from "./engine/bridge-storage";
+import Link from "next/link";
+import { announceOutpostToggled, clearEngineSideKeys } from "./engine/bridge-storage";
 import { isPhoneDevice } from "./device";
 import DesktopOnlyNotice from "./DesktopOnlyNotice";
 
 const RESET_CONFIRM_WINDOW_MS = 4000;
 
-// Standalone settings console for "The Outpost" homepage feature — reads
-// and writes the same localStorage blob HubSection uses, but stays outside
-// AchievementsProvider entirely: this page shouldn't unlock achievements or
-// show toasts, it just flips the switch that lets the homepage render it.
+// Standalone settings console for "The Outpost" — reads and writes the same
+// localStorage blob HubSection uses, but stays outside AchievementsProvider
+// entirely: this page shouldn't unlock achievements or show toasts, it just
+// flips the switch that opens the /outpost page (and its header link).
 export default function OutpostControlPanel() {
   const [state, setState] = useState<HubState>(defaultState());
   const [mounted, setMounted] = useState(false);
@@ -39,6 +40,8 @@ export default function OutpostControlPanel() {
       saveState(next);
       return next;
     });
+    // Lets the header's Outpost link appear/disappear right away.
+    window.setTimeout(announceOutpostToggled, 0);
   }
 
   function handleResetClick() {
@@ -50,7 +53,7 @@ export default function OutpostControlPanel() {
     if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
     setConfirmingReset(false);
     // Resetting progress data is a separate action from the enable switch —
-    // it shouldn't silently turn the homepage section off too.
+    // it shouldn't silently turn the Outpost off too.
     const next = defaultState();
     next.enabled = state.enabled;
     saveState(next);
@@ -105,9 +108,9 @@ export default function OutpostControlPanel() {
                 {mounted ? (isEnabled ? "Online" : "Offline") : ""}
               </span>
               <p className="mt-2 max-w-xs text-sm text-slate-400">
-                A small hangout section that unlocks on the homepage — mod
-                spotlight, quiz, patch notes, and achievements. Saved locally
-                in your browser only.
+                A small idle game on its own page, reached from the menu once
+                it&apos;s on: an Engine to grow, a quiz, patch notes, and
+                achievements. Saved locally in your browser only.
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -124,6 +127,13 @@ export default function OutpostControlPanel() {
 
           <div className={`outpost-panel-collapse ${isEnabled ? "open" : ""}`}>
             <div>
+              <Link
+                href="/outpost"
+                tabIndex={isEnabled ? undefined : -1}
+                className="mt-4 flex items-center justify-center gap-1.5 rounded-lg border border-[var(--outpost-accent)] px-3 py-2 text-sm font-semibold text-[var(--outpost-accent)] transition-colors hover:bg-[var(--outpost-accent-soft)]"
+              >
+                Enter the Outpost {"→"}
+              </Link>
               <div className="mt-4 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
                 <p className="text-sm font-semibold text-white">Achievements</p>
                 <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-[var(--outpost-accent)]">

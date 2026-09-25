@@ -110,7 +110,7 @@ export function writeEngineDebug(d: EngineDebug): void {
 }
 
 // --- One running Engine per browser ---
-// Two homepage tabs would each accrue and save their own copy of the
+// Two Outpost tabs would each accrue and save their own copy of the
 // Engine. Whichever tab holds a fresh heartbeat here runs it; any other
 // open Outpost goes passive until the visitor chooses to run it there.
 export const LOCK_KEY = "btwr:hub:engine-lock:v1";
@@ -155,11 +155,53 @@ export function readEnginePublic(): EnginePublic | null {
 
 export function clearEngineSideKeys(): void {
   if (typeof window === "undefined") return;
-  for (const key of [MODS_READ_KEY, INBOX_KEY, HOLD_KEY, DEBUG_KEY, LOCK_KEY]) {
+  for (const key of [MODS_READ_KEY, INBOX_KEY, HOLD_KEY, DEBUG_KEY, LOCK_KEY, SECRETS_KEY]) {
     try {
       window.localStorage.removeItem(key);
     } catch {
       // ignore
     }
   }
+}
+
+// --- Is the Outpost switched on? (read by the site header's nav link) ---
+// A light read of just the save's `enabled` flag, so the header doesn't pull
+// in all of hub-storage. Desktop-only, like hub-storage's isOutpostEnabled.
+export const EVT_OUTPOST_TOGGLED = "btwr-outpost-toggled";
+
+/** The switch itself, whatever the device. */
+export function readOutpostSwitch(): boolean {
+  return read<{ enabled?: unknown }>(HUB_KEY, {}).enabled === true;
+}
+
+export function readOutpostEnabled(): boolean {
+  return !isPhoneDevice() && readOutpostSwitch();
+}
+
+export function announceOutpostToggled(): void {
+  dispatch(EVT_OUTPOST_TOGGLED);
+}
+
+// --- Secrets found away from the Outpost page ---
+// Header.tsx's logo easter egg can finish on any page, but the provider only
+// lives on /outpost: queue it here, and the provider unlocks it next time.
+export const SECRETS_KEY = "btwr:hub:pending-secrets:v1";
+
+export function queueSecret(id: string): void {
+  const v = read<{ ids?: unknown }>(SECRETS_KEY, {});
+  const ids = Array.isArray(v.ids) ? (v.ids as string[]) : [];
+  if (!ids.includes(id)) write(SECRETS_KEY, { ids: [...ids, id] });
+}
+
+export function takeQueuedSecrets(): string[] {
+  const v = read<{ ids?: unknown }>(SECRETS_KEY, {});
+  const ids = Array.isArray(v.ids) ? v.ids.filter((x): x is string => typeof x === "string") : [];
+  if (ids.length > 0) {
+    try {
+      window.localStorage.removeItem(SECRETS_KEY);
+    } catch {
+      // ignore
+    }
+  }
+  return ids;
 }

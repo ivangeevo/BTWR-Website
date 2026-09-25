@@ -3,17 +3,47 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
+import {
+  EVT_OUTPOST_TOGGLED,
+  queueSecret,
+  readOutpostEnabled,
+} from "@/components/hub/engine/bridge-storage";
 import HeaderCompanion from "@/components/hub/engine/ui/HeaderCompanion";
 import { enableRoadmap, siteName } from "@/lib/site-config";
 
-const navLinks = [
+const baseLinks = [
   { href: "/", label: "Home" },
   { href: "/roadmap", label: "Roadmap", hidden: !enableRoadmap },
   { href: "/mods", label: "Mods" },
   { href: "/community", label: "Community" },
 ].filter((link) => !link.hidden);
+
+// The Outpost's own page joins the menu, after Community, once it's been
+// switched on from the Community page (and only on desktop, see device.ts).
+const outpostLink = { href: "/outpost", label: "Outpost" };
+
+// trailingSlash export: a page's pathname may or may not end in "/".
+function isCurrent(pathname: string, href: string) {
+  return pathname === href || pathname === `${href}/`;
+}
+
+// Off until the client has read the save, so the server render matches.
+function useOutpostLink(): boolean {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const sync = () => setShown(readOutpostEnabled());
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener(EVT_OUTPOST_TOGGLED, sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener(EVT_OUTPOST_TOGGLED, sync);
+    };
+  }, []);
+  return shown;
+}
 
 const getBtwrLink = { href: "/get-btwr", label: "Get BTWR!" };
 
@@ -21,10 +51,15 @@ export default function Header() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const logoClicksRef = useRef<number[]>([]);
+  const showOutpost = useOutpostLink();
+  const navLinks = showOutpost ? [...baseLinks, outpostLink] : baseLinks;
+  // The Outpost fills the screen under the header, so the header slims down there.
+  const onOutpost = isCurrent(pathname, outpostLink.href);
 
-  // A small easter egg for the homepage hub: click the logo 5x quickly and
-  // it notices. Doesn't touch storage itself — just tells whoever's
-  // listening (see components/hub/AchievementsProvider.tsx).
+  // A small Outpost easter egg: click the logo 5x quickly and it notices.
+  // The logo leads home, away from the Outpost page, so the find is queued
+  // for the Outpost to pick up (see AchievementsProvider.tsx) and announced
+  // in case it's open right now.
   function handleLogoClick() {
     setOpen(false);
     const now = Date.now();
@@ -32,13 +67,18 @@ export default function Header() {
     logoClicksRef.current = recent;
     if (recent.length >= 5) {
       logoClicksRef.current = [];
+      queueSecret("secret-logo-clicks");
       window.dispatchEvent(new Event("btwr-secret-logo"));
     }
   }
 
   return (
     <header className="border-b-[5px] border-chrome bg-chrome-light dark:bg-slate-900">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+      <div
+        className={`mx-auto flex items-center justify-between px-6 ${
+          onOutpost ? "max-w-[120rem] py-2" : "max-w-5xl py-4"
+        }`}
+      >
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <HeaderCompanion />
@@ -62,7 +102,7 @@ export default function Header() {
 
         <nav className="hidden gap-6 sm:flex">
           {navLinks.map((link) => {
-            const active = pathname === link.href;
+            const active = isCurrent(pathname, link.href);
             return (
               <Link
                 key={link.href}
@@ -120,7 +160,7 @@ export default function Header() {
       {open && (
         <nav className="flex flex-col gap-1 border-t border-chrome bg-chrome-light px-6 py-4 dark:bg-slate-900 sm:hidden">
           {navLinks.map((link) => {
-            const active = pathname === link.href;
+            const active = isCurrent(pathname, link.href);
             return (
               <Link
                 key={link.href}

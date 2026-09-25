@@ -5,7 +5,7 @@ import { useAchievements } from "./AchievementsProvider";
 
 const ROTATE_MS = 60_000;
 
-// Thin bar, sitting above the Resources & Tool strip — shows whatever
+// Thin bar above the Engine, in the Outpost's left column — shows whatever
 // tip(s) are set for the Engine's current stage (Stages tab in
 // /outpost-admin). Renders nothing if that stage has no tips.
 // Multiple entries rotate on a 1-minute timer; a single entry just sits.
@@ -25,7 +25,7 @@ export default function StageTip() {
   if (stageTips.length === 0) return null;
 
   return (
-    <div className="outpost-tip-box sm:col-span-2" title={stageTips[index]}>
+    <div className="outpost-tip-box" title={stageTips[index]}>
       <span className="shrink-0 text-sm leading-none" aria-hidden="true">
         {"\u{1F4A1}"}
       </span>

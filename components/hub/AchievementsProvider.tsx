@@ -37,6 +37,7 @@ import { resolveEngineConfig, type EngineConfig } from "./engine/config";
 import { settle } from "./engine/economy";
 import { ENGINE_CUSTOM_RULES, ENGINE_NUMERIC_RULES } from "./engine/achievements";
 import { engineOnPrestige, normalizeEngineState } from "./engine/state";
+import { takeQueuedSecrets } from "./engine/bridge-storage";
 import type { EngineState } from "./engine/types";
 import {
   collectBonus,
@@ -218,7 +219,6 @@ const SECRET_SEQUENCE = [
   "ArrowRight",
 ];
 
-const SCROLL_BOTTOM_THRESHOLD_PX = 4;
 const RESIZE_DEBOUNCE_MS = 300;
 
 // --- The 111-achievement expansion's check engine ---
@@ -510,7 +510,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   const settingsRef = useRef<HubState["settings"]>(defaultState().settings);
   // Admin overrides (tiers/module placement/achievement tiers/tool ladder)
   // load once on mount, same as everything else — the admin panel lives on
-  // its own page, so by the time a visitor reaches the homepage again after
+  // its own page, so by the time a visitor reaches the Outpost again after
   // editing, this is a fresh mount that picks up the new config naturally.
   const [adminConfig, setAdminConfig] = useState<AdminConfig>(defaultAdminConfig());
   const adminConfigRef = useRef<AdminConfig>(defaultAdminConfig());
@@ -1411,15 +1411,20 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [unlock]);
 
-  // Easter egg 2: clicking the header wolf logo. Header.tsx dispatches this
-  // event itself once it sees enough rapid clicks — it never touches
-  // localStorage directly, this provider is the single writer.
+  // Secrets found on other pages: the header wolf logo (Header.tsx) and
+  // scrolling the homepage to the bottom (OutpostTeaser.tsx). They queue
+  // their find (see bridge-storage.ts) and fire this event; the queue is
+  // drained here on mount and on the event — neither ever touches the main
+  // save, this provider is its writer.
   useEffect(() => {
-    function onSecretLogo() {
-      unlock("secret-logo-clicks");
+    function drainSecrets() {
+      for (const id of takeQueuedSecrets()) {
+        if (id === "secret-logo-clicks" || id === "rope-grapple") unlock(id);
+      }
     }
-    window.addEventListener("btwr-secret-logo", onSecretLogo);
-    return () => window.removeEventListener("btwr-secret-logo", onSecretLogo);
+    drainSecrets();
+    window.addEventListener("btwr-secret-logo", drainSecrets);
+    return () => window.removeEventListener("btwr-secret-logo", drainSecrets);
   }, [unlock]);
 
   // Tier 2 egg: the theme toggle lives in Header.tsx, outside this
@@ -1463,18 +1468,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       window.removeEventListener("resize", onResize);
       if (debounceTimer) clearTimeout(debounceTimer);
     };
-  }, [unlock]);
-
-  // Tier 2 egg: scroll clear from the top of the homepage to the bottom.
-  useEffect(() => {
-    function onScroll() {
-      const atBottom =
-        window.innerHeight + window.scrollY >=
-        document.documentElement.scrollHeight - SCROLL_BOTTOM_THRESHOLD_PX;
-      if (atBottom) unlock("rope-grapple");
-    }
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
   }, [unlock]);
 
   // The expansion's check engine — re-evaluates every numeric/custom rule

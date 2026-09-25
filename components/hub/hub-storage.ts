@@ -122,8 +122,8 @@ export type OutpostSettings = {
 export type HubState = {
   version: 1;
   // Controlled from the Community page's Outpost control panel, not from
-  // the homepage itself — the homepage just reads this to decide whether
-  // to render the section at all.
+  // the Outpost itself — the /outpost page (and the header link to it) just
+  // read this to decide whether to open at all.
   enabled: boolean;
   unlocked: Partial<Record<AchievementId, string>>;
   quiz: QuizStats;

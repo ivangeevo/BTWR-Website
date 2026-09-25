@@ -1,6 +1,6 @@
 "use client";
 
-import Reveal from "@/components/Reveal";
+import { useEffect, useRef, useState } from "react";
 import type { Mod, PackRelease } from "@/lib/mods";
 import { ACHIEVEMENTS } from "./achievements-catalog";
 import { AchievementsProvider, useAchievements } from "./AchievementsProvider";
@@ -19,7 +19,7 @@ import PrestigeBadge from "./PrestigeBadge";
 import GuessTheMod from "./GuessTheMod";
 import ResourceToolStrip from "./ResourceToolStrip";
 import StageTip from "./StageTip";
-import UpgradesBadge from "./UpgradesBadge";
+import UpgradesPanel, { useUpgradesShown } from "./UpgradesPanel";
 import YourProgressSection from "./YourProgressSection";
 import { type ModuleId } from "./module-registry";
 import { EngineProvider, useEngine } from "./engine/ui/EngineProvider";
@@ -27,6 +27,18 @@ import { EngineToasts, EurekaLayer } from "./engine/ui/overlays/EngineOverlays";
 import { SKINS_BY_ID } from "./tier2";
 import { END_KEY, useCardReorder, type CardReorder } from "./use-card-reorder";
 import { useReducedMotion } from "./engine/ui/use-reduced-motion";
+
+// The Outpost, on its own page (/outpost) and exactly one screen tall, like
+// Cookie Clicker: the page never scrolls, each part scrolls inside itself.
+// - A slim top bar: title, the Basecamp/Progress/Achievements tabs, rank, settings.
+// - Basecamp is three columns. Left, "the cookie": the Engine (the Ponder
+//   card), with the stage tip above it. Its Workshop, when open, widens over
+//   the middle column. Middle: the activity cards, as a grid that scrolls in
+//   its own column, and any one of them can be expanded to fill it. Right,
+//   "the store": resources & tool, then the Upgrades shop.
+// - Progress and Achievements fill the space under the bar.
+// Below the lg breakpoint (a narrow desktop window) the columns stack and
+// the page scrolls normally instead; see .outpost-screen in globals.css.
 
 // Shows a module once the Engine reaches the stage that reveals it
 // (module-registry.ts's DEFAULT_MODULE_STAGE, admin-overridable) — the one
@@ -37,17 +49,10 @@ function ModuleGate({ id, children }: { id: ModuleId; children: React.ReactNode 
   return <>{children}</>;
 }
 
-// Maps a main-grid module id to its actual card, with whatever props it
-// needs — kept as one lookup rather than a component-id map so the
-// mods/packReleases props each card needs individually stay simple to
-// thread through. Only covers ids that appear in DEFAULT_CARD_ORDER
-// (module-registry.ts) — the full-width utility rows (stage-tip,
-// resource-tool-strip) and the two full-width sections below the grid are
-// rendered separately in HubBody/OutpostFrame, never through this.
+// Maps a middle-column module id to its actual card, with whatever props it
+// needs. The Engine ("ponder") has its own column, so it's never in here.
 function renderCard(id: ModuleId, mods: Mod[], packReleases: PackRelease[]): React.ReactNode {
   switch (id) {
-    case "ponder":
-      return <Ponder />;
     case "daily-briefing":
       return <DailyBriefing mods={mods} />;
     case "campfire":
@@ -64,13 +69,6 @@ function renderCard(id: ModuleId, mods: Mod[], packReleases: PackRelease[]): Rea
       return null;
   }
 }
-
-// The card grid is one modular 2-column layout — every card the same size,
-// laid out row-major — rather than two independently-stacked columns, so a
-// card can be dragged to any position (including diagonally, into the other
-// visual column) and the rest of the grid shifts to make room. Dragging is
-// handled by use-card-reorder.ts: a card is picked up by its move handle (top-right) only,
-// and the other cards slide aside live while it's held.
 
 // Sits after the last card so a drag has somewhere to land for "move this
 // card to the very end". Occupies its own grid cell; only visible while a
@@ -91,13 +89,8 @@ function DropzoneEnd({ reorder }: { reorder: CardReorder | null }) {
 
 // Cosmetic-only "rank" derived from achievement completion — no separate
 // tracking, just a label over the same unlocked/total ratio already shown
-// as a fraction, to give the progress readout more weight. Deliberately
-// its own small vocabulary (Wanderer/Settler/Homesteader/Founding Member)
-// rather than reusing tier 2's rank titles (Newcomer/Veteran/Outpost
-// Legend) — those mean something much bigger (deep XP/level progress
-// across all 136 achievements), so sharing words with this 12-achievement,
-// tier-1-only badge would make "Outpost Legend" mean two very different
-// things depending on which readout you're looking at.
+// as a fraction, to give the progress readout more weight. Deliberately its
+// own small vocabulary, apart from the Progress tab's level titles.
 function rankForProgress(unlockedCount: number, total: number): string {
   if (total === 0) return "Wanderer";
   const ratio = unlockedCount / total;
@@ -107,54 +100,46 @@ function rankForProgress(unlockedCount: number, total: number): string {
   return "Wanderer";
 }
 
-// Deliberately tier-agnostic — no XP, no level badge, nothing tier-2-only.
-// Level/XP is a genuinely different kind of progress (see rankForProgress's
-// comment above) and now reads entirely from YourProgressSection instead,
-// so this stays the same plain achievement-completion bar for everyone.
-function HubHeader({ tabs }: { tabs: ReturnType<typeof useOutpostTabs> }) {
+// The slim bar across the top: status and title (with the Prestige badge),
+// the tabs in the middle, the rank bar and settings gear on the right.
+function TopBar({ tabs }: { tabs: ReturnType<typeof useOutpostTabs> }) {
   const { unlocked, mounted } = useAchievements();
   const totalUnlocked = unlocked.size;
   const totalAchievements = ACHIEVEMENTS.length;
   const percent = mounted ? Math.round((totalUnlocked / totalAchievements) * 100) : 0;
 
   return (
-    <div id="outpost" className="relative scroll-mt-6 border-b border-white/10 px-6 py-8 text-center sm:py-10">
-      <OutpostSettings />
-      {/* Upgrades/Prestige moved here from the main-grid card layout — see
-          module-registry.ts's comment on why they're no longer in MODULES.
-          Mirrors OutpostSettings' gear on the opposite corner; each badge
-          renders nothing until its own Feature toggle/tier unlocks it. */}
-      <div className="absolute left-4 top-4 flex items-center gap-2 sm:left-5 sm:top-5">
-        <UpgradesBadge />
+    <div
+      id="outpost"
+      className="relative z-30 grid shrink-0 items-center gap-3 border-b border-white/10 px-4 py-2.5 sm:grid-cols-[1fr_auto_1fr]"
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="outpost-status-tag">
+          <span className="outpost-status-dot outpost-status-dot-online" aria-hidden="true" />
+          Online
+        </span>
+        <h1 className="truncate font-heading text-xl font-extrabold tracking-wide text-white">The Outpost</h1>
         <PrestigeBadge />
       </div>
-      <span className="outpost-status-tag">
-        <span className="outpost-status-dot outpost-status-dot-online" aria-hidden="true" />
-        Outpost Online
-      </span>
-      <h2 className="mt-4 font-heading text-3xl font-extrabold tracking-wide text-white sm:text-4xl">
-        The Outpost
-      </h2>
-      <p className="mx-auto mt-2 max-w-xl text-white/70">
-        Your basecamp for BTWR — spotlights, secrets, and a quiz that remembers you.
-      </p>
-      {mounted && (
-        <div className="mx-auto mt-5 max-w-xs">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-white/50">
-            {/* Plain live count, not <CountUp> — CountUp locks itself after
-                its first scroll-into-view animation, but this number keeps
-                changing all session long as achievements unlock. */}
-            <span>{rankForProgress(totalUnlocked, totalAchievements)}</span>
-            <span className="text-[var(--outpost-accent)]">
-              {totalUnlocked}/{totalAchievements}
-            </span>
+      {/* Keeps the three-part grid in shape while the tab bar is hidden. */}
+      {tabs.available.length > 1 ? <OutpostTabs {...tabs} /> : <div />}
+      <div className="flex items-center gap-3 sm:justify-end">
+        {mounted && (
+          <div className="w-44" title={`${totalUnlocked} of ${totalAchievements} achievements`}>
+            <div className="flex items-center justify-between text-[0.65rem] font-semibold uppercase tracking-wider text-white/50">
+              {/* Plain live count, not <CountUp> — this keeps changing all session. */}
+              <span>{rankForProgress(totalUnlocked, totalAchievements)}</span>
+              <span className="text-[var(--outpost-accent)]">
+                {totalUnlocked}/{totalAchievements}
+              </span>
+            </div>
+            <div className="outpost-progress-track mt-1">
+              <div className="outpost-progress-fill" style={{ width: `${percent}%` }} />
+            </div>
           </div>
-          <div className="outpost-progress-track mt-1.5">
-            <div className="outpost-progress-fill" style={{ width: `${percent}%` }} />
-          </div>
-        </div>
-      )}
-      <OutpostTabs {...tabs} />
+        )}
+        <OutpostSettings />
+      </div>
     </div>
   );
 }
@@ -178,97 +163,209 @@ function MoveIcon() {
   );
 }
 
-// Each grid card's cell — carries data-module-id (Eureka sparks land on
-// cards by it) and lets the Engine's card span both columns once it has a
-// body or its Workshop is open. With the "card-reorder" upgrade owned it
-// also holds the card's move handle; the cell stays put as a dashed
-// placeholder while its card is lifted out and follows the pointer.
+// Expand (corners pointing out) / collapse (corners pointing in).
+function ExpandIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="h-3 w-3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {expanded ? (
+        <path d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4" />
+      ) : (
+        <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" />
+      )}
+    </svg>
+  );
+}
+
+const HANDLE_CLASS =
+  "absolute top-1 z-20 flex h-5 w-5 items-center justify-center rounded text-xs transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--outpost-accent)]";
+
+// Each middle-column card's cell — carries data-module-id (Eureka sparks
+// land on cards by it) and the card's expand button. With the
+// "card-reorder" upgrade owned it also holds the move handle; the cell
+// stays put as a dashed placeholder while its card is lifted out and
+// follows the pointer. An expanded card fills the column (the others stay
+// mounted, just hidden, so nothing loses its in-progress state).
 function CardCell({
   id,
   reorder,
+  expanded,
+  anyExpanded,
+  onExpand,
   children,
 }: {
   id: ModuleId;
   reorder: CardReorder | null;
+  expanded: boolean;
+  anyExpanded: boolean;
+  onExpand: (id: ModuleId | null) => void;
   children: React.ReactNode;
 }) {
-  const { wide } = useEngine();
-  const span = id === "ponder" && wide ? "sm:col-span-2" : "";
-  if (!reorder) {
-    return (
-      <div data-module-id={id} className={span || undefined}>
-        {children}
-      </div>
-    );
-  }
-  const dragging = reorder.draggingId === id;
-  const settling = reorder.settlingId === id;
+  const dragging = reorder?.draggingId === id;
+  const settling = reorder?.settlingId === id;
+  const canMove = reorder && !anyExpanded;
   return (
     <div
-      ref={reorder.cellRef(id)}
+      ref={reorder?.cellRef(id)}
       data-module-id={id}
-      className={`relative rounded-xl ${span} ${dragging ? "outpost-card-placeholder z-50" : settling ? "z-40" : ""}`}
+      hidden={anyExpanded && !expanded}
+      className={`relative rounded-xl ${expanded ? "outpost-card-expanded col-span-full" : ""} ${
+        dragging ? "outpost-card-placeholder z-50" : settling ? "z-40" : ""
+      }`}
     >
       <div
-        ref={reorder.cardRef(id)}
-        className={`relative rounded-xl transition-shadow duration-200 ${
-          dragging || settling ? "outpost-card-lifted" : ""
-        }`}
+        ref={reorder?.cardRef(id)}
+        className={`relative rounded-xl transition-shadow duration-200 ${dragging || settling ? "outpost-card-lifted" : ""}`}
       >
         {children}
         <button
           type="button"
-          {...reorder.handleProps(id)}
-          aria-label="Move this card: drag it, or use the arrow keys"
-          title="Drag to move"
-          className={`absolute right-1 top-1 z-20 flex h-5 w-5 touch-none items-center justify-center rounded text-xs transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--outpost-accent)] ${
-            dragging
-              ? "cursor-grabbing bg-white/15 text-white"
-              : "cursor-grab text-white/30 hover:bg-white/10 hover:text-white/80"
+          onClick={() => onExpand(expanded ? null : id)}
+          aria-label={expanded ? "Shrink this card back" : "Expand this card to fill the column"}
+          aria-pressed={expanded}
+          title={expanded ? "Shrink" : "Expand"}
+          className={`${HANDLE_CLASS} ${canMove ? "right-7" : "right-1"} ${
+            expanded ? "bg-white/10 text-white" : "text-white/30 hover:bg-white/10 hover:text-white/80"
           }`}
         >
-          <MoveIcon />
+          <ExpandIcon expanded={expanded} />
         </button>
+        {canMove && (
+          <button
+            type="button"
+            {...reorder.handleProps(id)}
+            aria-label="Move this card: drag it, or use the arrow keys"
+            title="Drag to move"
+            className={`${HANDLE_CLASS} right-1 touch-none ${
+              dragging
+                ? "cursor-grabbing bg-white/15 text-white"
+                : "cursor-grab text-white/30 hover:bg-white/10 hover:text-white/80"
+            }`}
+          >
+            <MoveIcon />
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function HubBody({ mods, packReleases }: { mods: Mod[]; packReleases: PackRelease[] }) {
+// The middle column: every revealed activity card, in the visitor's order.
+function CardColumn({
+  ids,
+  mods,
+  packReleases,
+}: {
+  ids: ModuleId[];
+  mods: Mod[];
+  packReleases: PackRelease[];
+}) {
   const { cardOrder, reorderCard, upgrades } = useAchievements();
   const reorderEnabled = upgrades.purchased.includes("card-reorder");
   const reducedMotion = useReducedMotion();
-  const drag = useCardReorder({ order: cardOrder, commit: reorderCard, reducedMotion });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const drag = useCardReorder({ order: cardOrder, commit: reorderCard, reducedMotion, scrollRef });
   const reorder = reorderEnabled ? drag : null;
+  const [expanded, setExpanded] = useState<ModuleId | null>(null);
+  const shown = new Set(ids);
+  const expandedId = expanded && shown.has(expanded) ? expanded : null;
+
+  // Escape shrinks an expanded card back (a drag's own Escape comes first).
+  useEffect(() => {
+    if (!expandedId) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !e.defaultPrevented) setExpanded(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expandedId]);
+
+  function expand(id: ModuleId | null) {
+    setExpanded(id);
+    scrollRef.current?.scrollTo({ top: 0 });
+  }
 
   return (
-    <div
-      className="mx-auto grid max-w-5xl gap-6 rounded-xl border p-4 sm:grid-cols-2 sm:p-6"
-      style={{ borderColor: "var(--outpost-accent-soft)", backgroundColor: "rgba(0, 0, 0, 0.12)" }}
-    >
-      <ModuleGate id="stage-tip">
-        <StageTip />
-      </ModuleGate>
-      <ModuleGate id="resource-tool-strip">
-        <ResourceToolStrip />
-      </ModuleGate>
-      {/* One modular grid — every card is the same size, so any card can be
-          dragged to any other card's spot (including diagonally, across what
-          used to be a fixed left/right column split) and the rest reflow to
-          make room. While dragging, this renders the live preview order. */}
-      {(reorder ? drag.displayOrder : cardOrder).map((id) => (
-        <ModuleGate key={id} id={id}>
-          <CardCell id={id} reorder={reorder}>
-            {renderCard(id, mods, packReleases)}
-          </CardCell>
-        </ModuleGate>
-      ))}
-      <DropzoneEnd reorder={reorder} />
+    <div ref={scrollRef} data-outpost-scroll className="outpost-col-scroll lg:h-full lg:overflow-y-auto">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]">
+        {(reorder ? drag.displayOrder : cardOrder)
+          .filter((id) => shown.has(id))
+          .map((id) => (
+            <CardCell
+              key={id}
+              id={id}
+              reorder={reorder}
+              expanded={expandedId === id}
+              anyExpanded={expandedId !== null}
+              onExpand={expand}
+            >
+              {renderCard(id, mods, packReleases)}
+            </CardCell>
+          ))}
+        {!expandedId && <DropzoneEnd reorder={reorder} />}
+      </div>
     </div>
   );
 }
 
-// The whole card's accent (header tag, corners, progress bar, every shared
+function Basecamp({ mods, packReleases }: { mods: Mod[]; packReleases: PackRelease[] }) {
+  const { cardOrder, isModuleRevealed } = useAchievements();
+  const { workshopOpen } = useEngine();
+  const upgradesShown = useUpgradesShown();
+  const cardIds = cardOrder.filter((id) => id !== "ponder" && isModuleRevealed(id));
+  const hasMiddle = cardIds.length > 0;
+  const hasRight = isModuleRevealed("resource-tool-strip") || upgradesShown;
+  // The Engine's column is fixed-width beside the cards, and takes their
+  // room while its Workshop is open (or when there are no cards yet).
+  const wideEngine = workshopOpen || !hasMiddle;
+
+  return (
+    <div className="flex flex-col gap-4 p-3 sm:p-4 lg:absolute lg:inset-0 lg:flex-row">
+      <div
+        data-outpost-scroll
+        className={`outpost-engine-col flex flex-col gap-3 lg:h-full lg:overflow-y-auto ${
+          wideEngine ? "lg:min-w-0 lg:flex-1" : "lg:w-[22rem] lg:shrink-0 2xl:w-[26rem]"
+        }`}
+      >
+        <div className={`flex w-full flex-1 flex-col gap-3 ${!hasMiddle && !workshopOpen ? "mx-auto max-w-2xl" : ""}`}>
+          <ModuleGate id="stage-tip">
+            <StageTip />
+          </ModuleGate>
+          <div data-module-id="ponder" className="flex flex-1 flex-col">
+            <Ponder />
+          </div>
+        </div>
+      </div>
+      {hasMiddle && (
+        <div hidden={workshopOpen} className="lg:min-w-0 lg:flex-1">
+          <CardColumn ids={cardIds} mods={mods} packReleases={packReleases} />
+        </div>
+      )}
+      {hasRight && (
+        <aside
+          data-outpost-scroll
+          aria-label="Store"
+          className="flex flex-col gap-4 lg:h-full lg:w-[18rem] lg:shrink-0 lg:overflow-y-auto 2xl:w-[21rem]"
+        >
+          <ModuleGate id="resource-tool-strip">
+            <ResourceToolStrip />
+          </ModuleGate>
+          <UpgradesPanel />
+        </aside>
+      )}
+    </div>
+  );
+}
+
+// The whole frame's accent (top bar, corners, progress bar, every shared
 // panel's hover glow) follows whichever skin is picked in the Progress tab.
 function OutpostFrame({ mods, packReleases }: { mods: Mod[]; packReleases: PackRelease[] }) {
   const { tier2, settings } = useAchievements();
@@ -281,29 +378,33 @@ function OutpostFrame({ mods, packReleases }: { mods: Mod[]; packReleases: PackR
         "--outpost-accent-dark": skin.accentDark,
       } as React.CSSProperties)
     : undefined;
+  const labelled = tabs.available.length > 1;
 
   return (
     <div
-      className="outpost-frame relative mx-auto w-full max-w-6xl"
+      className="outpost-frame relative mx-auto flex w-full max-w-[120rem] flex-col lg:min-h-0 lg:flex-1"
       style={style}
       data-reduced-motion={settings.reducedMotion || undefined}
     >
       <OutpostCorners />
-      <HubHeader tabs={tabs} />
+      <TopBar tabs={tabs} />
       {/* Basecamp stays mounted while another tab is open, so its cards keep
           their in-progress state; the other two mount when opened. */}
-      <OutpostTabPanel id="basecamp" active={tabs.tab === "basecamp"} labelled={tabs.available.length > 1}>
-        <div className="px-3 py-8 sm:py-10">
-          <HubBody mods={mods} packReleases={packReleases} />
-        </div>
+      <OutpostTabPanel
+        id="basecamp"
+        active={tabs.tab === "basecamp"}
+        labelled={labelled}
+        className="relative lg:min-h-0 lg:flex-1"
+      >
+        <Basecamp mods={mods} packReleases={packReleases} />
       </OutpostTabPanel>
       {tabs.tab === "progress" && (
-        <OutpostTabPanel id="progress" active labelled>
+        <OutpostTabPanel id="progress" active labelled className="outpost-tab-scroll lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
           <YourProgressSection />
         </OutpostTabPanel>
       )}
       {tabs.tab === "achievements" && (
-        <OutpostTabPanel id="achievements" active labelled>
+        <OutpostTabPanel id="achievements" active labelled className="outpost-tab-scroll lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
           <AccomplishmentsSection />
         </OutpostTabPanel>
       )}
@@ -324,11 +425,9 @@ export default function HubSection({
   return (
     <AchievementsProvider>
       <EngineProvider mods={mods}>
-        <Reveal>
-          <section className="outpost-zone relative overflow-hidden px-3 py-10 sm:px-4 sm:py-14">
-            <OutpostFrame mods={mods} packReleases={packReleases} />
-          </section>
-        </Reveal>
+        <section className="outpost-zone outpost-screen outpost-materialize relative flex flex-col overflow-hidden p-2 sm:p-3 lg:min-h-0 lg:flex-1">
+          <OutpostFrame mods={mods} packReleases={packReleases} />
+        </section>
       </EngineProvider>
     </AchievementsProvider>
   );

@@ -73,25 +73,26 @@ function Toast({
 }
 
 // Lives inside .outpost-frame (a `position: relative` pane), not the
-// viewport — anchored to the pane's own bottom edge so it only ever shows
-// over the Outpost itself, scrolls away with it, and never floats over the
-// rest of the page. Rendered oldest-to-newest with the newest on top: the
-// array itself is oldest-first (unlock() appends), so it's reversed here
-// rather than changed at the source, since every other consumer of
-// `toasts` (there are none yet, but the shape is shared) expects
-// chronological order.
+// viewport — in its top-right corner, just under the top bar, where
+// Minecraft shows its own advancement toasts. At most MAX_SHOWN at once so
+// the stack always fits the one-screen Outpost; the rest wait their turn
+// (their timers only start once shown) and count toward "Dismiss all".
+// Newest on top: the array itself is oldest-first (unlock() appends), so
+// it's reversed here rather than changed at the source.
+const MAX_SHOWN = 4;
+
 export default function AchievementToastStack() {
   const { toasts, dismissToast, dismissAllToasts } = useAchievements();
 
   if (toasts.length === 0) return null;
 
-  const newestOnTop = [...toasts].reverse();
+  const newestOnTop = [...toasts].reverse().slice(0, MAX_SHOWN);
 
   return (
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none absolute inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2 px-3"
+      className="pointer-events-none absolute right-3 top-16 z-50 flex flex-col items-end gap-2"
     >
       {toasts.length > 1 && (
         <button

@@ -1356,7 +1356,7 @@ export default function AdminPanel() {
               </p>
             </div>
             <Link
-              href="/#outpost"
+              href="/outpost"
               className="shrink-0 text-xs font-semibold text-white/50 transition-colors hover:text-[var(--outpost-accent)]"
             >
               {"←"} Back to The Outpost
