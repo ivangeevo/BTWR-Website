@@ -25,7 +25,7 @@ export default function AccomplishmentsSection() {
           Achievements
         </h3>
         <div className="mt-4">
-          <AchievementGallery variant="flat" />
+          <AchievementGallery />
         </div>
       </div>
     </div>

@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
-import { Rajdhani } from "next/font/google";
+import { Pixelify_Sans, Rajdhani } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import DayNightSky from "@/components/DayNightSky";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { siteDescription, siteName, siteUrl } from "@/lib/site-config";
+
+// Pixel font for the Outpost's Minecraft-style advancement screen and toasts.
+const pixelify = Pixelify_Sans({
+  subsets: ["latin"],
+  weight: ["400", "600"],
+  variable: "--font-pixel",
+  display: "swap",
+});
 
 const rajdhani = Rajdhani({
   subsets: ["latin"],
@@ -105,7 +113,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={rajdhani.variable} suppressHydrationWarning>
+    <html lang="en" className={`${rajdhani.variable} ${pixelify.variable}`} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
         <DayNightSky />

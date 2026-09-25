@@ -1962,3 +1962,275 @@ html.outpost-card-dragging * {
   cursor: grabbing !important;
   user-select: none !important;
 }
+
+/* ---------------------------------------------------------------------------
+   Achievements tab — Minecraft-style advancement screen (AchievementGallery.tsx).
+   Frames: task (bevelled square), goal (rounded), challenge (spiky). Lines are
+   a light stroke over a dark outline, like the in-game tree. No game textures —
+   the stone look is a CSS grid.
+   ------------------------------------------------------------------------- */
+.adv-tab {
+  display: flex;
+  min-width: 3.25rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  border: 2px solid #1a1612;
+  border-bottom-width: 3px;
+  background: #3a322b;
+  padding: 0.35rem 0.4rem 0.3rem;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08);
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+.adv-tab:hover {
+  background: #463c33;
+}
+.adv-tab-active {
+  background: #5b4c3f;
+  border-color: var(--outpost-accent, #d98a4a);
+  transform: translateY(-2px);
+}
+.adv-tab-count {
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  font-size: 0.62rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.6);
+}
+.adv-tab-active .adv-tab-count {
+  color: #fff;
+}
+
+.adv-canvas {
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  border: 3px solid #0d0b09;
+  border-radius: 4px;
+  background-color: #1e1b18;
+  background-image:
+    radial-gradient(ellipse at 30% 20%, var(--adv-tint, rgba(217, 138, 74, 0.08)), transparent 65%),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(0, 0, 0, 0.25) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.25) 1px, transparent 1px);
+  background-size: 100% 100%, 32px 32px, 32px 32px, 16px 16px, 16px 16px;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+}
+.adv-canvas:active {
+  cursor: grabbing;
+}
+.adv-tint-engine,
+.adv-tint-soul-forge { --adv-tint: rgba(155, 89, 208, 0.12); }
+.adv-tint-secrets,
+.adv-tint-nether-reachievement { --adv-tint: rgba(200, 60, 40, 0.12); }
+.adv-tint-quiz,
+.adv-tint-rtfm-wiki,
+.adv-tint-patch-notes { --adv-tint: rgba(79, 160, 224, 0.1); }
+.adv-tint-husbandry-harvest,
+.adv-tint-homestead-basics { --adv-tint: rgba(110, 170, 70, 0.1); }
+.adv-tint-mob-moonphase { --adv-tint: rgba(120, 130, 220, 0.12); }
+.adv-tint-frontier-record { --adv-tint: rgba(230, 190, 60, 0.12); }
+
+.adv-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+.adv-lines {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.adv-line-outline,
+.adv-line {
+  fill: none;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+.adv-line-outline {
+  stroke: #000;
+  stroke-width: 6;
+  opacity: 0.85;
+}
+.adv-line {
+  stroke: #7d7d7d;
+  stroke-width: 2;
+}
+.adv-line-lit {
+  stroke: #f2f2f2;
+}
+
+.adv-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+.adv-recenter {
+  position: absolute;
+  right: 0.5rem;
+  top: 0.5rem;
+  border: 2px solid #0d0b09;
+  background: #3a322b;
+  padding: 0.15rem 0.5rem;
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+}
+.adv-recenter:hover {
+  color: #fff;
+  background: #463c33;
+}
+
+/* Nodes: the button is the frame's rim, the inner span its face. */
+.adv-node {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  border: 0;
+  background: #7a7a7a;
+  cursor: default;
+}
+.adv-node-inner {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  background: #2c2c2c;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.adv-frame-task,
+.adv-frame-task .adv-node-inner {
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px);
+}
+.adv-frame-goal,
+.adv-frame-goal .adv-node-inner {
+  border-radius: 38%;
+}
+.adv-frame-challenge,
+.adv-frame-challenge .adv-node-inner {
+  clip-path: polygon(50% 0, 62% 12%, 80% 5%, 84% 20%, 100% 22%, 92% 38%, 100% 50%, 92% 62%, 100% 78%, 84% 80%, 80% 95%, 62% 88%, 50% 100%, 38% 88%, 20% 95%, 16% 80%, 0 78%, 8% 62%, 0 50%, 8% 38%, 0 22%, 16% 20%, 20% 5%, 38% 12%);
+}
+.adv-frame-challenge {
+  padding: 4px;
+}
+.adv-earned {
+  background: #e8c35a;
+}
+.adv-earned .adv-node-inner {
+  background: #5a4a26;
+}
+.adv-earned.adv-frame-challenge {
+  background: #c27ce8;
+}
+.adv-earned.adv-frame-challenge .adv-node-inner {
+  background: #4a2860;
+}
+.adv-locked .adv-node-inner > *,
+.adv-locked .adv-node-inner {
+  filter: grayscale(0.85);
+  opacity: 0.75;
+}
+.adv-masked .adv-node-inner {
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  color: rgba(255, 255, 255, 0.55);
+}
+.adv-animate {
+  transition: transform 120ms ease, filter 120ms ease;
+}
+.adv-animate:hover,
+.adv-node:focus-visible {
+  transform: scale(1.12);
+  filter: brightness(1.15);
+  z-index: 2;
+}
+.adv-node:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* Hover card — Minecraft's advancement tooltip: coloured title bar over a dark box. */
+.adv-card {
+  position: fixed;
+  z-index: 999;
+  pointer-events: none;
+  border: 2px solid #0d0b09;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+}
+.adv-card-title {
+  padding: 0.35rem 0.6rem;
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: #fff;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.6);
+}
+.adv-card-earned .adv-card-title { background: #b4852a; }
+.adv-card-challenge .adv-card-title { background: #7a3fa8; }
+.adv-card-locked .adv-card-title { background: #2f5b86; }
+.adv-card-body {
+  background: #16130f;
+  padding: 0.45rem 0.6rem 0.5rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #d8d8d8;
+}
+.adv-card-meta {
+  margin-top: 0.3rem;
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Unlock toasts — Minecraft's "Advancement Made!" box. */
+.hub-toast.adv-toast {
+  background: #212121;
+  border: 2px solid #0d0d0d;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 0 0 2px #555,
+    0 10px 24px -8px rgba(0, 0, 0, 0.7);
+}
+.adv-toast-icon {
+  display: grid;
+  height: 2.4rem;
+  width: 2.4rem;
+  flex-shrink: 0;
+  place-items: center;
+  background: #e8c35a;
+  padding: 3px;
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px);
+}
+.adv-toast-icon > span {
+  display: grid;
+  height: 100%;
+  width: 100%;
+  place-items: center;
+  background: #5a4a26;
+  clip-path: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.adv-toast-challenge .adv-toast-icon { background: #c27ce8; }
+.adv-toast-challenge .adv-toast-icon > span { background: #4a2860; }
+.adv-toast-head {
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: #ffff55;
+}
+.adv-toast-challenge .adv-toast-head {
+  color: #ff55ff;
+}
+.adv-toast-title {
+  font-family: var(--font-pixel), ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: #fff;
+}

@@ -15,6 +15,7 @@ import {
   importAdminConfig,
   isModuleDisabled,
   loadAdminConfig,
+  resolvedAchievementTree,
   resolvedCraftCost,
   resolvedMechanic,
   resolvedModuleStage,
@@ -34,6 +35,7 @@ import type { UpgradeId } from "./upgrade-catalog";
 import EngineAdminTab from "./engine/ui/admin/EngineAdminTab";
 import EngineDebugPanel from "./engine/ui/admin/EngineDebugPanel";
 import { STAGES } from "./engine/stages";
+import { DEFAULT_ACHIEVEMENT_TREE, isSelfOrDescendant, type AdvFrame } from "./achievement-tree";
 import { ENGINE_STAGES } from "./engine/types";
 
 // Same measure-then-position recipe as AchievementGallery.tsx's tile
@@ -469,42 +471,72 @@ function AchievementLabel({ achievement }: { achievement: (typeof ACHIEVEMENTS)[
   );
 }
 
+// The Achievements tab's advancement trees: each achievement's parent (what
+// it chains off, within its own category) and frame. Parent options leave
+// out the achievement itself and everything below it, so no loop can be
+// picked. See achievement-tree.ts for the authored defaults.
 function AchievementsTab({ config, update }: { config: AdminConfig; update: Update }) {
   const [query, setQuery] = useState("");
+  const tree = resolvedAchievementTree(config);
 
-  function setAchievementDefault(id: AchievementId, isDefault: boolean) {
+  function setParent(id: AchievementId, value: string) {
     update((prev) => {
-      const achievementDefault = { ...prev.achievementDefault };
-      if (isDefault) achievementDefault[id] = true;
-      else delete achievementDefault[id];
-      return { ...prev, achievementDefault };
+      const achievementParent = { ...prev.achievementParent };
+      const authored = DEFAULT_ACHIEVEMENT_TREE[id].parent;
+      const next = value === "root" ? null : (value as AchievementId);
+      if (next === authored) delete achievementParent[id];
+      else achievementParent[id] = next ?? "root";
+      return { ...prev, achievementParent };
     });
   }
 
-  // Shared by the Default group and every category group below.
+  function setFrame(id: AchievementId, value: AdvFrame) {
+    update((prev) => {
+      const achievementFrame = { ...prev.achievementFrame };
+      if (value === DEFAULT_ACHIEVEMENT_TREE[id].frame) delete achievementFrame[id];
+      else achievementFrame[id] = value;
+      return { ...prev, achievementFrame };
+    });
+  }
+
   function AchievementRow({ a }: { a: (typeof ACHIEVEMENTS)[number] }) {
-    const isDefault = config.achievementDefault[a.id] === true;
+    const node = tree[a.id];
+    const edited = config.achievementParent[a.id] !== undefined || config.achievementFrame[a.id] !== undefined;
+    const options = ACHIEVEMENTS.filter((o) => o.category === a.category && !isSelfOrDescendant(tree, a.id, o.id));
     return (
-      <div className="flex items-center justify-between gap-2 rounded-md bg-white/5 px-2.5 py-1.5 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white/5 px-2.5 py-1.5 text-xs">
         <AchievementLabel achievement={a} />
         <div className="flex shrink-0 items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setAchievementDefault(a.id, !isDefault)}
-            aria-pressed={isDefault}
-            title={
-              isDefault
-                ? "Default — shown first in the gallery, ahead of every category. Click to unpin."
-                : "Pin to the Default group — shown first in the gallery, ahead of every category."
-            }
-            className={`rounded-md border px-1.5 py-1 text-[0.65rem] transition-colors ${
-              isDefault
-                ? "border-[var(--outpost-accent)] bg-[var(--outpost-accent-soft)] text-[var(--outpost-accent)]"
-                : "border-white/15 text-white/25 hover:text-white/60"
-            }`}
+          {edited && (
+            <span className="text-[0.6rem] font-semibold text-[var(--outpost-accent)]" title="Changed from the default">
+              edited
+            </span>
+          )}
+          <label className="flex items-center gap-1 text-[0.6rem] text-white/40">
+            After
+            <select
+              value={node.parent ?? "root"}
+              onChange={(e) => setParent(a.id, e.target.value)}
+              className="max-w-[11rem] rounded-md border border-white/15 bg-[#241a12] px-1.5 py-1 text-[0.65rem] font-semibold text-white"
+            >
+              <option value="root">(starts a tree)</option>
+              {options.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <select
+            value={node.frame}
+            onChange={(e) => setFrame(a.id, e.target.value as AdvFrame)}
+            aria-label="Frame"
+            className="rounded-md border border-white/15 bg-[#241a12] px-1.5 py-1 text-[0.65rem] font-semibold text-white"
           >
-            <span aria-hidden="true">{"\u{1F4CC}"}</span>
-          </button>
+            <option value="task">Task</option>
+            <option value="goal">Goal</option>
+            <option value="challenge">Challenge</option>
+          </select>
         </div>
       </div>
     );
@@ -514,11 +546,8 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
   const filtered = q
     ? ACHIEVEMENTS.filter((a) => a.title.toLowerCase().includes(q) || a.id.toLowerCase().includes(q))
     : ACHIEVEMENTS;
-
-  const pinned = filtered.filter((a) => config.achievementDefault[a.id] === true);
-  const rest = filtered.filter((a) => config.achievementDefault[a.id] !== true);
   const byCategory = new Map<AchievementCategory, typeof ACHIEVEMENTS>();
-  for (const a of rest) {
+  for (const a of filtered) {
     if (!byCategory.has(a.category)) byCategory.set(a.category, []);
     byCategory.get(a.category)!.push(a);
   }
@@ -526,10 +555,9 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
   return (
     <div>
       <p className="text-sm text-slate-400">
-        Every achievement, by category — all of them are listed in the Outpost&apos;s gallery from the start (secret
-        ones stay masked until earned). Pin the odds and ends that don&apos;t belong to any one category (resizing
-        the window, an old cheat code) to <span aria-hidden="true">{"\u{1F4CC}"}</span> Default, and they&apos;ll
-        show first instead.
+        How the Outpost&apos;s Achievements tab chains its advancement trees. For each achievement, pick the one it
+        comes <span className="font-semibold text-white">after</span> (same category only) and its frame: Task,
+        Goal, or a spiky Challenge. Unlocking isn&apos;t affected, only how the trees are drawn.
       </p>
       <input
         value={query}
@@ -538,18 +566,6 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
         className="mt-3 w-full rounded-md border border-white/15 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/30"
       />
       <div className="mt-3 max-h-[32rem] space-y-2 overflow-y-auto pr-1">
-        {pinned.length > 0 && (
-          <div>
-            <h5 className="mb-1.5 flex items-center gap-1 text-[0.65rem] font-bold uppercase tracking-wider text-white/40">
-              <span aria-hidden="true">{"\u{1F4CC}"}</span> Default
-            </h5>
-            <div className="space-y-1.5">
-              {pinned.map((a) => (
-                <AchievementRow key={a.id} a={a} />
-              ))}
-            </div>
-          </div>
-        )}
         {CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((c) => (
           <CollapsibleSection key={c} foldKey={`achievements:${c}`} title={CATEGORY_LABELS[c]} count={byCategory.get(c)!.length}>
             {byCategory.get(c)!.map((a) => (
@@ -640,7 +656,7 @@ function TipsTab({ config, update }: { config: AdminConfig; update: Update }) {
 }
 
 // What each Engine stage brings: the cards it reveals, the tips shown at it,
-// plus the achievement gallery's Default pins.
+// plus how the Achievements tab chains its advancement trees.
 function StagesSection({ config, update }: { config: AdminConfig; update: Update }) {
   const [subTab, setSubTab] = useState<StageSubTab>("modules");
 

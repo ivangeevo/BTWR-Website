@@ -4,177 +4,265 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ACHIEVEMENTS,
+  ACHIEVEMENTS_BY_ID,
   CATEGORY_LABELS,
   CATEGORY_ORDER,
   type AchievementCategory,
-  type AchievementDef,
+  type AchievementId,
 } from "./achievements-catalog";
+import { layoutTree, visibleNodes, type AchievementTree, type AdvFrame, type LaidOutNode } from "./achievement-tree";
 import { useAchievements } from "./AchievementsProvider";
+import { useReducedMotion } from "./engine/ui/use-reduced-motion";
 
-// Same measure-then-animate recipe as app/mods/page.tsx and PatchNotes.tsx.
-const useIsomorphicLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+// The Achievements tab, drawn like Minecraft's advancement screen: one icon
+// tab per category, and a dark draggable canvas holding that category's
+// tree (achievement-tree.ts) — framed icons joined by elbow lines, root on
+// the left, with fog of war hiding everything more than a step past what's
+// been earned. The previous flat grid lives on the backup/achievements-grid
+// branch.
 
-// However many locked secrets actually remain (across both tiers, once
-// tier 2 is visible), the gallery only ever shows this many anonymous
-// "???" slots for them — the true remaining count stays hidden.
-const MAX_VISIBLE_LOCKED_SECRETS = 3;
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-// Same hold-to-reveal ring/tooltip as AdminPanel.tsx's AchievementLabel
-// (reusing its admin-hint-* CSS for a consistent feel) — a tile's title and
-// description are both truncated to one line to fit the grid, so this is
-// the way to read the full text without redesigning the tile itself. Every
-// tile gets it uniformly, not just ones that happen to overflow, so the
-// interaction stays predictable across the whole gallery.
-const ACHIEVEMENT_HINT_HOLD_MS = 1000;
-const ACHIEVEMENT_HINT_RING_CIRCUMFERENCE = 2 * Math.PI * 6;
-// Matches the tooltip's own w-56.
-const ACHIEVEMENT_HINT_TOOLTIP_WIDTH_PX = 224;
-const ACHIEVEMENT_HINT_TOOLTIP_MARGIN_PX = 8;
+const CANVAS_H = 440;
+const PAD = 56;
+const NODE = 40;
+const CARD_W = 240;
+const CARD_MARGIN = 8;
+const DRAG_SLOP_PX = 4;
+const VIEW_KEY = "btwr:hub:advancements:v1";
 
-function AchievementTile({
-  achievement,
-  isUnlocked,
-}: {
-  achievement: AchievementDef;
-  isUnlocked: boolean;
+type Pan = { x: number; y: number };
+type SavedView = { tab: AchievementCategory; pans: Partial<Record<AchievementCategory, Pan>> };
+
+function readView(): SavedView | null {
+  try {
+    const raw = window.localStorage.getItem(VIEW_KEY);
+    const v = raw ? (JSON.parse(raw) as Partial<SavedView>) : null;
+    if (!v || !CATEGORY_ORDER.includes(v.tab as AchievementCategory)) return null;
+    return { tab: v.tab as AchievementCategory, pans: v.pans ?? {} };
+  } catch {
+    return null;
+  }
+}
+
+function writeView(v: SavedView) {
+  try {
+    window.localStorage.setItem(VIEW_KEY, JSON.stringify(v));
+  } catch {
+    // Remembering the view is a nicety.
+  }
+}
+
+// A category's tab icon: its first root that isn't a secret (a secret's
+// icon would give it away before it's found).
+function tabIcon(tree: AchievementTree, category: AchievementCategory): string {
+  const root = ACHIEVEMENTS.find((a) => a.category === category && tree[a.id].parent === null && !a.secret);
+  return root?.icon ?? "\u{2754}";
+}
+
+function frameLabel(frame: AdvFrame): string {
+  return frame === "challenge" ? "Challenge" : frame === "goal" ? "Goal" : "Advancement";
+}
+
+function formatEarned(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+// Minecraft-style hover/focus card, portaled so the canvas's clipping
+// can't cut it off. Opens to the node's right, flipping left near the edge.
+function NodeCard({ node, frame, earnedAt, anchor }: {
+  node: LaidOutNode;
+  frame: AdvFrame;
+  earnedAt: string | undefined;
+  anchor: DOMRect;
 }) {
-  const hideDetails = achievement.secret && !isUnlocked;
-  const [hovering, setHovering] = useState(false);
-  const [ready, setReady] = useState(false);
-  // The tile's own rect at the moment the tooltip opens — left/top are
-  // recomputed into a tooltip position below, not stored as the tooltip's
-  // position directly, since which side it opens on can flip after mount.
-  const [tileRect, setTileRect] = useState<{ left: number; top: number; bottom: number } | null>(null);
-  const [placeAbove, setPlaceAbove] = useState(false);
-  const tileRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const a = ACHIEVEMENTS_BY_ID[node.id];
+  const earned = !!earnedAt;
+  const hidden = node.masked;
+  const right = anchor.right + CARD_MARGIN + CARD_W <= window.innerWidth;
+  const left = right ? anchor.right + CARD_MARGIN : Math.max(CARD_MARGIN, anchor.left - CARD_MARGIN - CARD_W);
+  const date = formatEarned(earnedAt);
+  return createPortal(
+    <div
+      role="tooltip"
+      className={`adv-card adv-card-${earned ? (frame === "challenge" ? "challenge" : "earned") : "locked"}`}
+      style={{ left, top: Math.max(CARD_MARGIN, anchor.top - 2), width: CARD_W }}
+    >
+      <div className="adv-card-title">{hidden ? "???" : a.title}</div>
+      <div className="adv-card-body">
+        <p>{hidden ? "Something hidden leads here." : a.description}</p>
+        <p className="adv-card-meta">
+          {frameLabel(frame)} · {earned ? (date ? `Earned ${date}` : "Earned") : "Not yet"}
+        </p>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+function AdvancementCanvas({ category, pan, onPan }: {
+  category: AchievementCategory;
+  pan: Pan | undefined;
+  onPan: (p: Pan) => void;
+}) {
+  const { unlocked, unlockedAt, achievementTree } = useAchievements();
+  const reduced = useReducedMotion();
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [vw, setVw] = useState(0);
+  const [hover, setHover] = useState<{ node: LaidOutNode; rect: DOMRect } | null>(null);
+  const drag = useRef<{ startX: number; startY: number; from: Pan; moved: boolean } | null>(null);
 
-  function dismiss() {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setHovering(false);
-    setReady(false);
-    setTileRect(null);
-    setPlaceAbove(false);
-  }
+  const layout = useMemo(
+    () => layoutTree(achievementTree, visibleNodes(achievementTree, category, unlocked)),
+    [achievementTree, category, unlocked]
+  );
+  const layerW = layout.width + PAD * 2;
+  const layerH = layout.height + PAD * 2;
 
-  function handleEnter() {
-    setHovering(true);
-    timerRef.current = setTimeout(() => {
-      setReady(true);
-      // Portaled to <body> and positioned in viewport coordinates (position:
-      // fixed) instead of nesting inside the tile — the gallery card and its
-      // collapse panel both clip overflow, so a tooltip anchored inside them
-      // gets cut off at the card's own edge.
-      const rect = tileRef.current?.getBoundingClientRect();
-      if (rect) setTileRect({ left: rect.left, top: rect.top, bottom: rect.bottom });
-    }, ACHIEVEMENT_HINT_HOLD_MS);
-  }
-  // Touch devices have no hover — a tap-and-hold does the same job.
-  // preventDefault keeps the hold from also triggering a text-selection
-  // callout on release.
-  function handleTouchStart(e: React.TouchEvent) {
-    e.preventDefault();
-    handleEnter();
-  }
-
-  // A fixed-position tooltip doesn't track the page scrolling under it, so
-  // dismiss rather than let it drift out of alignment with its tile.
-  useEffect(() => {
-    if (!ready) return;
-    window.addEventListener("scroll", dismiss, true);
-    window.addEventListener("resize", dismiss);
-    return () => {
-      window.removeEventListener("scroll", dismiss, true);
-      window.removeEventListener("resize", dismiss);
-    };
-  }, [ready]);
-
-  // Opens below the tile by default (the natural reading direction) and
-  // only flips above once actually measured not to fit under the current
-  // scroll position — e.g. hovering the bottom-most achievement while
-  // scrolled near the bottom of the page. Runs before paint so the flip
-  // itself never flashes the wrong placement first.
   useIsomorphicLayoutEffect(() => {
-    if (!ready || !tileRect || placeAbove) return;
-    const height = tooltipRef.current?.getBoundingClientRect().height ?? 0;
-    if (tileRect.bottom + ACHIEVEMENT_HINT_TOOLTIP_MARGIN_PX + height > window.innerHeight) {
-      setPlaceAbove(true);
-    }
-  }, [ready, tileRect, placeAbove]);
+    const el = viewportRef.current;
+    if (!el) return;
+    const measure = () => setVw(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
-  const tooltipLeft = tileRect
-    ? Math.min(
-        Math.max(tileRect.left, ACHIEVEMENT_HINT_TOOLTIP_MARGIN_PX),
-        window.innerWidth - ACHIEVEMENT_HINT_TOOLTIP_WIDTH_PX - ACHIEVEMENT_HINT_TOOLTIP_MARGIN_PX
-      )
-    : 0;
-  const tooltipTop = tileRect
-    ? placeAbove
-      ? tileRect.top - ACHIEVEMENT_HINT_TOOLTIP_MARGIN_PX
-      : tileRect.bottom + ACHIEVEMENT_HINT_TOOLTIP_MARGIN_PX
-    : 0;
+  // Keeps the tree inside the viewport; a tree smaller than it is centred.
+  function clamp(p: Pan): Pan {
+    const x = layerW <= vw ? (vw - layerW) / 2 : Math.min(0, Math.max(vw - layerW, p.x));
+    const y = layerH <= CANVAS_H ? (CANVAS_H - layerH) / 2 : Math.min(0, Math.max(CANVAS_H - layerH, p.y));
+    return { x, y };
+  }
+
+  // Opens with the first root in view (left edge, vertically centred on it).
+  function home(): Pan {
+    const root = layout.nodes.find((n) => n.depth === 0);
+    return clamp({ x: 0, y: CANVAS_H / 2 - PAD - (root?.y ?? 0) });
+  }
+
+  const current = vw > 0 ? clamp(pan ?? home()) : { x: 0, y: 0 };
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return;
+    drag.current = { startX: e.clientX, startY: e.clientY, from: current, moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const d = drag.current;
+    if (!d) return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.moved && Math.hypot(dx, dy) < DRAG_SLOP_PX) return;
+    if (!d.moved) setHover(null);
+    d.moved = true;
+    onPan(clamp({ x: d.from.x + dx, y: d.from.y + dy }));
+  }
+  function onPointerUp() {
+    drag.current = null;
+  }
+
+  // Keyboard focus pans a node into view.
+  function reveal(n: LaidOutNode) {
+    const cx = PAD + n.x + current.x;
+    const cy = PAD + n.y + current.y;
+    const m = NODE;
+    let { x, y } = current;
+    if (cx < m) x += m - cx;
+    else if (cx > vw - m) x -= cx - (vw - m);
+    if (cy < m) y += m - cy;
+    else if (cy > CANVAS_H - m) y -= cy - (CANVAS_H - m);
+    if (x !== current.x || y !== current.y) onPan(clamp({ x, y }));
+  }
+
+  const byId = new Map(layout.nodes.map((n) => [n.id, n]));
+  const half = NODE / 2;
 
   return (
     <div
-      ref={tileRef}
-      className={`relative flex items-center gap-2 rounded-lg border p-2 text-xs ${
-        isUnlocked ? "border-[var(--outpost-accent-soft)] bg-white/5" : "border-white/10 opacity-50"
-      }`}
-      onMouseEnter={handleEnter}
-      onMouseLeave={dismiss}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={dismiss}
-      onTouchCancel={dismiss}
+      ref={viewportRef}
+      className={`adv-canvas adv-tint-${category}`}
+      style={{ height: CANVAS_H }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      data-no-drag
     >
-      <span className="text-lg leading-none">{hideDetails ? "❓" : achievement.icon}</span>
-      <div className="min-w-0">
-        <p className="truncate font-semibold text-slate-200">
-          {hideDetails ? "???" : achievement.title}
-        </p>
-        <p className="truncate text-slate-400">
-          {hideDetails ? "A hidden secret." : achievement.description}
-        </p>
-      </div>
-      {hovering && !ready && (
-        <svg
-          className="admin-hint-ring absolute right-1.5 top-1.5 h-3 w-3 shrink-0"
-          viewBox="0 0 16 16"
-          aria-hidden="true"
+      {layout.nodes.length === 0 ? (
+        <p className="adv-empty">Nothing found here yet. Keep exploring.</p>
+      ) : (
+        <div
+          className="adv-layer"
+          style={{ width: layerW, height: layerH, transform: `translate3d(${current.x}px, ${current.y}px, 0)` }}
         >
-          <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/15" />
-          <circle
-            cx="8"
-            cy="8"
-            r="6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeDasharray={ACHIEVEMENT_HINT_RING_CIRCUMFERENCE}
-            className="admin-hint-ring-fill text-[var(--outpost-accent)]"
-          />
-        </svg>
+          <svg className="adv-lines" width={layerW} height={layerH} aria-hidden="true">
+            {layout.edges.map(({ from, to }) => {
+              const a = byId.get(from)!;
+              const b = byId.get(to)!;
+              const x1 = PAD + a.x + half;
+              const x2 = PAD + b.x - half;
+              const mid = (x1 + x2) / 2;
+              const d = `M ${x1} ${PAD + a.y} H ${mid} V ${PAD + b.y} H ${x2}`;
+              const lit = unlocked.has(to);
+              return (
+                <g key={`${from}-${to}`}>
+                  <path d={d} className="adv-line-outline" />
+                  <path d={d} className={lit ? "adv-line adv-line-lit" : "adv-line"} />
+                </g>
+              );
+            })}
+          </svg>
+          {layout.nodes.map((n) => {
+            const a = ACHIEVEMENTS_BY_ID[n.id];
+            const frame = achievementTree[n.id].frame;
+            const earned = unlocked.has(n.id);
+            return (
+              <button
+                key={n.id}
+                type="button"
+                className={`adv-node adv-frame-${frame} ${earned ? "adv-earned" : n.masked ? "adv-masked" : "adv-locked"} ${
+                  reduced ? "" : "adv-animate"
+                }`}
+                style={{ left: PAD + n.x - half, top: PAD + n.y - half, width: NODE, height: NODE }}
+                aria-label={`${n.masked ? "Hidden" : a.title}: ${earned ? "earned" : "not yet earned"}`}
+                onPointerEnter={(e) => !drag.current?.moved && setHover({ node: n, rect: e.currentTarget.getBoundingClientRect() })}
+                onPointerLeave={() => setHover(null)}
+                onFocus={(e) => {
+                  reveal(n);
+                  const el = e.currentTarget;
+                  requestAnimationFrame(() => setHover({ node: n, rect: el.getBoundingClientRect() }));
+                }}
+                onBlur={() => setHover(null)}
+              >
+                <span className="adv-node-inner" aria-hidden="true">
+                  {n.masked ? "?" : a.icon}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
-      {ready &&
-        tileRect &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            ref={tooltipRef}
-            role="tooltip"
-            className={`admin-hint-tooltip pointer-events-none fixed z-[999] w-56 rounded-md border border-white/15 bg-[#1c140d] px-2.5 py-1.5 text-[0.7rem] font-normal leading-snug text-slate-200 shadow-lg ${
-              placeAbove ? "-translate-y-full" : ""
-            }`}
-            style={{ left: tooltipLeft, top: tooltipTop }}
-          >
-            <p className="font-semibold text-white">{hideDetails ? "???" : achievement.title}</p>
-            <p className="mt-0.5 text-slate-300">{hideDetails ? "A hidden secret." : achievement.description}</p>
-          </div>,
-          document.body
-        )}
+      <button
+        type="button"
+        className="adv-recenter"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => onPan(home())}
+        title="Back to the start of this tree"
+      >
+        {"\u{21BA}"} Recenter
+      </button>
+      {hover && typeof document !== "undefined" && (
+        <NodeCard
+          node={hover.node}
+          frame={achievementTree[hover.node.id].frame}
+          earnedAt={unlockedAt[hover.node.id as AchievementId]}
+          anchor={hover.rect}
+        />
+      )}
     </div>
   );
 }
@@ -192,7 +280,7 @@ function LedgerSection() {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-[0.7rem] font-bold uppercase tracking-wider text-white/40">Ledger Entries</h4>
+        <h4 className="font-pixel text-sm text-white/60">Ledger Entries</h4>
         <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-[var(--outpost-accent)]">
           {ledgerProgress.unlockedCount}/{ledgerProgress.total}
         </span>
@@ -216,183 +304,90 @@ function LedgerSection() {
   );
 }
 
-function GalleryContent({
-  visible,
-  unlocked,
-}: {
-  visible: AchievementDef[];
-  unlocked: Set<string>;
-}) {
-  const { achievementIsDefault } = useAchievements();
+export default function AchievementGallery() {
+  const { unlocked, mounted, achievementTree } = useAchievements();
+  const [view, setView] = useState<SavedView>({ tab: CATEGORY_ORDER[0], pans: {} });
+  const loaded = useRef(false);
 
-  const { pinned, categoryGroups } = useMemo(() => {
-    const byCategory = new Map<AchievementCategory, AchievementDef[]>();
-    const pinnedItems: AchievementDef[] = [];
-    let lockedSecretCount = 0;
-    for (const a of visible) {
-      if (a.category === "secrets" && !unlocked.has(a.id)) {
-        lockedSecretCount++;
-        continue; // locked secrets are represented by anonymous slots below, not listed individually
-      }
-      // Pinned ahead of every category — see admin-config.ts's
-      // achievementDefault — for odds-and-ends like window resizing or an
-      // old cheat code that don't really belong to any one category.
-      if (achievementIsDefault(a.id)) {
-        pinnedItems.push(a);
-        continue;
-      }
-      if (!byCategory.has(a.category)) byCategory.set(a.category, []);
-      byCategory.get(a.category)!.push(a);
-    }
-    const visibleLockedSecrets = Math.min(lockedSecretCount, MAX_VISIBLE_LOCKED_SECRETS);
-    if (visibleLockedSecrets > 0) {
-      if (!byCategory.has("secrets")) byCategory.set("secrets", []);
-    }
-    // Completed achievements float to the top of each group (stable sort,
-    // so relative catalog order is otherwise preserved) — a visitor only
-    // needs to look toward the bottom of a group to find what's left.
-    const byUnlockedFirst = (a: AchievementDef, b: AchievementDef) =>
-      Number(unlocked.has(b.id)) - Number(unlocked.has(a.id));
-    pinnedItems.sort(byUnlockedFirst);
-    for (const items of byCategory.values()) items.sort(byUnlockedFirst);
-    return {
-      pinned: pinnedItems,
-      categoryGroups: CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((c) => ({
-        category: c,
-        items: byCategory.get(c)!,
-        lockedPlaceholders: c === "secrets" ? visibleLockedSecrets : 0,
-      })),
-    };
-  }, [visible, unlocked, achievementIsDefault]);
+  useEffect(() => {
+    if (!mounted || loaded.current) return;
+    loaded.current = true;
+    const saved = readView();
+    if (saved) setView(saved);
+  }, [mounted]);
 
-  return (
-    <div className="space-y-4">
-      {pinned.length > 0 && (
-        <div>
-          <h4 className="mb-2 text-[0.7rem] font-bold uppercase tracking-wider text-white/40">Default</h4>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {pinned.map((achievement) => (
-              <AchievementTile
-                key={achievement.id}
-                achievement={achievement}
-                isUnlocked={unlocked.has(achievement.id)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-      {categoryGroups.map((group) => (
-        <div key={group.category}>
-          <h4 className="mb-2 text-[0.7rem] font-bold uppercase tracking-wider text-white/40">
-            {CATEGORY_LABELS[group.category]}
-          </h4>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {group.items.map((achievement) => (
-              <AchievementTile
-                key={achievement.id}
-                achievement={achievement}
-                isUnlocked={unlocked.has(achievement.id)}
-              />
-            ))}
-            {Array.from({ length: group.lockedPlaceholders }).map((_, i) => (
-              <div
-                key={`locked-secret-${i}`}
-                className="flex items-center gap-2 rounded-lg border border-white/10 p-2 text-xs opacity-50"
-              >
-                <span className="text-lg leading-none">❓</span>
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-200">???</p>
-                  <p className="truncate text-slate-400">A hidden secret.</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+  // Saved a moment after the last change, not on every drag step.
+  useEffect(() => {
+    if (!loaded.current) return;
+    const id = window.setTimeout(() => writeView(view), 250);
+    return () => window.clearTimeout(id);
+  }, [view]);
 
-export default function AchievementGallery({
-  variant = "card",
-}: {
-  /** "card": collapsible card. "flat": always-open, no outer chrome (the Achievements tab). */
-  variant?: "card" | "flat";
-}) {
-  const { unlocked, mounted } = useAchievements();
-  const [open, setOpen] = useState(false);
-  const [naturalHeight, setNaturalHeight] = useState(0);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useIsomorphicLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-    const recompute = () => setNaturalHeight(el.scrollHeight);
-    recompute();
-    window.addEventListener("resize", recompute);
-    return () => window.removeEventListener("resize", recompute);
-  }, [open, unlocked.size]);
-
-  // Every achievement is listed from the start; secret ones stay masked
-  // as "???" until earned (see GalleryContent).
-  const visible = ACHIEVEMENTS;
-  const visibleUnlockedCount = visible.filter((a) => unlocked.has(a.id)).length;
-
-  if (variant === "flat") {
-    return (
-      <div>
-        <div className="flex items-center justify-end gap-2">
-          <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-[var(--outpost-accent)]">
-            {visibleUnlockedCount}/{visible.length} unlocked
-          </span>
-        </div>
-        <div className="mt-4 space-y-4">
-          <GalleryContent visible={visible} unlocked={unlocked} />
-          <LedgerSection />
-        </div>
-      </div>
-    );
+  function update(next: SavedView) {
+    setView(next);
   }
 
-  const panelHeight = open ? naturalHeight : 0;
+  const totals = useMemo(() => {
+    const out = {} as Record<AchievementCategory, { earned: number; total: number }>;
+    for (const c of CATEGORY_ORDER) out[c] = { earned: 0, total: 0 };
+    for (const a of ACHIEVEMENTS) {
+      out[a.category].total++;
+      if (unlocked.has(a.id)) out[a.category].earned++;
+    }
+    return out;
+  }, [unlocked]);
+
+  const tabs = CATEGORY_ORDER.filter((c) => totals[c].total > 0);
+  const tab = tabs.includes(view.tab) ? view.tab : tabs[0];
 
   return (
-    <div className="outpost-panel rounded-xl">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
-      >
-        <span className="flex items-center gap-2">
-          <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-[var(--outpost-accent)]">
-            Achievements
-          </h3>
-          {mounted && (
-            <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-[var(--outpost-accent)]">
-              {visibleUnlockedCount}/{visible.length}
-            </span>
-          )}
+    <div>
+      <div className="flex items-center justify-end">
+        <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-[var(--outpost-accent)]">
+          {unlocked.size}/{ACHIEVEMENTS.length} unlocked
         </span>
-        <svg
-          className={`h-4 w-4 shrink-0 text-white/60 transition-transform duration-300 ${
-            open ? "rotate-180" : ""
-          }`}
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M5 7.5l5 5 5-5" />
-        </svg>
-      </button>
-      <div className="category-panel overflow-hidden" style={{ maxHeight: `${panelHeight}px` }}>
-        <div ref={contentRef} className="space-y-4 px-5 pb-5">
-          <GalleryContent visible={visible} unlocked={unlocked} />
-          <LedgerSection />
-        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Achievement categories">
+        {tabs.map((c) => {
+          const active = c === tab;
+          const t = totals[c];
+          return (
+            <button
+              key={c}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={CATEGORY_LABELS[c]}
+              onClick={() => update({ ...view, tab: c })}
+              className={`adv-tab ${active ? "adv-tab-active" : ""}`}
+            >
+              <span className="text-lg leading-none" aria-hidden="true">
+                {tabIcon(achievementTree, c)}
+              </span>
+              <span className="adv-tab-count">{c === "secrets" ? `${t.earned} found` : `${t.earned}/${t.total}`}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-3">
+        <h4 className="font-pixel mb-2 text-base text-white">{CATEGORY_LABELS[tab]}</h4>
+        {mounted ? (
+          <AdvancementCanvas
+            key={tab}
+            category={tab}
+            pan={view.pans[tab]}
+            onPan={(p) => update({ ...view, tab, pans: { ...view.pans, [tab]: p } })}
+          />
+        ) : (
+          <div className="adv-canvas" style={{ height: CANVAS_H }} />
+        )}
+        <p className="mt-1.5 text-[0.7rem] text-slate-500">Drag to look around. Earn an advancement to see what comes next.</p>
+      </div>
+
+      <div className="mt-6">
+        <LedgerSection />
       </div>
     </div>
   );

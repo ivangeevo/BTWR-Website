@@ -58,7 +58,7 @@ import {
 } from "./resources";
 import {
   defaultAdminConfig,
-  isAchievementDefault,
+  resolvedAchievementTree,
   isModuleDisabled,
   loadAdminConfig,
   resolvedCollectAmounts,
@@ -82,6 +82,7 @@ import type {
   UpgradesMechanic,
 } from "./mechanics";
 import { DEFAULT_CARD_ORDER, type ModuleId } from "./module-registry";
+import type { AchievementTree } from "./achievement-tree";
 import type { UpgradeDef, UpgradeId } from "./upgrade-catalog";
 import {
   computeLedgerProgress,
@@ -110,6 +111,8 @@ export type ToastInstance = { instanceId: string; achievementId: AchievementId }
 type AchievementsContextValue = {
   mounted: boolean;
   unlocked: Set<AchievementId>;
+  /** When each earned achievement was unlocked (ISO timestamps). */
+  unlockedAt: HubState["unlocked"];
   unlock: (id: AchievementId) => void;
   toasts: ToastInstance[];
   dismissToast: (instanceId: string) => void;
@@ -166,8 +169,8 @@ type AchievementsContextValue = {
   isModuleEnabled: (id: ModuleId) => boolean;
   /** Whether the card is enabled and the Engine has reached the stage that reveals it. */
   isModuleRevealed: (id: ModuleId) => boolean;
-  /** Whether an achievement is pinned to the gallery's "Default" group, ahead of every category — see admin-config.ts's achievementDefault. */
-  achievementIsDefault: (id: AchievementId) => boolean;
+  /** The Achievements tab's advancement trees (authored + admin edits) — see achievement-tree.ts. */
+  achievementTree: AchievementTree;
   toolTiersList: ReturnType<typeof resolvedToolTiers>;
   craftCostFor: (tierId: string) => Partial<ResourceState>;
   resourceMeta: ReturnType<typeof resolvedResourceMeta>;
@@ -1563,10 +1566,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     (id: ModuleId): boolean => !isModuleDisabled(adminConfig, id) && engineStage >= resolvedModuleStage(adminConfig, id),
     [adminConfig, engineStage]
   );
-  const achievementIsDefault = useCallback(
-    (id: AchievementId): boolean => isAchievementDefault(adminConfig, id),
-    [adminConfig]
-  );
+  const achievementTree = useMemo(() => resolvedAchievementTree(adminConfig), [adminConfig]);
   const toolTiersList = useMemo(() => resolvedToolTiers(adminConfig), [adminConfig]);
   const craftCostFor = useCallback(
     (tierId: string) => resolvedCraftCost(adminConfig, tierId),
@@ -1615,6 +1615,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   const value: AchievementsContextValue = {
     mounted,
     unlocked: unlockedRef.current,
+    unlockedAt: state.unlocked,
     unlock,
     toasts,
     dismissToast,
@@ -1661,7 +1662,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     moduleStage,
     isModuleEnabled,
     isModuleRevealed,
-    achievementIsDefault,
+    achievementTree,
     toolTiersList,
     craftCostFor,
     resourceMeta: resourceMetaResolved,

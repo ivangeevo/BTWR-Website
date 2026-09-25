@@ -2,10 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { ACHIEVEMENTS_BY_ID } from "./achievements-catalog";
+import type { AdvFrame } from "./achievement-tree";
 import { useAchievements, type ToastInstance } from "./AchievementsProvider";
 
 const AUTO_DISMISS_MS = 25_000;
 const LEAVE_ANIMATION_MS = 220;
+
+// Minecraft's toast headers, by the achievement's tree frame (achievement-tree.ts).
+const TOAST_HEADS: Record<AdvFrame, string> = {
+  task: "Advancement Made!",
+  goal: "Goal Reached!",
+  challenge: "Challenge Complete!",
+};
 
 function Toast({
   toast,
@@ -15,6 +23,7 @@ function Toast({
   onRemove: (instanceId: string) => void;
 }) {
   const [leaving, setLeaving] = useState(false);
+  const { achievementTree } = useAchievements();
   const achievement = ACHIEVEMENTS_BY_ID[toast.achievementId];
 
   useEffect(() => {
@@ -29,13 +38,14 @@ function Toast({
   }, [leaving, onRemove, toast.instanceId]);
 
   if (!achievement) return null;
+  const frame = achievementTree[achievement.id]?.frame ?? "task";
 
   return (
     <div
       onClick={() => setLeaving(true)}
-      className={`hub-toast relative flex w-72 cursor-pointer items-start gap-3 rounded-lg px-4 py-3 pr-7 text-left text-white shadow-lg ${
-        leaving ? "leaving" : ""
-      }`}
+      className={`hub-toast adv-toast relative flex w-72 cursor-pointer items-center gap-3 px-3 py-2.5 pr-7 text-left text-white ${
+        frame === "challenge" ? "adv-toast-challenge" : ""
+      } ${leaving ? "leaving" : ""}`}
     >
       <button
         type="button"
@@ -50,15 +60,13 @@ function Toast({
           ×
         </span>
       </button>
-      <span className="text-2xl leading-none">{achievement.icon}</span>
+      <span className="adv-toast-icon" aria-hidden="true">
+        <span>{achievement.icon}</span>
+      </span>
       <span className="min-w-0">
-        <span className="block text-[10px] font-bold uppercase tracking-wider text-glow">
-          Achievement Get!
-        </span>
-        <span className="block truncate font-heading text-sm font-bold">
-          {achievement.title}
-        </span>
-        <span className="block text-xs text-white/70">{achievement.description}</span>
+        <span className="adv-toast-head block">{TOAST_HEADS[frame]}</span>
+        <span className="adv-toast-title block truncate">{achievement.title}</span>
+        <span className="block text-xs text-white/60">{achievement.description}</span>
       </span>
     </div>
   );

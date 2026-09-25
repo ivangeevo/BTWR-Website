@@ -8,6 +8,7 @@ import type { AchievementId } from "./achievements-catalog";
 import { DEFAULT_MODULE_STAGE, type ModuleId } from "./module-registry";
 import { MODULE_MECHANICS } from "./mechanics";
 import type { EngineAdminOverrides } from "./engine/config";
+import { resolveTree, type AchievementTree, type AdvFrame } from "./achievement-tree";
 import { UPGRADES, type UpgradeDef, type UpgradeId } from "./upgrade-catalog";
 import {
   RESOURCE_IDS,
@@ -57,10 +58,10 @@ export type AdminConfig = {
   moduleStage: Partial<Record<ModuleId, number>>;
   /** Cards/sections switched off entirely — never shown, whatever the Engine's stage. */
   moduleDisabled: Partial<Record<ModuleId, boolean>>;
-  /** Achievements pinned to a "Default" group shown first in the gallery,
-   * ahead of every category — for the odds and ends (window resizing, an
-   * old cheat code) that don't really belong to any one category. */
-  achievementDefault: Partial<Record<AchievementId, boolean>>;
+  /** Overrides which achievement another chains off in the Achievements tab's trees ("root" = starts its own tree). See achievement-tree.ts. */
+  achievementParent: Partial<Record<AchievementId, AchievementId | "root">>;
+  /** Overrides an achievement's tree frame (task / goal / challenge). */
+  achievementFrame: Partial<Record<AchievementId, AdvFrame>>;
   toolTierEdits: Partial<Record<string, Partial<ToolTier>>>;
   customToolTiers: CustomToolTier[];
   /** Overrides a tool tier's craft cost — works for both built-ins (which
@@ -91,11 +92,8 @@ export function defaultAdminConfig(): AdminConfig {
     version: 1,
     moduleStage: {},
     moduleDisabled: {},
-    // The two obvious "doesn't belong to any category" odds and ends
-    // — resizing the window, and the old Konami-style cheat code — pinned
-    // out of the box so the Default group isn't an empty, opt-in-only
-    // feature. Anything else is up to the admin.
-    achievementDefault: { "window-resized-once": true, "secret-sequence": true },
+    achievementParent: {},
+    achievementFrame: {},
     toolTierEdits: {},
     customToolTiers: [],
     craftCostEdits: {},
@@ -136,12 +134,14 @@ function normalizeAdminConfig(parsed: Partial<AdminConfig>): AdminConfig {
   delete legacy.moduleTier;
   delete legacy.achievementTier;
   delete legacy.tierTips;
+  delete legacy.achievementDefault;
   return {
     ...base,
     ...parsed,
     moduleStage: { ...base.moduleStage, ...parsed.moduleStage },
     moduleDisabled: { ...base.moduleDisabled, ...parsed.moduleDisabled },
-    achievementDefault: { ...base.achievementDefault, ...parsed.achievementDefault },
+    achievementParent: { ...base.achievementParent, ...parsed.achievementParent },
+    achievementFrame: { ...base.achievementFrame, ...parsed.achievementFrame },
     toolTierEdits: { ...base.toolTierEdits, ...parsed.toolTierEdits },
     customToolTiers: Array.isArray(parsed.customToolTiers) ? parsed.customToolTiers : [],
     craftCostEdits: { ...base.craftCostEdits, ...parsed.craftCostEdits },
@@ -204,8 +204,8 @@ export function isModuleDisabled(config: AdminConfig, moduleId: ModuleId): boole
   return moduleId !== "ponder" && config.moduleDisabled[moduleId] === true;
 }
 
-export function isAchievementDefault(config: AdminConfig, id: AchievementId): boolean {
-  return config.achievementDefault[id] === true;
+export function resolvedAchievementTree(config: AdminConfig): AchievementTree {
+  return resolveTree({ parent: config.achievementParent, frame: config.achievementFrame });
 }
 
 // Merges the built-in 6-tier ladder with any admin edits/additions into one

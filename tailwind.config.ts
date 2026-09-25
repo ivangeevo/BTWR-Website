@@ -19,6 +19,8 @@ const config: Config = {
       },
       fontFamily: {
         heading: ["var(--font-heading)", "ui-sans-serif", "system-ui", "sans-serif"],
+        // The Outpost's Minecraft-style advancements (tabs, cards, toasts).
+        pixel: ["var(--font-pixel)", "ui-monospace", "monospace"],
       },
     },
   },
