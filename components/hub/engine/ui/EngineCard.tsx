@@ -100,7 +100,7 @@ export default function EngineCard() {
           <span className="outpost-resource-chip">{stageDef.chapter}</span>
         </div>
       </div>
-      <p className="mt-1 text-xs text-slate-400">{stageDef.caption}</p>
+      <p className="mt-1 text-xs leading-snug text-slate-400">{stageDef.caption}</p>
       {dust > 0 && (
         <p className="mt-0.5 text-[0.65rem] italic text-slate-500">
           {dust >= 2 ? "Thick with dust. It's thinking slowly." : "A little dusty. It missed you."}

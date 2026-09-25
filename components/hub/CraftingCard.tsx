@@ -131,7 +131,7 @@ export default function CraftingCard() {
       <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-[var(--outpost-accent)]">
         Crafting
       </h3>
-      <p className="mt-1.5 text-sm text-slate-300">
+      <p className="mt-1 text-xs leading-snug text-slate-400">
         Spend collected resources to craft a better tool — current:{" "}
         {findToolTier(toolTiersList, tools.tier).name}.
       </p>

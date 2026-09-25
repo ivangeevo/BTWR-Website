@@ -33,7 +33,7 @@ export default function ResourceToolStrip() {
         </div>
       </div>
       {collected.length === 0 && !showInsight ? (
-        <p className="mt-2 text-xs text-slate-400">
+        <p className="mt-1 text-xs leading-snug text-slate-400">
           Collect resources from Wood Chopping, Hunting, and Mining to see them here.
         </p>
       ) : (

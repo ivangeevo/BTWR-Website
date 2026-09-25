@@ -91,7 +91,7 @@ export default function Campfire() {
             </span>
             <p className="text-sm font-semibold text-white">{CAMPFIRE_STAGES[stage]}</p>
           </div>
-          <p className="mt-2 text-sm text-slate-300">{CAMPFIRE_CAPTIONS[stage]}</p>
+          <p className="mt-1.5 text-xs leading-snug text-slate-400">{CAMPFIRE_CAPTIONS[stage]}</p>
           <button
             type="button"
             onClick={() => {

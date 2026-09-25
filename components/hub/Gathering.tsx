@@ -66,7 +66,7 @@ export default function Gathering() {
       <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-[var(--outpost-accent)]">
         Gathering
       </h3>
-      <p className="mt-2 text-sm text-slate-300">Pick an activity — they share one rest timer.</p>
+      <p className="mt-1 text-xs leading-snug text-slate-400">Pick an activity — they share one rest timer.</p>
 
       <div className="mt-2.5 flex gap-1.5" role="tablist">
         {ACTIONS.map((a) => {

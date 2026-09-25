@@ -82,7 +82,7 @@ export default function UpgradesPanel() {
         </span>
       </div>
       <div id="outpost-upgrades-list" hidden={folded}>
-        <p className="mt-1 text-xs leading-snug text-white/50">
+        <p className="mt-1 text-xs leading-snug text-slate-400">
           Skill Points trickle in as you unlock achievements. Spend them on permanent capabilities for the Outpost
           itself.
         </p>
