@@ -1,12 +1,92 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { cipherTitle, nextCipherTarget, puzzleFor } from "../../cipher-flow";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { cipherPlainText, cipherTitle, nextCipherTarget, puzzleFor } from "../../cipher-flow";
 import { ALPHABET, decodeMap, renderAttempt } from "../../ciphers";
-import { KEY_FRAGMENTS } from "../../content/blueprints";
+import { BLUEPRINTS_BY_ID, KEY_FRAGMENTS } from "../../content/blueprints";
 import { formatInsight, stageFlat } from "../../economy";
+import { PART_DEFS } from "../../grid/parts";
 import { useEngine } from "../EngineProvider";
 import { useLive } from "../live-store";
+import { useReducedMotion } from "../use-reduced-motion";
+
+// The moment a page is decoded, the Engine moves straight on (the provider
+// clears ciphers.current), so the panel keeps a snapshot of the page it was
+// showing and plays it out: the sentence lights up letter by letter, left
+// to right, the page glows with what it unlocked, holds for a few seconds,
+// then fades — and only then does the next page (if any) take its place.
+const LETTER_STEP_MS = 45;
+const SWEEP_MAX_MS = 1600;
+const LETTER_POP_MS = 520;
+const HOLD_MS = 3200;
+const LEAVE_MS = 450;
+
+type Solved = { id: string; title: string; cipher: string; plain: string; unlocked: string };
+
+function DecodedPage({ page, onDone }: { page: Solved; onDone: () => void }) {
+  const reduced = useReducedMotion();
+  const [leaving, setLeaving] = useState(false);
+  const letters = page.plain.replace(/ /g, "").length;
+  const step = reduced ? 0 : Math.min(LETTER_STEP_MS, SWEEP_MAX_MS / Math.max(1, letters));
+  const sweepMs = reduced ? 0 : step * letters + LETTER_POP_MS;
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
+
+  useEffect(() => {
+    const leave = window.setTimeout(() => setLeaving(true), sweepMs + HOLD_MS);
+    const done = window.setTimeout(() => doneRef.current(), sweepMs + HOLD_MS + LEAVE_MS);
+    return () => {
+      window.clearTimeout(leave);
+      window.clearTimeout(done);
+    };
+  }, [sweepMs]);
+
+  // Letters are numbered in reading order across the whole sentence, so the
+  // light runs left to right and on down through every wrapped line.
+  let n = 0;
+  const cipherWords = page.cipher.split(" ");
+  const plainWords = page.plain.split(" ");
+  return (
+    <div
+      data-engine-target="cipher"
+      data-no-drag
+      role="status"
+      aria-label={`Decoded: ${page.plain}`}
+      className={`cipher-decoded ${leaving ? "cipher-decoded-leaving" : ""}`}
+      style={{ "--cipher-sweep": `${sweepMs}ms` } as React.CSSProperties}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-[var(--outpost-accent)]">{page.title}</p>
+        <span className="cipher-decoded-tag">Decoded</span>
+      </div>
+      <div className="cipher-decoded-board mt-2 flex flex-wrap gap-x-3 gap-y-2 rounded-lg border p-2 font-mono">
+        {plainWords.map((word, wi) => (
+          <div key={wi} className="flex gap-0.5">
+            {word.split("").map((p, ci) => {
+              const c = cipherWords[wi]?.[ci] ?? "";
+              const delay = n++ * step;
+              return (
+                <span
+                  key={ci}
+                  className="cipher-decoded-cell flex w-[1.35rem] flex-col items-center rounded text-center leading-tight"
+                  style={{ animationDelay: `${delay}ms` }}
+                >
+                  <span className="cipher-decoded-letter text-sm" style={{ animationDelay: `${delay}ms` }}>
+                    {p}
+                  </span>
+                  <span className="cipher-decoded-sub text-[0.6rem]" style={{ animationDelay: `${delay}ms` }}>
+                    {/[A-Z]/.test(c) ? c : ""}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <p className="cipher-decoded-unlock mt-2 text-xs text-white">{page.unlocked}</p>
+    </div>
+  );
+}
 
 // Decoding the Engine's lost blueprints. The board shows the scrambled page
 // word by word; what you've worked out so far fills in underneath.
@@ -16,6 +96,8 @@ export default function CipherPanel() {
   const [selected, setSelected] = useState<string | null>(null);
   const [keyword, setKeyword] = useState("");
   const [keywordWrong, setKeywordWrong] = useState(false);
+  const [decoded, setDecoded] = useState<Solved | null>(null);
+  const shownRef = useRef<Omit<Solved, "plain" | "unlocked"> | null>(null);
 
   const target = nextCipherTarget(e);
   useEffect(() => {
@@ -25,6 +107,29 @@ export default function CipherPanel() {
 
   const cur = e.ciphers.current;
   const puzzle = useMemo(() => (cur ? puzzleFor(cur, e, fx) : null), [cur, e, fx]);
+
+  // The page on screen just went from current to solved: play it out.
+  useEffect(() => {
+    const shown = shownRef.current;
+    if (shown && shown.id !== cur?.id && e.ciphers.solved.includes(shown.id)) {
+      const part = BLUEPRINTS_BY_ID[shown.id]?.part;
+      setDecoded({
+        ...shown,
+        plain: cipherPlainText(shown.id),
+        unlocked: part
+          ? `Blueprint decoded: the ${PART_DEFS[part].name}. It's in the Body tab now.`
+          : BLUEPRINTS_BY_ID[shown.id]
+            ? "The last page, decoded."
+            : "Practice page decoded.",
+      });
+      setSelected(null);
+    }
+    shownRef.current = cur && puzzle ? { id: cur.id, title: cipherTitle(cur.id), cipher: puzzle.cipher } : null;
+    // puzzle follows cur; its cipher text never changes for the same page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cur?.id, e.ciphers.solved]);
+
+  if (decoded) return <DecodedPage key={decoded.id} page={decoded} onDone={() => setDecoded(null)} />;
 
   if (!target) {
     return (

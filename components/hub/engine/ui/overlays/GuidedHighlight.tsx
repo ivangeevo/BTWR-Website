@@ -44,6 +44,9 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
   const tut = ceremony ? null : pendingTutorial(e);
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState<Outline | null>(null);
+  // Holds off while a just-decoded cipher page is playing out (CipherPanel),
+  // so the next lesson doesn't land on top of the moment it unlocked.
+  const [waiting, setWaiting] = useState(false);
 
   useEffect(() => setStep(0), [tut?.id]);
 
@@ -58,6 +61,7 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
     }
     const measure = () => {
       const host = root.current;
+      setWaiting(!!host?.querySelector(".cipher-decoded"));
       const el = host?.querySelector<HTMLElement>(`[data-engine-target="${target}"]`);
       if (!host || !el) {
         setRect(null);
@@ -72,13 +76,17 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
     measure();
     const id = window.setInterval(measure, 500);
     window.addEventListener("resize", measure);
+    // Straight away when the card's contents change, too (a decoded page appearing).
+    const mo = root.current ? new MutationObserver(measure) : null;
+    if (root.current) mo?.observe(root.current, { childList: true, subtree: true });
     return () => {
       window.clearInterval(id);
       window.removeEventListener("resize", measure);
+      mo?.disconnect();
     };
   }, [target, root, workshopOpen, e.stage]);
 
-  if (!tut) return null;
+  if (!tut || waiting) return null;
   const s = tut.steps[step];
   const last = step >= tut.steps.length - 1;
 
