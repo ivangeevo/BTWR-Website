@@ -1936,3 +1936,29 @@ html.daynight-fighting .outpost-zone::after {
   border-radius: 0.75rem;
   animation: engine-reveal-glow 2.6s ease-out;
 }
+
+/* Card reordering (use-card-reorder.ts): the lifted card's cell stays behind
+   as a dashed "it'll land here" slot, and nothing on the page selects text
+   or shows another cursor while a card is held. */
+.outpost-card-placeholder::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 2px dashed var(--outpost-accent, #d98a4a);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  opacity: 0.55;
+  pointer-events: none;
+}
+/* The card panels are translucent over the grid; a held card gets a solid
+   backing so the cards it passes over don't show through it. */
+.outpost-card-lifted {
+  background: #221a15;
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.65);
+}
+html.outpost-card-dragging,
+html.outpost-card-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
