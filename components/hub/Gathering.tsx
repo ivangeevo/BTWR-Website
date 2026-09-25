@@ -7,14 +7,14 @@ import { findToolTier, type ResourceId, type ResourceState } from "./resources";
 
 type ActionId = "tree-mining" | "hunting" | "mining";
 
-// Ordered simplest -> most involved: Tree Mining needs nothing and is
+// Ordered simplest -> most involved: Wood Chopping needs nothing and is
 // always available (the "start very simple" baseline), Hunting and Mining
 // reveal as toggles once later tiers unlock, gradually turning this from a
 // one-button card into the full three-way gathering hub. Mining also keeps
 // its own separate "need a tool" gate below regardless of tier, same as
 // before.
 const ACTIONS: { id: ActionId; label: string; icon: string }[] = [
-  { id: "tree-mining", label: "Tree Mining", icon: "\u{1FA93}" },
+  { id: "tree-mining", label: "Wood Chopping", icon: "\u{1FA93}" },
   { id: "hunting", label: "Hunting", icon: "\u{1F3F9}" },
   { id: "mining", label: "Mining", icon: "\u{26CF}\u{FE0F}" },
 ];
@@ -22,7 +22,7 @@ const ACTIONS: { id: ActionId; label: string; icon: string }[] = [
 // All three activities used to be separate cards; combined into one so the
 // shared cooldown (only one can ever be "active" at a time anyway) reads as
 // one coherent hub instead of three cards that happen to fight over the
-// same timer. Tree Mining is always available; Hunting and Mining each
+// same timer. Wood Chopping is always available; Hunting and Mining each
 // unlock as their own purchase in the Upgrades shop (upgrade-catalog.ts —
 // ids "hunting"/"mining"), each keeping its own tier requirement there
 // before it can even be bought.

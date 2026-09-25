@@ -100,7 +100,7 @@ export type ToolState = {
   tier: string;
 };
 
-// Tree Mining, Hunting, and Mining all share this single cooldown — see
+// Wood Chopping, Hunting, and Mining all share this single cooldown — see
 // mechanics.ts's GatheringMechanic.
 export type ActivityState = {
   cooldownUntil: string | null;

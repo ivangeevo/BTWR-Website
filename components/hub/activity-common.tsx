@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Ticks down the shared activity cooldown (Tree Mining / Hunting / Mining
+// Ticks down the shared activity cooldown (Wood Chopping / Hunting / Mining
 // all set the same `activity.cooldownUntil`) so each card can show its own
 // "resting" countdown without re-deriving the math three times.
 export function useCooldownRemaining(cooldownUntil: string | null): number {
@@ -32,7 +32,7 @@ export function CooldownNotice({ remainingMs }: { remainingMs: number }) {
   );
 }
 
-// Press-and-hold mechanic shared by Tree Mining and Mining — releasing
+// Press-and-hold mechanic shared by Wood Chopping and Mining — releasing
 // early pauses progress rather than resetting it (matches vanilla
 // Minecraft's own block-breaking forgiveness), so a twitchy mouse isn't
 // punished as harshly as a hard reset would be.

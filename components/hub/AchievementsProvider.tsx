@@ -966,7 +966,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // Only succeeds while the fire's real (decay-aware) stage is Medium — the
   // one stage that's ever actually cooked anything, per the campfire's own
   // long-standing flavor text (campfire-stage.ts). Shares the same rest
-  // timer as Tree Mining/Hunting/Mining so it can't be spammed back-to-back.
+  // timer as Wood Chopping/Hunting/Mining so it can't be spammed back-to-back.
   const completeCooking = useCallback((): boolean => {
     const campfireMechanic = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire");
     if (currentCampfireStage(campfireRef.current, campfireDecayMinutes()) !== 3) return false;
@@ -1041,7 +1041,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       .join(", ");
   }
 
-  // Tree Mining, Hunting, and Mining all funnel through this — computes the
+  // Wood Chopping, Hunting, and Mining all funnel through this — computes the
   // new resource totals synchronously off resourcesRef (so the ref and the
   // persisted state never disagree), sets the shared cooldown, and logs a
   // Recent Activity line.
@@ -1076,7 +1076,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     const buffs = currentEngineBuffs();
     const amount = wood + collectBonus(legacyRef.current.perks) + buffs.sawWood;
     const meta = resolvedResourceMeta(adminConfigRef.current);
-    applyResourceGain({ wood: amount }, `Tree Mining: +${amount} ${meta.wood.name}${buffs.sawPowered ? " (Saw)" : ""}`);
+    applyResourceGain({ wood: amount }, `Wood Chopping: +${amount} ${meta.wood.name}${buffs.sawPowered ? " (Saw)" : ""}`);
     if (buffs.sawPowered) {
       updateEngine((e) => ({ ...e, counters: { ...e.counters, sawChops: e.counters.sawChops + 1 } }), "soon");
     }

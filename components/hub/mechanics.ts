@@ -67,14 +67,14 @@ export class CampfireMechanic {
 }
 
 export class GatheringMechanic {
-  /** Shared rest timer after any Tree Mining/Hunting/Mining completion, in ms. */
-  activityCooldownMs = 20_000;
+  /** Shared rest timer after any Wood Chopping/Hunting/Mining completion, in ms. */
+  activityCooldownMs = 10_000;
 
   static readonly configFields: MechanicConfigField[] = [
     {
       key: "activityCooldownMs",
       label: "Activity cooldown",
-      description: "Shared rest timer after any Tree Mining, Hunting, or Mining completion.",
+      description: "Shared rest timer after any Wood Chopping, Hunting, or Mining completion.",
       min: 1000,
       max: 120_000,
       step: 1000,

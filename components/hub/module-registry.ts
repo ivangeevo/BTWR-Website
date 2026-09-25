@@ -45,7 +45,7 @@ export const MODULES: ModuleDef[] = [
     id: "gathering",
     label: "Gathering",
     description:
-      "Tree Mining / Hunting / Mining combined into one card with tab toggles — Tree Mining is always available, Hunting and Mining reveal as later tiers unlock.",
+      "Wood Chopping / Hunting / Mining combined into one card with tab toggles — Wood Chopping is always available, Hunting and Mining reveal as later tiers unlock.",
   },
   { id: "patch-notes", label: "Patch Notes", description: "Modpack/mod changelog feed." },
   { id: "crafting", label: "Crafting", description: "Spend resources on better tools." },

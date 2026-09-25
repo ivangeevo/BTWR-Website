@@ -90,7 +90,7 @@ export const PART_DEFS: Record<GridPartType, PartDef> = {
     name: "Saw",
     icon: "\u{1FA9A}",
     role: "attachment",
-    blurb: "While powered, Tree Mining is faster and yields extra wood. Takes power on its input face only.",
+    blurb: "While powered, Wood Chopping is faster and yields extra wood. Takes power on its input face only.",
     cost: { iron: 3, wood: 2 },
     needsBlueprint: true,
     soulforged: false,

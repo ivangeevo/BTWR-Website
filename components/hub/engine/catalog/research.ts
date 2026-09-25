@@ -91,7 +91,7 @@ const SPECIALS: ResearchDef[] = [
   { id: "r-gear-2", name: "Iron Teeth", description: "Gearboxes are rated for 2 more power.", cost: 5e7, stage: 6, effect: { kind: "gearboxCap", add: 2 } },
   { id: "r-gear-3", name: "Steel Teeth", description: "Gearboxes are rated for 2 more power.", cost: 1e10, stage: 7, effect: { kind: "gearboxCap", add: 2 } },
   // Attachments
-  { id: "r-saw", name: "Sharpened Blade", description: "The Saw's bonus to Tree Mining is 50% stronger.", cost: 100_000, stage: 5, effect: { kind: "sawPct", pct: 50 } },
+  { id: "r-saw", name: "Sharpened Blade", description: "The Saw's bonus to Wood Chopping is 50% stronger.", cost: 100_000, stage: 5, effect: { kind: "sawPct", pct: 50 } },
   { id: "r-mill", name: "Dressed Millstone", description: "The Millstone's bonuses are 50% stronger.", cost: 100_000, stage: 5, effect: { kind: "millPct", pct: 50 } },
   { id: "r-detector-1", name: "Second Sense", description: "The Detector Block holds one more charge.", cost: 1e7, stage: 6, effect: { kind: "detectorCharges", add: 1 } },
   { id: "r-detector-2", name: "Quick Study", description: "Detector charges refill twice as fast.", cost: 5e7, stage: 6, effect: { kind: "detectorRecharge", mult: 0.5 } },

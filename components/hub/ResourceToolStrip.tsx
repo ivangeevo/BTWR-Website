@@ -19,7 +19,7 @@ export default function ResourceToolStrip() {
         <div className="flex flex-wrap items-center gap-1.5">
           {collected.length === 0 ? (
             <p className="text-xs text-slate-400">
-              Collect resources from Tree Mining, Hunting, and Mining to see them here.
+              Collect resources from Wood Chopping, Hunting, and Mining to see them here.
             </p>
           ) : (
             collected.map((id) => (

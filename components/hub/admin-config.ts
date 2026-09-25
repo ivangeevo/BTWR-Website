@@ -79,7 +79,7 @@ export type AdminConfig = {
    * whatever cost they were created with). */
   craftCostEdits: Partial<Record<string, Partial<ResourceState>>>;
   resourceEdits: Partial<Record<ResourceId, ResourceMetaEdit>>;
-  /** Flat amount Tree Mining/Hunting grant per completed hold/trip. */
+  /** Flat amount Wood Chopping/Hunting grant per completed hold/trip. */
   collectAmounts: { wood: number; food: number };
   /** Tip strings shown (rotating every 60s if more than one) while the
    * Engine is at that stage — see StageTip.tsx. Empty/missing means no tip

@@ -5,7 +5,7 @@ import { findToolTier, RESOURCE_IDS, type ResourceState, type ToolTier } from ".
 import { rankIconForLevel, rankTitleForLevel } from "./tier2";
 
 // Sits on the left of the level badge row — what's been gathered so far
-// from Tree Mining/Hunting/Mining. Zero-amount resources stay hidden so a
+// from Wood Chopping/Hunting/Mining. Zero-amount resources stay hidden so a
 // fresh save doesn't show six "0" chips before you've collected anything.
 function ResourceStrip({ resources }: { resources: ResourceState }) {
   const { resourceMeta } = useAchievements();
@@ -24,7 +24,7 @@ function ResourceStrip({ resources }: { resources: ResourceState }) {
 }
 
 // Sits on the right of the level badge row — the shared tool tier that
-// speeds up Tree Mining/Hunting and unlocks better Mining yields, crafted
+// speeds up Wood Chopping/Hunting and unlocks better Mining yields, crafted
 // in the Crafting card.
 function ToolBadge({ tool }: { tool: ToolTier }) {
   return (
