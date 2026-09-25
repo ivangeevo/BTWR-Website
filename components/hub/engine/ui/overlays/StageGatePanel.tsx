@@ -57,8 +57,17 @@ export default function StageGatePanel() {
             <span className={affordable ? "text-[var(--outpost-accent)]" : "text-white/30"} aria-hidden="true">
               {affordable ? "\u{2714}" : "\u{25CB}"}
             </span>
-            <span className="flex-1 text-slate-400">Spend insight</span>
-            <span className="font-mono text-white/40">{formatInsight(gate.cost)}</span>
+            {/* The price of growing, not a task of its own: it ticks once enough
+                insight is saved up, and is only spent by the button below. */}
+            <span className="flex-1 text-slate-400">
+              Save up insight to grow
+              {!affordable && e.stage <= 2 && (
+                <span className="block text-[0.62rem] text-white/30">Every finished sentence earns some.</span>
+              )}
+            </span>
+            <span className="font-mono text-white/40">
+              {formatInsight(Math.min(insight, gate.cost))}/{formatInsight(gate.cost)}
+            </span>
           </div>
           <button
             type="button"
@@ -67,6 +76,7 @@ export default function StageGatePanel() {
             className="mt-1 w-full rounded-md border border-[var(--outpost-accent)] px-2 py-1.5 text-xs font-semibold text-[var(--outpost-accent)] transition-colors hover:bg-[var(--outpost-accent-soft)] disabled:border-white/15 disabled:text-white/30 disabled:hover:bg-transparent"
           >
             Grow into {next.chapter}
+            {gate.cost > 0 && ` (spends ${formatInsight(gate.cost)} insight)`}
           </button>
         </div>
       )}
