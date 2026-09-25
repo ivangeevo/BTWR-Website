@@ -67,21 +67,56 @@ const DISABLED_GROUP = { id: "disabled", name: "Disabled" };
 
 type Update = (updater: (prev: AdminConfig) => AdminConfig) => void;
 
+// Which lists the admin has folded, remembered per browser so they stay
+// folded across tab switches and visits. A per-viewer convenience only:
+// if storage is unavailable, every list just starts open.
+const FOLDS_KEY = "btwr:hub:admin-folds:v1";
+
+function readFolded(key: string): boolean {
+  try {
+    const raw = window.localStorage.getItem(FOLDS_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, boolean>)[key] === true : false;
+  } catch {
+    return false;
+  }
+}
+
+function writeFolded(key: string, folded: boolean) {
+  try {
+    const raw = window.localStorage.getItem(FOLDS_KEY);
+    const all = raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    if (folded) all[key] = true;
+    else delete all[key];
+    window.localStorage.setItem(FOLDS_KEY, JSON.stringify(all));
+  } catch {
+    // Remembering folds is a nicety.
+  }
+}
+
 // Shared by the Stages and Upgrades tabs — a stage is the group you drop
 // things into, so it's visible at a glance which stage holds what.
 function CollapsibleSection({
+  foldKey,
   title,
   count,
   danger,
   children,
 }: {
+  /** Unique per list across the whole panel (e.g. "modules:3"), for remembering whether it's folded. */
+  foldKey: string;
   title: string;
   count: number;
   /** Red title — for the Modules tab's "Disabled" group. */
   danger?: boolean;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(true);
+  // The panel only renders its tabs after mount, so reading storage here is safe.
+  const [open, setOpenState] = useState(() => !readFolded(foldKey));
+  const setOpen = (update: (v: boolean) => boolean) => {
+    const next = update(open);
+    setOpenState(next);
+    writeFolded(foldKey, !next);
+  };
   return (
     <div className="rounded-lg border border-white/10">
       <button
@@ -296,7 +331,7 @@ function ModulesTab({ config, update }: { config: AdminConfig; update: Update })
         {tiers.map((t) => {
           const items = byTier.get(t.id) ?? [];
           return (
-            <CollapsibleSection key={t.id} title={t.name} count={items.length} danger={t.id === DISABLED_GROUP.id}>
+            <CollapsibleSection key={t.id} foldKey={`modules:${t.id}`} title={t.name} count={items.length} danger={t.id === DISABLED_GROUP.id}>
               {items.length === 0 ? (
                 <p className="text-xs text-white/30">
                   {t.id === DISABLED_GROUP.id ? "Nothing disabled — every card shows at its stage." : "Nothing assigned here."}
@@ -516,7 +551,7 @@ function AchievementsTab({ config, update }: { config: AdminConfig; update: Upda
           </div>
         )}
         {CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((c) => (
-          <CollapsibleSection key={c} title={CATEGORY_LABELS[c]} count={byCategory.get(c)!.length}>
+          <CollapsibleSection key={c} foldKey={`achievements:${c}`} title={CATEGORY_LABELS[c]} count={byCategory.get(c)!.length}>
             {byCategory.get(c)!.map((a) => (
               <AchievementRow key={a.id} a={a} />
             ))}
@@ -566,7 +601,7 @@ function TipsTab({ config, update }: { config: AdminConfig; update: Update }) {
         {tiers.map((t) => {
           const tips = tipsFor(t.id);
           return (
-            <CollapsibleSection key={t.id} title={t.name} count={tips.length}>
+            <CollapsibleSection key={t.id} foldKey={`tips:${t.id}`} title={t.name} count={tips.length}>
               {tips.length === 0 ? (
                 <p className="text-xs text-white/30">No tips set — the Tip box stays hidden at this stage.</p>
               ) : (
@@ -1084,7 +1119,7 @@ function UpgradesTab({ config, update }: { config: AdminConfig; update: Update }
         {tiers.map((t) => {
           const items = byTier.get(t.id) ?? [];
           return (
-            <CollapsibleSection key={t.id} title={t.name} count={items.length}>
+            <CollapsibleSection key={t.id} foldKey={`upgrades:${t.id}`} title={t.name} count={items.length}>
               {items.length === 0 ? (
                 <p className="text-xs text-white/30">Nothing assigned here.</p>
               ) : (
