@@ -8,6 +8,8 @@ import { solveGrid } from "../../grid/solver";
 import { solveOptions } from "../../grid/engage";
 import type { GridPartType, PlacedPart, SolveWarningCode, Terrain } from "../../types";
 import { useEngine } from "../EngineProvider";
+import { useLive } from "../live-store";
+import CrankButton from "../visuals/CrankButton";
 
 const HOLD_MS = 500;
 
@@ -51,7 +53,8 @@ export function PartGlyph({ part, dim }: { part: PlacedPart; dim?: boolean }) {
 }
 
 export default function BodyTab() {
-  const { e, env, cfg, fx, knownParts, placePart, rotatePart, removePart, engage, craftPart, partCost, toast } = useEngine();
+  const { e, env, cfg, fx, store, knownParts, placePart, rotatePart, removePart, engage, craftPart, partCost, toast } = useEngine();
+  const livePU = useLive(store, (s) => s.corePU);
   const { resources, resourceMeta, engineBuffs } = useAchievements();
   const [selected, setSelected] = useState<GridPartType | null>(null);
   const holdTimer = useRef<number | null>(null);
@@ -215,10 +218,15 @@ export default function BodyTab() {
             {e.grid.clutch ? "Clutch engaged — re-engage" : "Engage the clutch"}
           </button>
 
+          {e.blueprints.includes("handCrank") && <CrankButton />}
+
           <div className="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5 text-[0.7rem] text-slate-300">
             {e.grid.clutch && summary ? (
               <>
                 <p>
+                  Reaching the core right now: <span className="font-semibold text-[var(--outpost-accent)]">{livePU} PU</span>
+                </p>
+                <p className="text-slate-400">
                   Steady power to core: <span className="font-semibold text-white">{summary.corePU} PU</span>
                   {e.solved && e.solved.cranked.corePU !== summary.corePU && (
                     <> · while cranking: <span className="font-semibold text-white">{e.solved.cranked.corePU} PU</span></>
