@@ -4,6 +4,14 @@ import { formatInsight } from "../../economy";
 import { useEngine } from "../EngineProvider";
 import { useLive } from "../live-store";
 
+// Just the live amount, for rows that bring their own icon and label
+// (ResourceToolStrip.tsx's materials list).
+export function InsightValue() {
+  const { store, e } = useEngine();
+  const insight = useLive(store, (s) => (s.at === 0 ? e.insight : s.insight));
+  return <>{formatInsight(insight)}</>;
+}
+
 // The clicker's big number — reads the external live store, so it ticks
 // every second without re-rendering anything else in the Outpost.
 export default function InsightCounter({ compact = false }: { compact?: boolean }) {

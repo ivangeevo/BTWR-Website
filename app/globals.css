@@ -1409,6 +1409,51 @@ html.daynight-fighting .outpost-zone::after {
   padding: 0.4rem 0.6rem;
 }
 
+/* The tool badge as a slim pill, beside the Materials heading. */
+.outpost-tool-badge-inline {
+  flex-direction: row;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem;
+}
+
+/* ResourceToolStrip.tsx's materials: every collected one on its own
+   labelled row, two to a line, so the list just grows (the store column
+   scrolls) instead of hiding any. */
+.outpost-materials {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.outpost-material {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.04);
+  padding: 0.2rem 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+
+.outpost-material-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.outpost-material-count {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.9);
+}
+
 /* A fixed square (--grid) split into --cols x --cols equal squares, so a
    slot is always square and every grid size takes the same room. The
    emoji inside scales with its slot. */
