@@ -55,6 +55,12 @@ export function markModRead(slug: string): boolean {
   return true;
 }
 
+/** Swaps the whole list (an imported save brings its own reading with it). */
+export function replaceModsRead(slugs: string[]): void {
+  write(MODS_READ_KEY, { slugs: [...new Set(slugs)] });
+  dispatch(EVT_MODS_READ);
+}
+
 // --- Inbox: off-Outpost events the provider drains idempotently by id ---
 
 export type InboxEvent = {

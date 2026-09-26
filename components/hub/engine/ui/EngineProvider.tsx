@@ -160,7 +160,7 @@ function pushJournal(journal: string[], line: string): string[] {
 
 export function EngineProvider({ mods, children }: { mods: Mod[]; children: React.ReactNode }) {
   const a = useAchievements();
-  const { mounted, engine: e, engineConfig: cfg, getEngine, updateEngine, spendResources } = a;
+  const { mounted, importEpoch, engine: e, engineConfig: cfg, getEngine, updateEngine, spendResources } = a;
   const fx = useMemo(() => researchEffects(e.research), [e.research]);
   const storeRef = useRef<LiveStore>(new LiveStore());
   const [ceremony, setCeremony] = useState<CeremonyView | null>(null);
@@ -278,15 +278,19 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
   }, [resolveKey, mounted]);
 
   // --- Mount: offline accrual, grid layout, mods read, commissions, first ceremony ---
-  const didInitRef = useRef(false);
+  // Runs again after an imported save (importEpoch): the file's Engine gets
+  // the same load a page refresh would give it.
+  const initEpochRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!mounted || didInitRef.current) return;
-    didInitRef.current = true;
-    if (lockHeldElsewhere(tabIdRef.current)) {
+    if (!mounted || initEpochRef.current === importEpoch) return;
+    const firstRun = initEpochRef.current === null;
+    initEpochRef.current = importEpoch;
+    if (firstRun && lockHeldElsewhere(tabIdRef.current)) {
       passiveRef.current = true;
       setPassive(true);
       return;
     }
+    if (passiveRef.current) return;
     writeEngineLock(tabIdRef.current);
     const now = Date.now();
     const c = cfgRef.current;
@@ -342,7 +346,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
       delete document.documentElement.dataset.engineLive;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted]);
+  }, [mounted, importEpoch]);
 
   // --- The Engine narrates the cards each new stage reveals ---
   // Runs as a stage's ceremony closes (not on a Logbook replay): a line in
@@ -421,6 +425,9 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     function tick() {
       const now = Date.now();
       if (passiveRef.current) return;
+      // A save was just imported and the load above hasn't settled it yet:
+      // settling now would pay the time since export at the online rate.
+      if (aRef.current.getImportEpoch() !== initEpochRef.current) return;
       if (lockHeldElsewhere(tabIdRef.current, now)) {
         passiveRef.current = true;
         setPassive(true);
@@ -535,7 +542,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
       }
       // Back from a background tab: long gaps count as "away" (timers are throttled there anyway).
       const back = Date.now();
-      if (hiddenAt && back - hiddenAt > cfgRef.current.offline.awayThresholdSec * 1000) {
+      if (hiddenAt && aRef.current.getImportEpoch() === initEpochRef.current && back - hiddenAt > cfgRef.current.offline.awayThresholdSec * 1000) {
         const from = hiddenAt;
         updateEngine((prev) => {
           const c = cfgRef.current;

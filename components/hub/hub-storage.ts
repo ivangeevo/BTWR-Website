@@ -240,8 +240,23 @@ export function loadState(): HubState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState();
-    const parsed = JSON.parse(raw);
-    if (parsed?.version !== 1) return defaultState();
+    return normalizeState(JSON.parse(raw)) ?? defaultState();
+  } catch {
+    return defaultState();
+  }
+}
+
+/**
+ * Brings any stored or imported save up to the current shape — the one path
+ * both loadState and an imported save file (save-file.ts) go through, so the
+ * two can never migrate differently. Null when it isn't a version-1 save.
+ */
+export function normalizeState(raw: unknown): HubState | null {
+  if (typeof raw !== "object" || raw === null || (raw as { version?: unknown }).version !== 1) return null;
+  try {
+    // Old saves may still carry the retired First Iron Tool / Priorities slices.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+    const { firstIronTool, priorities, ...parsed } = raw as Record<string, any>;
     // Shallow-merge over defaults so a partially-shaped stored value (e.g.
     // from a future field addition) doesn't crash consumers expecting it.
     const base = defaultState();
@@ -277,12 +292,18 @@ export function loadState(): HubState {
     const unlocked = Object.fromEntries(
       Object.entries(parsed.unlocked ?? {}).filter(([id]) => id in ACHIEVEMENTS_BY_ID || id.startsWith("custom-"))
     ) as HubState["unlocked"];
-    // Old saves may still carry the retired First Iron Tool / Priorities slices.
-    delete (parsed as Record<string, unknown>).firstIronTool;
-    delete (parsed as Record<string, unknown>).priorities;
+    const survival: SurvivalState = {
+      ...base.survival,
+      ...parsed.survival,
+      acc: { ...base.survival.acc, ...parsed.survival?.acc },
+    };
+    // A save can't hold a dead visitor (death respawns on the spot), but
+    // guard anyway so a hand-edited or imported save never starts at 0.
+    if (!(survival.health > 0)) survival.health = 1;
     return {
       ...base,
       ...parsed,
+      version: 1,
       quiz: { ...base.quiz, ...parsed.quiz },
       modOfDay: { ...base.modOfDay, ...parsed.modOfDay },
       visits: { ...base.visits, ...parsed.visits },
@@ -299,16 +320,12 @@ export function loadState(): HubState {
       },
       upgrades: { ...base.upgrades, ...parsed.upgrades, cardOrder },
       engine: normalizeEngineState(parsed.engine),
-      survival: {
-        ...base.survival,
-        ...parsed.survival,
-        acc: { ...base.survival.acc, ...parsed.survival?.acc },
-      },
+      survival,
       tier2,
       unlocked,
     };
   } catch {
-    return defaultState();
+    return null;
   }
 }
 

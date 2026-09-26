@@ -22,8 +22,6 @@ import {
   applyVisit,
   defaultState,
   loadState,
-  normalizeCampfire,
-  normalizeExperience,
   saveState as saveStateRaw,
   type ExperienceMode,
   todayUTC,
@@ -37,8 +35,15 @@ import { researchEffects } from "./engine/catalog/research";
 import { resolveEngineConfig, type EngineConfig } from "./engine/config";
 import { settle } from "./engine/economy";
 import { ENGINE_CUSTOM_RULES, ENGINE_NUMERIC_RULES } from "./engine/achievements";
-import { engineOnPrestige, normalizeEngineState } from "./engine/state";
-import { readEngineDebug, takeQueuedSecrets, writeEngineDebug } from "./engine/bridge-storage";
+import { engineOnPrestige } from "./engine/state";
+import {
+  readEngineDebug,
+  readModsRead,
+  replaceModsRead,
+  takeQueuedSecrets,
+  writeEngineDebug,
+} from "./engine/bridge-storage";
+import { buildSaveFile, parseSaveFile } from "./save-file";
 import {
   computeCyclePhase,
   gloomDarkness,
@@ -172,7 +177,13 @@ type AchievementsContextValue = {
   recordModGuessCorrect: (projectId: string) => void;
   recordPatchNotesOpen: () => void;
   recordExport: () => void;
+  /** The whole Outpost as a save file's JSON text (see save-file.ts). */
+  exportSave: () => string;
   importState: (parsed: unknown) => boolean;
+  /** Bumped by every successful import — EngineProvider re-runs its load on it. */
+  importEpoch: number;
+  /** The same count, current the moment importState returns (before React re-renders). */
+  getImportEpoch: () => number;
   /** Ponder / The Analytical Engine's slice, as last committed to React state. */
   engine: EngineState;
   /** The engine slice as of right now (may be ahead of `engine` between throttled commits). */
@@ -529,6 +540,9 @@ function saveState(next: HubState) {
 export function AchievementsProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<HubState>(defaultState());
   const [mounted, setMounted] = useState(false);
+  const [importEpoch, setImportEpoch] = useState(0);
+  const importEpochRef = useRef(0);
+  const getImportEpoch = useCallback(() => importEpochRef.current, []);
   const [toasts, setToasts] = useState<ToastInstance[]>([]);
   const unlockedRef = useRef<Set<AchievementId>>(new Set());
   const keyBufferRef = useRef<string[]>([]);
@@ -911,67 +925,69 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
+  // The live state (engine included, even ahead of a throttled commit) plus
+  // the side keys that belong to the run — see save-file.ts for what's in
+  // the file and what's deliberately left out.
+  const exportSave = useCallback(
+    (): string =>
+      JSON.stringify(buildSaveFile({ ...state, engine: liveEngine.current }, loadCycleStartedAt(), readModsRead()), null, 2),
+    [state]
+  );
+
   // Imports apply in place (no page reload) so same-session achievements
-  // like "Round Trip" (export then import) stay detectable. importCount
+  // like "Round Trip" (export then import) stay detectable — so everything a
+  // page load would set up from the save is redone here by hand: every ref
+  // mirror, the session baselines, and (via importEpoch) the Engine's own
+  // load, which settles the time since export as capped offline time rather
+  // than letting the next tick pay it out at the online rate. importCount
   // carries forward from THIS browser's current count, not whatever the
-  // imported file happened to have. Returns false on a shape it doesn't
-  // recognize, so the caller can show an error.
+  // imported file happened to have, and the Outpost stays switched on.
+  // Returns false on a file it doesn't recognize, so the caller can show an
+  // error.
   const importState = useCallback((parsed: unknown): boolean => {
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      (parsed as { version?: unknown }).version !== 1 ||
-      typeof (parsed as { unlocked?: unknown }).unlocked !== "object"
-    ) {
-      return false;
-    }
+    const file = parseSaveFile(parsed);
+    if (!file) return false;
     sessionImportedRef.current = true;
-    const incoming = parsed as Partial<HubState>;
+    const imported = file.save;
+
+    // Side keys first, so the Engine's reload below already sees them.
+    replaceModsRead(file.modsRead);
+    if (file.cycleStartedAt !== null) saveCycleStartedAt(file.cycleStartedAt);
+
+    unlockedRef.current = new Set(Object.keys(imported.unlocked) as AchievementId[]);
+    resourcesRef.current = imported.resources;
+    toolsRef.current = imported.tools;
+    legacyRef.current = imported.legacy;
+    campfireRef.current = imported.campfire;
+    upgradesRef.current = imported.upgrades;
+    settingsRef.current = imported.settings;
+    survivalRef.current = imported.survival;
+    experienceRef.current = imported.experience.mode;
+    liveEngine.current = imported.engine;
+    patchSwitchCountRef.current = imported.tier2.patchNotesModeSwitchCount;
+    themeClicksRef.current = imported.tier2.themeToggleClicks;
+    resizeCountRef.current = imported.tier2.windowResizeCount;
+    // Session achievements measure from here, and Ledger ranks the file
+    // already had aren't newly crossed.
+    mountSnapshotRef.current = {
+      perfectRounds: imported.quiz.perfectRounds,
+      lifetimeXp: imported.tier2.lifetimeXp,
+      skinChangeCount: imported.tier2.skinChangeCount,
+      totalAnswered: imported.quiz.totalAnswered,
+    };
+    ledgerRanksRef.current = null;
+
     setState((prev) => {
-      const base = defaultState();
-      const tier2 = {
-        ...base.tier2,
-        ...incoming.tier2,
-        importCount: prev.tier2.importCount + 1,
+      const next: HubState = {
+        ...imported,
+        enabled: prev.enabled,
+        tier2: { ...imported.tier2, importCount: prev.tier2.importCount + 1 },
       };
-      const merged: HubState = {
-        ...base,
-        ...incoming,
-        version: 1,
-        quiz: { ...base.quiz, ...incoming.quiz },
-        modOfDay: { ...base.modOfDay, ...incoming.modOfDay },
-        visits: { ...base.visits, ...incoming.visits },
-        experience: normalizeExperience(incoming.experience),
-        campfire: normalizeCampfire(incoming.campfire),
-        resources: { ...base.resources, ...incoming.resources },
-        tools: { ...base.tools, ...incoming.tools },
-        legacy: {
-          ...base.legacy,
-          ...incoming.legacy,
-          perks: { ...base.legacy.perks, ...incoming.legacy?.perks },
-        },
-        upgrades: { ...base.upgrades, ...incoming.upgrades },
-        engine: normalizeEngineState(incoming.engine),
-        survival: {
-          ...base.survival,
-          ...incoming.survival,
-          acc: { ...base.survival.acc, ...incoming.survival?.acc },
-        },
-        tier2,
-        unlocked: { ...incoming.unlocked },
-      };
-      unlockedRef.current = new Set(Object.keys(merged.unlocked) as AchievementId[]);
-      resourcesRef.current = merged.resources;
-      toolsRef.current = merged.tools;
-      legacyRef.current = merged.legacy;
-      campfireRef.current = merged.campfire;
-      upgradesRef.current = merged.upgrades;
-      survivalRef.current = merged.survival;
-      experienceRef.current = merged.experience.mode;
-      liveEngine.current = merged.engine;
-      saveState(merged);
-      return merged;
+      saveState(next);
+      return next;
     });
+    importEpochRef.current += 1;
+    setImportEpoch(importEpochRef.current);
     return true;
   }, []);
 
@@ -1625,9 +1641,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     upgradesRef.current = next.upgrades;
     settingsRef.current = next.settings;
     liveEngine.current = next.engine;
-    // A save can't hold a dead visitor (death respawns on the spot), but
-    // guard anyway so a hand-edited or imported save never starts at 0.
-    if (next.survival.health <= 0) next.survival = { ...next.survival, health: 1 };
     survivalRef.current = next.survival;
     experienceRef.current = next.experience.mode;
     const loadedAdminConfig = loadAdminConfig();
@@ -1982,7 +1995,10 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     recordModGuessCorrect,
     recordPatchNotesOpen,
     recordExport,
+    exportSave,
     importState,
+    importEpoch,
+    getImportEpoch,
     engine: state.engine,
     getEngine,
     updateEngine,

@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAchievements } from "./AchievementsProvider";
-import { STORAGE_KEY } from "./hub-storage";
+import { useEngine } from "./engine/ui/EngineProvider";
 import {
   FLAIR_BADGES,
   loreSnippetForLevel,
@@ -113,18 +113,19 @@ function PrestigeButton({ onPrestige }: { onPrestige: () => void }) {
 }
 
 function ExportImportSection() {
-  const { recordExport, importState } = useAchievements();
+  const { recordExport, exportSave, importState } = useAchievements();
+  // Another tab is running the Engine: it would write its own copy straight
+  // back over an import made here.
+  const { passive } = useEngine();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
   function handleExport() {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const blob = new Blob([raw], { type: "application/json" });
+    const blob = new Blob([exportSave()], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "btwr-outpost-save.json";
+    a.download = `btwr-outpost-save-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     recordExport();
@@ -169,7 +170,8 @@ function ExportImportSection() {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/70 transition-colors hover:border-white hover:text-white"
+          disabled={passive}
+          className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/70 transition-colors enabled:hover:border-white enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           Import save
         </button>
@@ -181,6 +183,11 @@ function ExportImportSection() {
           onChange={handleFileChange}
         />
       </div>
+      {passive && (
+        <p className="mt-2 text-xs text-white/50">
+          The Outpost is running in another tab. Import there, or run it here first.
+        </p>
+      )}
       {importError && <p className="mt-2 text-xs text-red-400">{importError}</p>}
     </div>
   );
