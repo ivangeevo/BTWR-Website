@@ -15,6 +15,7 @@ import {
   type ActiveCatalog,
   type CustomAchievement,
 } from "./custom-achievements";
+import { OUTPOST_VERSION } from "./outpost-version";
 import { UPGRADES, type UpgradeDef, type UpgradeId } from "./upgrade-catalog";
 import {
   RESOURCE_IDS,
@@ -140,44 +141,142 @@ export function defaultAdminConfig(): AdminConfig {
   };
 }
 
-// Shallow-merges a parsed blob (from localStorage or an imported file) over
-// the defaults, the same way hub-storage tolerates a partially-shaped value
-// — shared by loadAdminConfig and importAdminConfig so a settings file
-// exported from an older/newer version of this panel doesn't crash it.
-function normalizeAdminConfig(parsed: Partial<AdminConfig>): AdminConfig {
+// --- Normalizing (localStorage and imported files share this) ---
+// Rebuilds a config from only the fields it knows, over the defaults, and
+// checks every value's type on the way in — a hand-edited file, an older or
+// newer panel's export, or a NaN that JSON turned into null can't leave a
+// string or null where the Outpost's mechanics do arithmetic. Shared by
+// loadAdminConfig and importAdminConfig, so the two can't migrate
+// differently. Keys configs saved before tiers were retired may carry
+// (tiers, moduleTier, achievementTier, tierTips, achievementDefault) simply
+// aren't copied.
+
+type Obj = Record<string, unknown>;
+
+function isObj(v: unknown): v is Obj {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function isNum(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+/** Keeps each entry `each` accepts (non-null), keyed as it was. */
+function mapOf<T>(v: unknown, each: (x: unknown) => T | null): Record<string, T> {
+  const out: Record<string, T> = {};
+  if (!isObj(v)) return out;
+  for (const [k, x] of Object.entries(v)) {
+    const kept = each(x);
+    if (kept !== null) out[k] = kept;
+  }
+  return out;
+}
+
+function numbers(v: unknown): Record<string, number> {
+  return mapOf(v, (x) => (isNum(x) ? x : null));
+}
+
+/** Only the listed numeric keys; null when none of them survive. */
+function pickNumbers<K extends string>(v: unknown, keys: readonly K[]): Partial<Record<K, number>> | null {
+  if (!isObj(v)) return null;
+  const out: Partial<Record<K, number>> = {};
+  for (const k of keys) {
+    const n = v[k];
+    if (isNum(n)) out[k] = n;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+function toolTierEdit(v: unknown): Partial<ToolTier> | null {
+  if (!isObj(v)) return null;
+  const out: Partial<ToolTier> = {};
+  if (typeof v.name === "string") out.name = v.name;
+  if (typeof v.icon === "string") out.icon = v.icon;
+  if (isNum(v.treeMiningMs)) out.treeMiningMs = v.treeMiningMs;
+  if (isNum(v.huntingMs)) out.huntingMs = v.huntingMs;
+  if (isNum(v.miningMs) || v.miningMs === null) out.miningMs = v.miningMs;
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+function customToolTiers(v: unknown): CustomToolTier[] {
+  if (!Array.isArray(v)) return [];
+  const taken = new Set<string>(TOOL_ORDER);
+  const out: CustomToolTier[] = [];
+  for (const t of v) {
+    if (!isObj(t) || typeof t.id !== "string" || !t.id || taken.has(t.id)) continue;
+    if (typeof t.name !== "string" || !isNum(t.treeMiningMs) || !isNum(t.huntingMs)) continue;
+    taken.add(t.id);
+    out.push({
+      id: t.id,
+      name: t.name,
+      icon: typeof t.icon === "string" ? t.icon : "✨",
+      treeMiningMs: t.treeMiningMs,
+      huntingMs: t.huntingMs,
+      miningMs: isNum(t.miningMs) ? t.miningMs : null,
+      craftCost: numbers(t.craftCost),
+    });
+  }
+  return out;
+}
+
+function resourceEdit(v: unknown): ResourceMetaEdit | null {
+  if (!isObj(v)) return null;
+  const out: ResourceMetaEdit = {};
+  if (typeof v.name === "string") out.name = v.name;
+  if (typeof v.icon === "string") out.icon = v.icon;
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+function normalizeFeatures(v: unknown): FeaturesConfig {
+  const out = defaultFeatures();
+  if (!isObj(v)) return out;
+  for (const k of Object.keys(out) as (keyof FeaturesConfig)[]) {
+    const x = v[k];
+    if (typeof x === typeof out[k] && (typeof x !== "number" || isNum(x))) {
+      (out as Record<string, unknown>)[k] = x;
+    }
+  }
+  return out;
+}
+
+const FRAMES: readonly AdvFrame[] = ["task", "goal", "challenge"];
+const COMPONENT_KEYS = ["baseCost", "rate", "draw"] as const;
+
+function normalizeAdminConfig(parsed: Obj): AdminConfig {
   const base = defaultAdminConfig();
-  // Configs saved before tiers were retired may still carry these.
-  const legacy = parsed as Record<string, unknown>;
-  delete legacy.tiers;
-  delete legacy.moduleTier;
-  delete legacy.achievementTier;
-  delete legacy.tierTips;
-  delete legacy.achievementDefault;
+  const collect = isObj(parsed.collectAmounts) ? parsed.collectAmounts : {};
+  const engine = isObj(parsed.engine) ? parsed.engine : {};
   return {
-    ...base,
-    ...parsed,
-    moduleStage: { ...base.moduleStage, ...parsed.moduleStage },
-    moduleDisabled: { ...base.moduleDisabled, ...parsed.moduleDisabled },
-    achievementParent: { ...base.achievementParent, ...parsed.achievementParent },
-    achievementFrame: { ...base.achievementFrame, ...parsed.achievementFrame },
+    version: 1,
+    moduleStage: numbers(parsed.moduleStage),
+    moduleDisabled: mapOf(parsed.moduleDisabled, (x) => (x === true ? true : null)),
+    achievementParent: mapOf(parsed.achievementParent, (x) => (typeof x === "string" ? (x as AchievementId) : null)),
+    achievementFrame: mapOf(parsed.achievementFrame, (x) => (FRAMES.includes(x as AdvFrame) ? (x as AdvFrame) : null)),
     customAchievements: Array.isArray(parsed.customAchievements)
       ? parsed.customAchievements.map(sanitizeCustom).filter((a): a is CustomAchievement => a !== null)
       : [],
     removedAchievements: Array.isArray(parsed.removedAchievements)
-      ? parsed.removedAchievements.filter((id): id is AchievementId => typeof id === "string")
+      ? [...new Set(parsed.removedAchievements.filter((id): id is AchievementId => typeof id === "string"))]
       : [],
-    toolTierEdits: { ...base.toolTierEdits, ...parsed.toolTierEdits },
-    customToolTiers: Array.isArray(parsed.customToolTiers) ? parsed.customToolTiers : [],
-    craftCostEdits: { ...base.craftCostEdits, ...parsed.craftCostEdits },
-    resourceEdits: { ...base.resourceEdits, ...parsed.resourceEdits },
-    collectAmounts: { ...base.collectAmounts, ...parsed.collectAmounts },
-    stageTips: { ...base.stageTips, ...parsed.stageTips },
-    features: { ...base.features, ...parsed.features },
-    upgradeEdits: { ...base.upgradeEdits, ...parsed.upgradeEdits },
-    mechanicOverrides: { ...base.mechanicOverrides, ...parsed.mechanicOverrides },
+    toolTierEdits: mapOf(parsed.toolTierEdits, toolTierEdit),
+    customToolTiers: customToolTiers(parsed.customToolTiers),
+    craftCostEdits: mapOf(parsed.craftCostEdits, (x) => (isObj(x) ? numbers(x) : null)),
+    resourceEdits: mapOf(parsed.resourceEdits, resourceEdit),
+    collectAmounts: {
+      wood: isNum(collect.wood) ? Math.max(0, collect.wood) : base.collectAmounts.wood,
+      food: isNum(collect.food) ? Math.max(0, collect.food) : base.collectAmounts.food,
+    },
+    // Per stage: a saved list (even an emptied one) replaces the default tips.
+    stageTips: {
+      ...base.stageTips,
+      ...mapOf(parsed.stageTips, (x) => (Array.isArray(x) ? x.filter((s): s is string => typeof s === "string") : null)),
+    },
+    features: normalizeFeatures(parsed.features),
+    upgradeEdits: mapOf(parsed.upgradeEdits, (x) => pickNumbers(x, ["cost", "stage"] as const)),
+    mechanicOverrides: mapOf(parsed.mechanicOverrides, (x) => (isObj(x) ? numbers(x) : null)),
     engine: {
-      mechanic: { ...base.engine.mechanic, ...parsed.engine?.mechanic },
-      components: { ...base.engine.components, ...parsed.engine?.components },
+      mechanic: mapOf(engine.mechanic, (x) => (isObj(x) ? numbers(x) : null)),
+      components: mapOf(engine.components, (x) => pickNumbers(x, COMPONENT_KEYS)),
     },
   };
 }
@@ -187,8 +286,8 @@ export function loadAdminConfig(): AdminConfig {
   try {
     const raw = window.localStorage.getItem(ADMIN_STORAGE_KEY);
     if (!raw) return defaultAdminConfig();
-    const parsed = JSON.parse(raw);
-    if (parsed?.version !== 1) return defaultAdminConfig();
+    const parsed: unknown = JSON.parse(raw);
+    if (!isObj(parsed) || parsed.version !== 1) return defaultAdminConfig();
     return normalizeAdminConfig(parsed);
   } catch {
     return defaultAdminConfig();
@@ -204,14 +303,52 @@ export function saveAdminConfig(config: AdminConfig) {
   }
 }
 
-// Parses a settings file the panel itself exported (see AdminPanel's
-// ExportImportControl) — returns null for anything that isn't recognizably
-// one, so the caller can show an error instead of silently no-op'ing.
+// --- The settings file (AdminPanel's ExportImportControl) ---
+// Everything the panel's tabs edit lives in this one config, so the file is
+// the config plus a header saying what it is. Deliberately not in it: the
+// Engine Debug tab's switches (btwr:hub:debug:v1 — test toggles like forced
+// night or gloom, not customization) and which lists are folded (a
+// per-browser nicety). Progress is the Outpost's own save file (save-file.ts).
+export const ADMIN_FILE_FORMAT = "btwr-outpost-admin-settings";
+export const ADMIN_FILE_VERSION = 2;
+
+export type AdminSettingsFile = {
+  format: typeof ADMIN_FILE_FORMAT;
+  fileVersion: typeof ADMIN_FILE_VERSION;
+  exportedAt: string;
+  /** Informational only — which Outpost build wrote the file. */
+  outpostVersion: string;
+  config: AdminConfig;
+};
+
+export function exportAdminConfig(config: AdminConfig, now: Date = new Date()): string {
+  const file: AdminSettingsFile = {
+    format: ADMIN_FILE_FORMAT,
+    fileVersion: ADMIN_FILE_VERSION,
+    exportedAt: now.toISOString(),
+    outpostVersion: OUTPOST_VERSION,
+    config,
+  };
+  return JSON.stringify(file, null, 2);
+}
+
+// Top-level keys every admin config has always saved — how an older export
+// (just the raw config) is told apart from an Outpost progress save, which
+// is also `version: 1`.
+const ADMIN_ONLY_KEYS = ["moduleStage", "moduleDisabled", "features", "mechanicOverrides", "stageTips", "toolTierEdits"];
+
+// Parses a settings file: the current bundle, or an older export that was
+// just the raw config. Returns null for anything else — an Outpost progress
+// save included — so the caller can show an error instead of silently
+// taking it in.
 export function importAdminConfig(raw: string): AdminConfig | null {
   try {
-    const parsed = JSON.parse(raw);
-    if (parsed?.version !== 1 || typeof parsed !== "object") return null;
-    return normalizeAdminConfig(parsed);
+    const parsed: unknown = JSON.parse(raw);
+    if (!isObj(parsed)) return null;
+    const body = parsed.format === ADMIN_FILE_FORMAT ? parsed.config : parsed;
+    if (!isObj(body) || body.version !== 1) return null;
+    if ("unlocked" in body || !ADMIN_ONLY_KEYS.some((k) => isObj(body[k]))) return null;
+    return normalizeAdminConfig(body);
   } catch {
     return null;
   }

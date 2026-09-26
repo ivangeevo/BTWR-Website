@@ -13,6 +13,7 @@ import {
 } from "./achievements-catalog";
 import {
   defaultAdminConfig,
+  exportAdminConfig,
   importAdminConfig,
   isModuleDisabled,
   loadAdminConfig,
@@ -1549,11 +1550,11 @@ function ExportImportControl({ config, update }: { config: AdminConfig; update: 
   const [importError, setImportError] = useState<string | null>(null);
 
   function handleExport() {
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+    const blob = new Blob([exportAdminConfig(config)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "btwr-outpost-admin-settings.json";
+    a.download = `btwr-outpost-admin-settings-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -1581,8 +1582,8 @@ function ExportImportControl({ config, update }: { config: AdminConfig; update: 
       <div className="min-w-0">
         <p className="text-sm font-semibold text-white">Export / import settings</p>
         <p className="mt-0.5 text-xs text-slate-400">
-          Save this customization (card stages, resources, tools, features) to a file, or load one you
-          saved earlier. Doesn&apos;t touch your actual progress.
+          Save this customization (every tab except Engine Debug) to a file, or load one you saved
+          earlier. Doesn&apos;t touch your actual progress.
         </p>
         {importError && <p className="mt-1 text-xs text-red-400">{importError}</p>}
       </div>
