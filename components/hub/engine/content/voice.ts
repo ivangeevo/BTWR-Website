@@ -1,7 +1,7 @@
 // Short reaction lines — card reveals, welcome-backs, pops, Eurekas — keyed
 // by stage band so the voice matures with the Engine.
 import type { ModuleId } from "../../module-registry";
-import type { BeliefAxis, EngineStage, PopReason } from "../types";
+import type { BeliefAxis, EngineStage, GridPartType, PopInfo, PopReason } from "../types";
 
 function band(stage: EngineStage): 0 | 1 | 2 {
   return stage <= 3 ? 0 : stage <= 6 ? 1 : 2;
@@ -37,7 +37,38 @@ export const POP_LINES: Record<PopReason, string> = {
   opposed: "That axle was being turned from both ends. It chose to stop existing.",
   twoSources: "Two sources met in that gearbox. Only one can own it.",
   overload: "That gearbox was rated for a windmill, not a river.",
+  crankOverload: "Handcrank got overloaded and was destroyed.",
 };
+
+const num = (n: number) => String(Math.round(n * 10) / 10);
+
+/** Why a part pops, plainly: "6 PU goes in, but it's rated for 4". */
+export function popReasonText(p: PopInfo, maxChain: number): string {
+  switch (p.reason) {
+    case "chain":
+      return `that's axle ${num(p.run ?? maxChain + 1)} in a row, and a powered line only runs ${maxChain} before it needs a gearbox`;
+    case "opposed":
+      return "power is turning it from both ends at once";
+    case "twoSources":
+      return "power from a second source comes in through one of its output sides";
+    case "overload":
+      return `${num(p.load ?? 0)} PU goes in, but it's rated for ${num(p.cap ?? 0)}`;
+    case "crankOverload":
+      return "it's right next to another power source";
+  }
+}
+
+/** A way out, where there's an obvious one. */
+export function popFixText(p: PopInfo, type: GridPartType): string {
+  if (p.reason === "overload") {
+    return type === "gearbox"
+      ? " Research stronger gear teeth in Works, use a Soulforged Gearbox, or run straight axles into the core instead."
+      : " Split the load, or run straight axles into the core instead.";
+  }
+  if (p.reason === "chain") return " Put a gearbox in the run to reset it.";
+  if (p.reason === "twoSources" || p.reason === "opposed") return " Give each source its own line.";
+  return "";
+}
 
 export function eurekaLine(kind: "frenzy" | "lucky" | "part" | "letter"): string {
   switch (kind) {
@@ -66,12 +97,12 @@ export const SPEC_LINES: Record<BeliefAxis, { name: string; line: string; perks:
   soulforger: {
     name: "Soulforger",
     line: "You wanted the forge. So do I. Weak now, strong later.",
-    perks: ["Soulforged parts cost 30% less", "Hibachi & Bellows draw less power", "Kilns, Soul Urns & Enchanters +50%"],
+    perks: ["Soulforged parts cost 30% less", "Kilns, Soul Urns & Enchanters +50%"],
   },
 };
 
 export function idleCaption(stage: EngineStage, corePU: number): string {
   if (stage < 3) return "";
-  if (corePU <= 0) return stage === 3 ? "Crank me — my core is still." : "No power reaching the core.";
+  if (corePU <= 0) return stage === 3 ? "No body yet." : "Nothing is turning.";
   return "";
 }

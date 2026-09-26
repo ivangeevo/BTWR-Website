@@ -24,14 +24,13 @@ function engine(over: Partial<EngineState> = {}): EngineState {
   return { ...defaultEngineState(iso(T0)), ...over };
 }
 
-function withPower(e: EngineState, idle: number, cranked = idle, boosted = cranked): EngineState {
+function withPower(e: EngineState, idle: number, cranked = idle, grind = { idle: 0, cranked: 0 }): EngineState {
   return {
     ...e,
     grid: { ...e.grid, clutch: true },
     solved: {
-      idle: { ...emptySummary(), corePU: idle },
-      cranked: { ...emptySummary(), corePU: cranked },
-      boosted: { ...emptySummary(), corePU: boosted },
+      idle: { ...emptySummary(), corePU: idle, supplyPU: idle, grinding: grind.idle },
+      cranked: { ...emptySummary(), corePU: cranked, supplyPU: cranked, grinding: grind.cranked },
       rev: 0,
     },
   };
@@ -76,11 +75,26 @@ describe("computeIps", () => {
     expect(computeIps(full, cfg, fx, T0).ips).toBeCloseTo(3);
   });
 
-  it("stage 3 powers a virtual core only while cranking", () => {
-    const e = engine({ stage: 3, blueprints: ["handCrank"], components: { hopper: 10 } });
-    expect(computeIps(e, cfg, fx, T0).ips).toBeCloseTo(0.2);
-    const cranking = { ...e, crankActiveUntil: iso(T0 + 5000) };
-    expect(computeIps(cranking, cfg, fx, T0).ips).toBeCloseTo(1);
+  it("isn't held back by power before the body exists", () => {
+    const e = engine({ stage: 3, components: { hopper: 10 } });
+    expect(computeIps(e, cfg, fx, T0).enginePU).toBe(0);
+    expect(computeIps(e, cfg, fx, T0).ips).toBeCloseTo(10 * 0.1);
+  });
+
+  it("adds the crank's power only while cranking", () => {
+    const e = withPower(engine({ stage: 4, components: { hopper: 10, dispenser: 1 } }), 0, 1);
+    const still = computeIps(e, cfg, fx, T0);
+    expect(still.enginePU).toBe(0);
+    const cranking = computeIps({ ...e, crankActiveUntil: iso(T0 + 5000) }, cfg, fx, T0);
+    expect(cranking.enginePU).toBe(1);
+    // draw 2, power 1 -> factor .6
+    expect(cranking.ips).toBeCloseTo((10 * 0.1 + 1) * 0.6);
+  });
+
+  it("a turning Millstone no longer multiplies insight", () => {
+    const e = withPower(engine({ stage: 5, components: { hopper: 10 } }), 4, 4, { idle: 2, cranked: 2 });
+    const plain = withPower(engine({ stage: 5, components: { hopper: 10 } }), 4, 4);
+    expect(computeIps(e, cfg, fx, T0).ips).toBeCloseTo(computeIps(plain, cfg, fx, T0).ips);
   });
 
   it("applies research, Mark, frenzy multipliers", () => {
@@ -117,7 +131,8 @@ describe("settle", () => {
         lastInteractAt: iso(T0 - 24 * 3.6e6 + 90_000),
       }),
       1,
-      2
+      2,
+      { idle: 0, cranked: 1 }
     );
     const to = T0 + 180_000;
     let brute = 0;
@@ -149,7 +164,12 @@ describe("offlineAccrual", () => {
   });
 
   it("ignores the crank and frenzies", () => {
-    const e = withPower(engine({ stage: 5, components: { hopper: 10 }, crankActiveUntil: iso(T0 + 1e9) }), 0, 5);
+    const e = withPower(
+      engine({ stage: 5, components: { hopper: 10 }, crankActiveUntil: iso(T0 + 1e9), frenzy: { until: iso(T0 + 1e9), mult: 7 } }),
+      0,
+      5,
+      { idle: 0, cranked: 1 }
+    );
     const r = offlineAccrual(e, cfg, fx, T0, T0 + 600_000);
     expect(r.offIps).toBeCloseTo(10 * 0.1 * 0.2 * 0.5);
   });

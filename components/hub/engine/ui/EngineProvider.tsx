@@ -22,13 +22,13 @@ import { BLUEPRINTS_BY_ID, KEY_FRAGMENTS } from "../content/blueprints";
 import type { LiveCtx } from "../content/live";
 import { LORE_FRAGMENT_RANK, loreRankForInsight } from "../content/lore";
 import { JOURNAL_ASK_PREFIX } from "../content/puzzles";
-import { eurekaLine, POP_LINES, revealLine, welcomeBackLine } from "../content/voice";
+import { eurekaLine, POP_LINES, popReasonText, revealLine, welcomeBackLine } from "../content/voice";
 import { MODULES } from "../../module-registry";
 import {
   bulkCost,
   cipherBurst,
   computeIps,
-  corePUAt,
+  enginePUAt,
   crankRevValue,
   DRUM_COSTS,
   askReward,
@@ -40,9 +40,10 @@ import {
   stageFlat,
 } from "../economy";
 import { eurekaLifeMs, luckyAmount, nextEurekaDelayMs, rollEurekaKind } from "../eureka";
-import { engageGrid } from "../grid/engage";
+import { breakOverloadedCranks, engageGrid } from "../grid/engage";
+import { crankCanTurn } from "../grid/solver";
 import { betterResult, DIFF_BY_ID, scoreChallenge, type DiffPart, type DiffScore } from "../grid/difference";
-import { canPlaceOn, layoutFor, remapGrid } from "../grid/layouts";
+import { canPlaceAt, layoutFor, placementRot, remapGrid, turnTarget } from "../grid/layouts";
 import { PART_DEFS, STARTER_BLUEPRINTS } from "../grid/parts";
 import {
   EVT_INBOX,
@@ -67,7 +68,7 @@ import type {
   EurekaKind,
   GridPartType,
   PlacedPart,
-  Rot,
+  Terrain,
 } from "../types";
 import { LiveStore } from "./live-store";
 
@@ -120,13 +121,15 @@ type EngineCtx = {
   craftPart: (type: GridPartType) => boolean;
   partCost: (type: GridPartType) => Record<string, number>;
   placePart: (index: number, type: GridPartType) => boolean;
-  rotatePart: (index: number) => void;
+  /** Moves the part with its hub at `from` so its hub sits at `to`. False if it doesn't fit there. */
+  movePart: (from: number, to: number) => boolean;
+  /** False when there's no room for it to turn. */
+  rotatePart: (index: number) => boolean;
   removePart: (index: number) => void;
   engage: () => void;
   // Attachments & events
   catchEureka: () => void;
   useDetector: () => boolean;
-  stokeCampfire: () => boolean;
   chooseSpec: (axis: BeliefAxis) => boolean;
   respecCost: () => number;
   claimCommission: (slot: number | "weekly") => boolean;
@@ -235,7 +238,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
         const f = fxOf(s);
         const pub = publicSnapshot(
           s,
-          { ips: computeIps(s, c, f, now).ips, corePU: corePUAt(s, c, now) },
+          { ips: computeIps(s, c, f, now).ips, corePU: enginePUAt(s, now) },
           { governsSky: f.governsSky && s.stage >= 8, keywordHunt: s.ciphers.current?.kind === "keyword" },
           iso(now)
         );
@@ -435,7 +438,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
       storeRef.current.set({
         insight,
         ips: computeIps(s, c, f, now).ips,
-        corePU: corePUAt(s, c, now),
+        corePU: enginePUAt(s, now),
         at: now,
       });
 
@@ -517,7 +520,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
         if (s.stage >= 8) s = { ...s, commissions: refreshCommissions(s, new Date(now), modsRef.current.length) };
         const pub = publicSnapshot(
           s,
-          { ips: computeIps(s, c, f, now).ips, corePU: corePUAt(s, c, now) },
+          { ips: computeIps(s, c, f, now).ips, corePU: enginePUAt(s, now) },
           { governsSky: f.governsSky && s.stage >= 8, keywordHunt: s.ciphers.current?.kind === "keyword" },
           iso(now)
         );
@@ -753,6 +756,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
         // The Engine's first body comes with a starter kit.
         if (next === 4) {
           inventory.handCrank = (inventory.handCrank ?? 0) + 1;
+          inventory.millstone = (inventory.millstone ?? 0) + 1;
           inventory.gearbox = (inventory.gearbox ?? 0) + 1;
           inventory.axle = (inventory.axle ?? 0) + 2;
         }
@@ -767,20 +771,67 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
 
   // ------------------------------------------------------------------ Clicker
 
+  // Crank turns since the last hand-turned yield (not saved — a reload just
+  // starts the next count over).
+  const handRevsRef = useRef(0);
+
+  // One revolution of the hand crank on the grid: a "click" of insight, and
+  // for a few seconds it powers the Engine and turns the Millstone / Saw /
+  // Bellows right next to it (the engaged `cranked` solve). Every few turns
+  // each of those yields its resource straight into the Outpost.
   const crankRev = useCallback((): number => {
+    const live = getEngine();
+    // A crank right next to another power source snaps on the first turn —
+    // committed right away, so the grid and the button show it at once.
+    if (breakOverloadedCranks(live, envRef.current, cfgRef.current, fxOf(live))) {
+      act((s) => {
+        const snapped = breakOverloadedCranks(s, envRef.current, cfgRef.current, fxOf(s));
+        if (!snapped) return s;
+        return { ...s, grid: snapped.grid, solved: snapped.solved, counters: { ...s.counters, pops: s.counters.pops + snapped.broken } };
+      });
+      toast(POP_LINES.crankOverload, "warn");
+      return 0;
+    }
+    // No working crank left on the grid: nothing to turn.
+    if (!crankCanTurn(live.grid.cells)) return 0;
     let value = 0;
+    const hand = { millstone: 0, saw: 0, bellows: 0 };
     act((s, now) => {
       value = crankRevValue(ipsNow(s, now), fxOf(s));
       const out = grant(s, value);
+      const turned = out.grid.clutch ? out.solved?.cranked : undefined;
+      const byUid = new Map(out.grid.cells.filter(Boolean).map((c) => [c!.uid, c!.type]));
+      hand.millstone = hand.saw = hand.bellows = 0;
+      for (const uid of turned?.handTurned ?? []) {
+        const t = byUid.get(uid);
+        if (t === "millstone" || t === "saw" || t === "bellows") hand[t] += 1;
+      }
       return {
         ...out,
         crankActiveUntil: iso(now + cfgRef.current.economy.crankActiveSec * 1000),
-        counters: { ...out.counters, cranks: out.counters.cranks + 1 },
+        counters: { ...out.counters, cranks: out.counters.cranks + 1, grinds: out.counters.grinds + (hand.millstone > 0 ? 1 : 0) },
       };
     }, "soon");
+    // What the crank turns by hand yields every few turns.
+    if (hand.millstone + hand.saw + hand.bellows > 0) {
+      handRevsRef.current += 1;
+      if (handRevsRef.current >= cfgRef.current.buffs.handYieldRevs) {
+        handRevsRef.current = 0;
+        const gain: Partial<Record<"stone" | "wood" | "coal" | "copper" | "iron", number>> = {};
+        if (hand.millstone) gain.stone = hand.millstone;
+        if (hand.saw) gain.wood = hand.saw;
+        for (let k = 0; k < hand.bellows; k++) {
+          const r = Math.random();
+          const ore = r < 0.6 ? "coal" : r < 0.9 ? "copper" : "iron";
+          gain[ore] = (gain[ore] ?? 0) + 1;
+        }
+        aRef.current.grantResources(gain, "The Engine's hand crank");
+        act((cur) => ({ ...cur, counters: { ...cur.counters, handYields: cur.counters.handYields + 1 } }));
+      }
+    }
     return value;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [act]);
+  }, [act, getEngine]);
 
   const feedCrank = useCallback((): boolean => {
     if (!spendResources({ cookedFood: 1 }, "Fed the Engine's hand crank")) return false;
@@ -861,16 +912,24 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
       const known = STARTER_BLUEPRINTS.includes(type) || s.blueprints.includes(type);
       if (!known || s.stage < 4) return false;
       if (def.soulforged && !aRef.current.engineBuffs.hibachiLit) return false;
+      // Parts it's built from (a windmill's own axle) come out of the inventory.
+      const uses = Object.entries(def.parts ?? {}) as [GridPartType, number][];
+      if (uses.some(([t, n]) => (s.inventory[t] ?? 0) < n)) return false;
       if (!spendResources(partCost(type), `The Engine crafted a ${def.name}`)) return false;
-      act((cur) => ({
-        ...cur,
-        inventory: { ...cur.inventory, [type]: (cur.inventory[type] ?? 0) + 1 },
-        counters: {
-          ...cur.counters,
-          partsCrafted: cur.counters.partsCrafted + 1,
-          soulforged: cur.counters.soulforged + (def.soulforged ? 1 : 0),
-        },
-      }));
+      act((cur) => {
+        const inventory = { ...cur.inventory };
+        for (const [t, n] of uses) inventory[t] = Math.max(0, (inventory[t] ?? 0) - n);
+        inventory[type] = (inventory[type] ?? 0) + 1;
+        return {
+          ...cur,
+          inventory,
+          counters: {
+            ...cur.counters,
+            partsCrafted: cur.counters.partsCrafted + 1,
+            soulforged: cur.counters.soulforged + (def.soulforged ? 1 : 0),
+          },
+        };
+      });
       return true;
     },
     [act, getEngine, partCost, spendResources]
@@ -893,12 +952,14 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     (index: number, type: GridPartType): boolean => {
       const s = getEngine();
       const layout = layoutFor(s.stage);
-      if (!layout || s.grid.cells[index] || (s.inventory[type] ?? 0) < 1) return false;
-      if (!canPlaceOn(layout.terrain[index], { type })) return false;
-      editGrid((cur) => {
-        if (cur.grid.cells[index] || (cur.inventory[type] ?? 0) < 1) return null;
+      // Faces the default way, or its other way when only that fits here.
+      const rotFor = (g: EngineState["grid"], terrain: Terrain[]) => placementRot(g.cells, terrain, g.w, g.h, index, type);
+      if (!layout || (s.inventory[type] ?? 0) < 1 || rotFor(s.grid, layout.terrain) === null) return false;
+      editGrid((cur, lay) => {
+        const rot = rotFor(cur.grid, lay.terrain);
+        if ((cur.inventory[type] ?? 0) < 1 || rot === null) return null;
         const cells = [...cur.grid.cells];
-        cells[index] = { uid: uid(), type, rot: 1 as Rot };
+        cells[index] = { uid: uid(), type, rot };
         return { ...cur, grid: { ...cur.grid, cells }, inventory: { ...cur.inventory, [type]: (cur.inventory[type] ?? 0) - 1 } };
       });
       return true;
@@ -906,17 +967,47 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     [editGrid, getEngine]
   );
 
-  const rotatePart = useCallback(
-    (index: number) => {
-      editGrid((cur) => {
-        const part = cur.grid.cells[index];
-        if (!part) return null;
+  const movePart = useCallback(
+    (from: number, to: number): boolean => {
+      if (from === to) return false;
+      const fits = (g: EngineState["grid"], terrain: Terrain[]) => {
+        const part = g.cells[from];
+        return !!part && canPlaceAt(g.cells, terrain, g.w, g.h, to, part.type, part.rot, from);
+      };
+      const s = getEngine();
+      const layout = layoutFor(s.stage);
+      if (!layout || !fits(s.grid, layout.terrain)) return false;
+      editGrid((cur, lay) => {
+        if (!fits(cur.grid, lay.terrain)) return null;
         const cells = [...cur.grid.cells];
-        cells[index] = { ...part, rot: ((part.rot + 1) % 4) as Rot };
+        cells[to] = cells[from];
+        cells[from] = null;
         return { ...cur, grid: { ...cur.grid, cells } };
       });
+      return true;
     },
-    [editGrid]
+    [editGrid, getEngine]
+  );
+
+  const rotatePart = useCallback(
+    (index: number): boolean => {
+      // A big part with no room to turn in place slides to where it fits.
+      const target = (g: EngineState["grid"], terrain: Terrain[]) => turnTarget(g.cells, terrain, g.w, g.h, index);
+      const s = getEngine();
+      const layout = layoutFor(s.stage);
+      if (!layout || !target(s.grid, layout.terrain)) return false;
+      editGrid((cur, lay) => {
+        const part = cur.grid.cells[index];
+        const t = target(cur.grid, lay.terrain);
+        if (!part || !t) return null;
+        const cells = [...cur.grid.cells];
+        cells[index] = null;
+        cells[t.hub] = { ...part, rot: t.rot };
+        return { ...cur, grid: { ...cur.grid, cells } };
+      });
+      return true;
+    },
+    [editGrid, getEngine]
   );
 
   const removePart = useCallback(
@@ -957,11 +1048,18 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
       };
     });
     if (r.pops.length > 0) {
-      toast(POP_LINES[r.pops[0].reason] + (r.refunded.length ? " (I kept the pieces this once.)" : ""), "warn");
-    } else if (r.solved.idle.corePU > 0 || r.solved.cranked.corePU > 0) {
+      const p = r.pops[0];
+      const why = `${PART_DEFS[p.type].name}: ${popReasonText(p, cfgRef.current.power.maxChain)}.`;
+      const more = r.pops.length > 1 ? ` ${r.pops.length - 1} more popped too.` : "";
+      toast(`${POP_LINES[p.reason]} (${why})${more}` + (r.refunded.length ? " (I kept the pieces this once.)" : ""), "warn");
+    } else if (r.solved.idle.corePU > 0) {
       toast("Clutch engaged. I can feel that.", "good");
+    } else if (r.solved.idle.supplyPU > 0) {
+      toast("Clutch engaged. The sources turn, but none of it reaches my core.", "warn");
+    } else if (r.solved.cranked.corePU > 0) {
+      toast("Clutch engaged. Now turn the crank.", "good");
     } else {
-      toast("Clutch engaged — but no power reaches my core yet.", "info");
+      toast("Clutch engaged — but nothing here makes power yet.", "info");
     }
   }, [act, getEngine, toast]);
 
@@ -1015,14 +1113,6 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     }));
     return true;
   }, [act, getEngine]);
-
-  const stokeCampfire = useCallback((): boolean => {
-    if (!aRef.current.engineBuffs.bellowsPowered) return false;
-    // Fails with no Campfire crafted, or on a dead fire without the Wood to relight it.
-    if (!aRef.current.tendCampfire()) return false;
-    act((cur) => ({ ...cur, counters: { ...cur.counters, stokes: cur.counters.stokes + 1 } }));
-    return true;
-  }, [act]);
 
   const respecCost = useCallback((): number => {
     const s = getEngine();
@@ -1216,12 +1306,12 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     craftPart,
     partCost,
     placePart,
+    movePart,
     rotatePart,
     removePart,
     engage,
     catchEureka,
     useDetector,
-    stokeCampfire,
     chooseSpec,
     respecCost,
     claimCommission,

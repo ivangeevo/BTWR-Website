@@ -123,11 +123,6 @@ export default function Gathering() {
           <p className="text-xs text-slate-300">
             Head out for food. Once you&apos;ve set off there&apos;s no calling it back early.
           </p>
-          {engineBuffs.millstonePowered && engineBuffs.millstoneFood > 0 && (
-            <p className="mt-1 text-[11px] text-[var(--outpost-accent)]">
-              {"\u{1FAA8}"} The Engine&apos;s Millstone is running: +{engineBuffs.millstoneFood} {resourceMeta.food.name} per trip.
-            </p>
-          )}
           <div className="mt-2">
             <LoadingBarButton
               durationMs={tool.huntingMs}
@@ -145,6 +140,16 @@ export default function Gathering() {
           <p className="text-xs text-slate-300">
             Break rock for Stone, Coal, Copper, and Iron — a better tool finds more of each.
           </p>
+          {engineBuffs.millPowered && (
+            <p className="mt-1 text-[11px] text-[var(--outpost-accent)]">
+              {"\u{1FAA8}"} The Engine&apos;s Millstone is running: +{engineBuffs.millStone} {resourceMeta.stone.name} per run.
+            </p>
+          )}
+          {engineBuffs.bellowsPowered && (
+            <p className="mt-1 text-[11px] text-[var(--outpost-accent)]">
+              {"\u{1F4A8}"} The Engine&apos;s Bellows are running: +{engineBuffs.bellowsOre} to each ore found.
+            </p>
+          )}
           {tool.miningMs === null ? (
             <p className="mt-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-white/50">
               Craft a Stone Tool in the Crafting card first — mining bare-handed doesn&apos;t get you anywhere.

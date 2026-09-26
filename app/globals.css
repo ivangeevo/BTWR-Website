@@ -1861,9 +1861,10 @@ html.daynight-fighting .outpost-zone::after {
   animation: engine-spark-pulse 1.1s ease-in-out infinite;
 }
 
-/* The gear grid: 44px-ish tap targets, down to 40px on very narrow phones. */
+/* The gear grid (5×5, then 6×6, then 7×7): cells shrink as it grows so the
+   whole grid still fits a phone, down to ~33px tap targets at 7×7. */
 .engine-grid {
-  --engine-cell: clamp(40px, 11vw, 48px);
+  --engine-cell: clamp(36px, 13vw, 48px);
   display: grid;
   gap: 3px;
   padding: 4px;
@@ -1873,6 +1874,12 @@ html.daynight-fighting .outpost-zone::after {
   width: max-content;
   max-width: 100%;
   overflow-x: auto;
+}
+.engine-grid[data-size="6"] {
+  --engine-cell: clamp(34px, 11vw, 46px);
+}
+.engine-grid[data-size="7"] {
+  --engine-cell: clamp(30px, 9.4vw, 44px);
 }
 .engine-cell {
   position: relative;
@@ -1928,10 +1935,196 @@ html.daynight-fighting .outpost-zone::after {
   font-weight: 800;
   color: #fbbf24;
 }
+/* Drag & drop: parts are picked up with a left-click drag. The squares a
+   part leaves show a faded ghost; the squares it would land on light up
+   (red, dashed, where it doesn't fit) with the part drawn there. */
+.engine-cell-filled {
+  cursor: grab;
+}
+.engine-cell-ghost {
+  border-style: dashed;
+}
+.engine-cell-ghost > :not(.engine-drop-preview) {
+  opacity: 0.35;
+  filter: grayscale(0.8);
+}
+.engine-cell-drop {
+  border-color: var(--outpost-accent, #d98a4a);
+  background-color: rgba(217, 138, 74, 0.16);
+}
+.engine-cell-drop-bad {
+  border-style: dashed;
+  border-color: rgba(248, 113, 113, 0.8);
+  background-color: rgba(248, 113, 113, 0.12);
+}
+.engine-drop-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  pointer-events: none;
+}
+/* Big sources (windmill, water wheel) are drawn once, from their hub
+   square, across every square they span; a quarter turn when they stand in
+   a column. */
+.engine-part-art {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  width: calc(var(--engine-span, 1) * var(--engine-cell) + (var(--engine-span, 1) - 1) * 3px);
+  height: var(--engine-cell);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.engine-part-art[data-vertical="true"] {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+.engine-part-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.engine-part-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 1.2em;
+  height: 1.2em;
+}
+/* A windmill seen from above: each pair of sails foreshortens as it turns
+   (full length → edge-on → full length the other way), the second pair a
+   quarter turn behind the first — edge-on, so hidden, at rest. */
+.engine-sail {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.engine-sail-b {
+  transform: scaleX(0);
+}
+.engine-cell-turning .engine-sail {
+  animation: engine-sail-sweep 2.4s linear infinite;
+}
+.engine-cell-turning .engine-sail-b {
+  animation-delay: -1.8s;
+}
+@keyframes engine-sail-sweep {
+  0% {
+    transform: scaleX(1);
+  }
+  12.5% {
+    transform: scaleX(0.707);
+  }
+  25% {
+    transform: scaleX(0);
+  }
+  37.5% {
+    transform: scaleX(-0.707);
+  }
+  50% {
+    transform: scaleX(-1);
+  }
+  62.5% {
+    transform: scaleX(-0.707);
+  }
+  75% {
+    transform: scaleX(0);
+  }
+  87.5% {
+    transform: scaleX(0.707);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+/* One-square parts drawn from above (millstone, gearbox, hand crank):
+   inset so the input/output face bars around the cell stay visible, and
+   the stone, gear or crank arm turns while powered. */
+.engine-cell-art {
+  position: relative;
+  display: flex;
+  width: 80%;
+  height: 80%;
+}
+.engine-cell-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.engine-cell-spin {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.engine-cell-turning .engine-cell-spin {
+  animation: engine-spin 3s linear infinite;
+}
+.engine-cell-turning .engine-cell-spin-fast {
+  animation-duration: 0.9s;
+}
+/* The Bellows pump while powered; the Hibachi's coals and the Detector's
+   lens only glow while powered. */
+.engine-cell-pump {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.engine-cell-turning .engine-cell-pump {
+  animation: engine-pump 1.1s ease-in-out infinite;
+}
+@keyframes engine-pump {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.88);
+  }
+}
+.engine-cell-glow {
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.engine-cell-turning .engine-cell-glow {
+  opacity: 1;
+  animation: engine-flicker 1.4s ease-in-out infinite alternate;
+}
+@keyframes engine-flicker {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* A soulforged axle: drawn left–right, a quarter turn for north–south;
+   its end caps light up while it turns, like a plain axle's. */
+.engine-cell-axle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.engine-cell-axle[data-axis="v"] {
+  transform: rotate(90deg);
+}
+.engine-cell-turning .engine-axle-cap {
+  fill: #fbbf24;
+}
+/* A water wheel seen from above: the paddles roll along the drum. */
+.engine-cell-turning .engine-paddles {
+  animation: engine-paddle-roll 0.7s linear infinite;
+}
+@keyframes engine-paddle-roll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--engine-paddle-pitch, 12px));
+  }
+}
 /* Which way a part faces: a bar on the side power must come in from
-   (gearbox, attachments) or go out of (the hand crank). */
+   (gearbox, attachments). */
 .engine-face {
   position: absolute;
+  z-index: 1;
   background: var(--outpost-accent, #d98a4a);
   border-radius: 2px;
   opacity: 0.85;
@@ -1959,6 +2152,111 @@ html.daynight-fighting .outpost-zone::after {
   top: 25%;
   bottom: 25%;
   width: 3px;
+}
+/* A gearbox's input — the yellow side, the only one it takes power on —
+   and faint ticks on the three sides it sends power out of. */
+.engine-face[data-kind="in"] {
+  background: #fbbf24;
+  opacity: 1;
+  box-shadow: 0 0 4px rgba(251, 191, 36, 0.6);
+}
+.engine-face[data-kind="in"][data-face="0"],
+.engine-face[data-kind="in"][data-face="2"] {
+  left: 12%;
+  right: 12%;
+  height: 4px;
+}
+.engine-face[data-kind="in"][data-face="1"],
+.engine-face[data-kind="in"][data-face="3"] {
+  top: 12%;
+  bottom: 12%;
+  width: 4px;
+}
+.engine-face[data-kind="out"] {
+  background: rgba(255, 255, 255, 0.35);
+  opacity: 1;
+}
+.engine-face[data-kind="out"][data-face="0"],
+.engine-face[data-kind="out"][data-face="2"] {
+  left: 40%;
+  right: 40%;
+  height: 2px;
+}
+.engine-face[data-kind="out"][data-face="1"],
+.engine-face[data-kind="out"][data-face="3"] {
+  top: 40%;
+  bottom: 40%;
+  width: 2px;
+}
+
+/* An axle drawn as its shaft, edge to edge along its axis. Only the two
+   thin ends (the bright caps) connect to anything. */
+.engine-shaft {
+  position: absolute;
+  background: linear-gradient(90deg, #7a5230, #b07a47 50%, #7a5230);
+  border-radius: 1px;
+}
+.engine-shaft[data-axis="v"] {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 22%;
+  transform: translateX(-50%);
+}
+.engine-shaft[data-axis="h"] {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 22%;
+  transform: translateY(-50%);
+  background: linear-gradient(180deg, #7a5230, #b07a47 50%, #7a5230);
+}
+.engine-shaft-sf {
+  background: linear-gradient(90deg, #4b5563, #9ca3af 50%, #4b5563);
+}
+.engine-shaft-sf[data-axis="h"] {
+  background: linear-gradient(180deg, #4b5563, #9ca3af 50%, #4b5563);
+}
+/* Axis sources (millstone, windmill, water wheel): a thinner shaft under the icon. */
+.engine-shaft-thin[data-axis="v"] {
+  width: 10%;
+}
+.engine-shaft-thin[data-axis="h"] {
+  height: 10%;
+}
+.engine-shaft::before,
+.engine-shaft::after {
+  content: "";
+  position: absolute;
+  background: var(--outpost-accent, #d98a4a);
+}
+.engine-shaft[data-axis="v"]::before,
+.engine-shaft[data-axis="v"]::after {
+  left: -2px;
+  right: -2px;
+  height: 3px;
+}
+.engine-shaft[data-axis="v"]::before {
+  top: 0;
+}
+.engine-shaft[data-axis="v"]::after {
+  bottom: 0;
+}
+.engine-shaft[data-axis="h"]::before,
+.engine-shaft[data-axis="h"]::after {
+  top: -2px;
+  bottom: -2px;
+  width: 3px;
+}
+.engine-shaft[data-axis="h"]::before {
+  left: 0;
+}
+.engine-shaft[data-axis="h"]::after {
+  right: 0;
+}
+.engine-cell-turning .engine-shaft::before,
+.engine-cell-turning .engine-shaft::after {
+  background: #fbbf24;
 }
 
 /* The header companion gear (Stage 7+). */
@@ -2019,7 +2317,12 @@ html.daynight-fighting .outpost-zone::after {
   .engine-spin-rev,
   .engine-glow,
   .engine-spark,
-  .engine-companion svg {
+  .engine-companion svg,
+  .engine-sail,
+  .engine-paddles,
+  .engine-cell-spin,
+  .engine-cell-pump,
+  .engine-cell-glow {
     animation: none !important;
   }
   .engine-spark {
@@ -2028,7 +2331,12 @@ html.daynight-fighting .outpost-zone::after {
 }
 .outpost-frame[data-reduced-motion="true"] .engine-spin,
 .outpost-frame[data-reduced-motion="true"] .engine-spin-rev,
-.outpost-frame[data-reduced-motion="true"] .engine-glow {
+.outpost-frame[data-reduced-motion="true"] .engine-glow,
+.outpost-frame[data-reduced-motion="true"] .engine-sail,
+.outpost-frame[data-reduced-motion="true"] .engine-paddles,
+.outpost-frame[data-reduced-motion="true"] .engine-cell-spin,
+.outpost-frame[data-reduced-motion="true"] .engine-cell-pump,
+.outpost-frame[data-reduced-motion="true"] .engine-cell-glow {
   animation: none !important;
 }
 

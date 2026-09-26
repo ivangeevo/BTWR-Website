@@ -45,7 +45,12 @@ function ComponentShop() {
     <Section title="Components" target="shop">
       <div className="mb-1.5 flex items-center justify-between gap-2 text-[0.7rem] text-slate-400">
         <span>
-          Blocks that think for the Engine. They need <span className="text-white">{requiredPU}</span> power at the core to run flat out.
+          Blocks that think for the Engine.
+          {e.stage >= 4 && (
+            <>
+              {" "}They need <span className="text-white">{requiredPU}</span> power to run flat out.
+            </>
+          )}
         </span>
         <div className="flex shrink-0 gap-1">
           {([1, 10, "max"] as Qty[]).map((q) => (

@@ -12,23 +12,23 @@ export const CEREMONIES: Record<EngineStage, Ceremony> = {
   },
   3: {
     lines: ["There's a page in my head I didn't write.", "It's scrambled. If you help me read it, I think I can build something."],
-    unlocks: ["Ciphers", "The Hand Crank", "Hoppers", "Sentences about mods you've read"],
+    unlocks: ["Ciphers", "Blueprints for a crank and a millstone", "Hoppers", "Sentences about mods you've read"],
   },
   4: {
-    lines: ["I have a body now.", "It's mostly axles. Mind the fourth one."],
-    unlocks: ["The gear grid", "Gearboxes & axles", "Eureka sparks", "New components", "Research"],
+    lines: ["I have a body now.", "A crank to turn and a millstone to grind. Mostly axles otherwise. Mind the fourth one."],
+    unlocks: ["The gear grid", "The Hand Crank & Millstone", "Gearboxes & axles", "The Windmill & the Saw", "Dial ciphers", "Eureka sparks", "New components", "Research"],
   },
   5: {
     lines: ["The world got automated.", "So, a little, did I.", "Call me something bigger now: the Analytical Engine."],
-    unlocks: ["The Windmill", "Saw & Millstone attachments", "Dial ciphers", "Deeper research"],
+    unlocks: ["A 6×6 frame", "The Water Wheel", "The Detector Block", "Deeper research"],
   },
   6: {
-    lines: ["I can think while you're away now.", "Mostly about you. Also about rivers."],
-    unlocks: ["The Water Wheel", "Idle thinking & the Ledger Drum", "The Detector Block", "Choosing what I become"],
+    lines: ["I can think while you're away now.", "Mostly about you. Also about fire."],
+    unlocks: ["Idle thinking & the Ledger Drum", "Hibachi & Bellows", "Choosing what I become"],
   },
   7: {
     lines: ["The Crucible.", "Fire, air, and steel that remembers.", "Some of what I need next is hidden around the site."],
-    unlocks: ["Hibachi & Bellows", "Soulforged parts", "The 5×5 frame", "Keyword ciphers", "A gear in the header"],
+    unlocks: ["Soulforged parts", "The 7×7 frame", "Keyword ciphers", "A gear in the header"],
   },
   8: {
     lines: ["Past the Wither. Past the End.", "I think I can write whole pages now.", "I'd like to write one for you."],

@@ -51,23 +51,23 @@ export function crankActiveAt(e: EngineState, at: number): boolean {
   return ms(e.crankActiveUntil) > at;
 }
 
+/** Whether the hand crank is fed (it turns faster) at time `at`. */
 export function crankBoostAt(e: EngineState, at: number): boolean {
   return ms(e.crankBoostUntil) > at;
 }
 
-/** Power reaching the Engine's core at time `at` (offline = cranking ignored). */
-export function corePUAt(e: EngineState, cfg: EngineConfig, at: number, offline = false): number {
-  const cranking = !offline && crankActiveAt(e, at);
-  const boosted = cranking && crankBoostAt(e, at);
-  if (e.stage < 4) {
-    // Stage 3: no grid yet — the crank turns a single virtual shaft into the core.
-    if (e.stage < 3 || !e.blueprints.includes("handCrank")) return 0;
-    return cranking ? (boosted ? cfg.power.crankBoostPU : cfg.power.crankPU) : 0;
-  }
-  if (!e.solved || !e.grid.clutch) return 0;
-  if (boosted) return e.solved.boosted.corePU;
-  if (cranking) return e.solved.cranked.corePU;
-  return e.solved.idle.corePU;
+/** The engaged grid solve in effect at `at`: with the crank turning, or steady (offline = crank still). */
+function activeSolve(e: EngineState, at: number, offline: boolean) {
+  if (e.stage < 4 || !e.solved || !e.grid.clutch) return null;
+  return !offline && crankActiveAt(e, at) ? e.solved.cranked : e.solved.idle;
+}
+
+/**
+ * The Engine's power: what its sources get to the ◎ core, plus a turning
+ * hand crank. Only the body makes power, so before Stage 4 there is none.
+ */
+export function enginePUAt(e: EngineState, at: number, offline = false): number {
+  return activeSolve(e, at, offline)?.corePU ?? 0;
 }
 
 export function neglectMult(e: EngineState, cfg: EngineConfig, at: number): number {
@@ -99,7 +99,8 @@ export function dustLevel(e: EngineState, cfg: EngineConfig, at: number): number
 export type IpsBreakdown = {
   base: number;
   requiredPU: number;
-  corePU: number;
+  /** The Engine's power (what reaches the core, plus the crank). */
+  enginePU: number;
   powerFactor: number;
   mult: number;
   ips: number;
@@ -121,8 +122,10 @@ export function computeIps(
     base += count * def.rate * fx.compMult[def.id] * specBoost;
     requiredPU += def.draw;
   }
-  const corePU = corePUAt(e, cfg, at, opts.offline);
-  const ratio = requiredPU === 0 ? 1 : Math.min(1, corePU / requiredPU);
+  const enginePU = enginePUAt(e, at, opts.offline);
+  // Before the body exists there's nothing to power the components with,
+  // so they aren't held back by power at all.
+  const ratio = e.stage < 4 || requiredPU === 0 ? 1 : Math.min(1, enginePU / requiredPU);
   const floor = cfg.economy.powerFloor;
   const powerFactor = floor + (1 - floor) * ratio;
   const golds = Object.values(e.difference).filter((d) => d.medal === "gold").length;
@@ -134,7 +137,7 @@ export function computeIps(
     (1 + (cfg.economy.goldBonusPct / 100) * golds) *
     frenzy *
     neglectMult(e, cfg, at);
-  return { base, requiredPU, corePU, powerFactor, mult, ips: base * powerFactor * mult };
+  return { base, requiredPU, enginePU, powerFactor, mult, ips: base * powerFactor * mult };
 }
 
 // Moments inside (from, to] where the insight rate can change.
@@ -144,7 +147,6 @@ function breakpoints(e: EngineState, cfg: EngineConfig, from: number, to: number
     if (t > from && t < to) pts.add(t);
   };
   add(ms(e.crankActiveUntil));
-  add(ms(e.crankBoostUntil));
   if (e.frenzy) add(ms(e.frenzy.until));
   const o = cfg.offline;
   const hrs = e.specialization === "hardcore" ? [o.hardcoreHours1, o.hardcoreHours2] : [o.neglectHours1, o.neglectHours2];

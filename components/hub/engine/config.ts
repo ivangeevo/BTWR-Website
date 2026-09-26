@@ -38,7 +38,7 @@ export class EngineEconomyMechanic {
   crankRevMs = 800;
   /** Milliseconds per revolution while the crank is fed. */
   crankBoostRevMs = 400;
-  /** Seconds the grid stays crank-powered after the last revolution. */
+  /** Seconds the grid counts as crank-turned after the last revolution. */
   crankActiveSec = 5;
   /** Seconds one Cooked Food keeps the crank fed. */
   crankBoostSec = 120;
@@ -59,7 +59,7 @@ export class EngineEconomyMechanic {
     field("askFlatMult", "Question reward", "Stage-flat rewards per answered question.", 0, 50, 1),
     field("crankRevMs", "Crank revolution", "Milliseconds per revolution.", 100, 5000, 50, "ms"),
     field("crankBoostRevMs", "Fed crank revolution", "Milliseconds per revolution while fed.", 50, 5000, 50, "ms"),
-    field("crankActiveSec", "Crank coast", "Seconds of grid power after the last revolution.", 1, 60, 1, "s"),
+    field("crankActiveSec", "Crank coast", "Seconds the crank keeps turning its neighbours after the last revolution.", 1, 60, 1, "s"),
     field("crankBoostSec", "Crank feed duration", "Seconds one Cooked Food keeps the crank fed.", 10, 3600, 10, "s"),
     field("hardcoreIpsMult", "Hardcore insight/sec", "Hardcore specialization multiplier.", 1, 5, 0.05),
     field("goldBonusPct", "Gold medal bonus", "Permanent insight/sec per Difference Engine gold.", 0, 100, 1, "%"),
@@ -68,8 +68,8 @@ export class EngineEconomyMechanic {
 }
 
 export class EnginePowerMechanic {
+  /** Power while the hand crank is turned. */
   crankPU = 1;
-  crankBoostPU = 2;
   windmillPU = 4;
   waterWheelPU = 6;
   /** A standard gearbox pops when more than this many power units enter it. */
@@ -77,55 +77,44 @@ export class EnginePowerMechanic {
   sfGearboxCap = 12;
   /** BTW's rule: a powered line may run this many axles before it needs a gearbox. */
   maxChain = 3;
-  drawSaw = 1;
-  drawMillstone = 1;
-  drawDetector = 1;
-  drawBellows = 2;
-  drawHibachi = 3;
 
   static readonly configFields: MechanicConfigField[] = [
-    field("crankPU", "Hand crank", "Power units while cranking.", 0, 20, 1, "PU"),
-    field("crankBoostPU", "Fed hand crank", "Power units while cranking fed.", 0, 40, 1, "PU"),
+    field("crankPU", "Hand crank", "Power units while the crank turns.", 0, 20, 1, "PU"),
     field("windmillPU", "Windmill", "Constant power units per windmill.", 0, 40, 1, "PU"),
     field("waterWheelPU", "Water wheel", "Constant power units per water wheel.", 0, 40, 1, "PU"),
     field("gearboxCap", "Gearbox rating", "Power a gearbox takes before it pops.", 1, 40, 1, "PU"),
     field("sfGearboxCap", "Soulforged gearbox rating", "Power a soulforged gearbox takes.", 1, 80, 1, "PU"),
     field("maxChain", "Axle run", "Axles a powered line may run before it needs a gearbox.", 1, 10, 1),
-    field("drawSaw", "Saw draw", "Power a Saw needs.", 0, 20, 1, "PU"),
-    field("drawMillstone", "Millstone draw", "Power a Millstone needs.", 0, 20, 1, "PU"),
-    field("drawDetector", "Detector draw", "Power a Detector Block needs.", 0, 20, 1, "PU"),
-    field("drawBellows", "Bellows draw", "Power the Bellows need.", 0, 20, 1, "PU"),
-    field("drawHibachi", "Hibachi draw", "Power the Hibachi needs.", 0, 20, 1, "PU"),
   ];
 }
 
 export class EngineBuffMechanic {
-  /** Extra wood per Wood Gathering while a Saw is powered. */
+  /** Extra wood per Wood Gathering per powered Saw. */
   sawWood = 1;
   /** Percent shorter Wood Gathering run while a Saw is powered. */
   sawHoldPct = 25;
-  /** Extra food per Hunting trip while a Millstone is powered. */
-  millstoneFood = 1;
-  /** Extra Cooked Food per cook while a Millstone is powered. */
-  millstoneCook = 1;
-  /** Campfire decays this many times slower while the Bellows are powered. */
-  bellowsDecayMult = 3;
+  /** Extra stone per Mining run per powered Millstone. */
+  millstoneStone = 2;
+  /** Extra of each ore found per Mining run per powered Bellows. */
+  bellowsOre = 1;
+  /** Crank turns per yield from each Millstone / Saw / Bellows the crank turns by hand. */
+  handYieldRevs = 10;
   /** Detector Block charges held at once. */
   detectorMaxCharges = 3;
   /** Real minutes to recharge one Detector charge. */
   detectorRechargeMin = 60;
-  /** Specialization bonus to Saw/Millstone (Homesteader), percent. */
+  /** Specialization bonus to the Saw, Millstone & Bellows (Homesteader), percent. */
   homesteaderAttachPct = 100;
 
   static readonly configFields: MechanicConfigField[] = [
-    field("sawWood", "Saw: extra wood", "Extra wood per Wood Gathering while powered.", 0, 50, 1),
+    field("sawWood", "Saw: extra wood", "Extra wood per Wood Gathering, per powered Saw.", 0, 50, 1),
     field("sawHoldPct", "Saw: faster chop", "Percent shorter Wood Gathering run.", 0, 90, 5, "%"),
-    field("millstoneFood", "Millstone: extra food", "Extra food per Hunting trip.", 0, 50, 1),
-    field("millstoneCook", "Millstone: extra meal", "Extra Cooked Food per cook.", 0, 50, 1),
-    field("bellowsDecayMult", "Bellows: slower decay", "Campfire decays N times slower.", 1, 20, 0.5, "x"),
+    field("millstoneStone", "Millstone: extra stone", "Extra stone per Mining run, per powered Millstone.", 0, 50, 1),
+    field("bellowsOre", "Bellows: extra ore", "Extra of each ore found per Mining run, per powered Bellows.", 0, 20, 1),
+    field("handYieldRevs", "Hand-turned yield", "Crank turns per Stone / Wood / ore from each machine the crank turns.", 1, 200, 1),
     field("detectorMaxCharges", "Detector charges", "Charges held at once.", 1, 20, 1),
     field("detectorRechargeMin", "Detector recharge", "Minutes per charge.", 1, 1440, 5, "min"),
-    field("homesteaderAttachPct", "Homesteader attachments", "Extra Saw/Millstone strength.", 0, 500, 10, "%"),
+    field("homesteaderAttachPct", "Homesteader attachments", "Extra Saw, Millstone & Bellows strength.", 0, 500, 10, "%"),
   ];
 }
 
@@ -211,7 +200,7 @@ export class EngineGateMechanic {
   s4Hoppers = 5;
   s4Meals = 1;
   s4Cost = 1_000;
-  s5CorePU = 1;
+  s5Grinds = 30;
   s5ComponentTypes = 3;
   s5Iron = 3;
   s5Cost = 50_000;
@@ -239,7 +228,7 @@ export class EngineGateMechanic {
     field("s4Hoppers", "→4 hoppers", "Hoppers owned.", 0, 200, 1),
     field("s4Meals", "→4 meals", "Meals cooked at the Campfire.", 0, 200, 1),
     field("s4Cost", "→4 insight cost", "Insight spent to advance.", 0, 1e12, 1),
-    field("s5CorePU", "→5 cranked power", "Core power while cranking.", 0, 20, 1, "PU"),
+    field("s5Grinds", "→5 grinds", "Crank turns with a Millstone next to the crank.", 0, 1000, 5),
     field("s5ComponentTypes", "→5 component types", "Different components owned.", 0, 9, 1),
     field("s5Iron", "→5 iron", "Iron on hand.", 0, 500, 1),
     field("s5Cost", "→5 insight cost", "Insight spent to advance.", 0, 1e12, 1),
@@ -250,7 +239,7 @@ export class EngineGateMechanic {
     field("s7Components", "→7 components", "Components owned in total.", 0, 1000, 1),
     field("s7Meals", "→7 meals", "Meals cooked at the Campfire, lifetime.", 0, 1000, 1),
     field("s7Cost", "→7 insight cost", "Insight spent to advance.", 0, 1e15, 1),
-    field("s8CorePU", "→8 idle power", "Idle core power on the 5×5 grid.", 0, 100, 1, "PU"),
+    field("s8CorePU", "→8 steady power", "Steady power reaching the Engine's core (crank not counted).", 0, 100, 1, "PU"),
     field("s8QuizCorrect", "→8 quiz answers", "Correct Guess the Mod answers, lifetime.", 0, 2000, 1),
     field("s8Cost", "→8 insight cost", "Insight spent to advance.", 0, 1e18, 1),
   ];

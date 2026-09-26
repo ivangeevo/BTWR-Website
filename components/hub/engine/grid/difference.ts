@@ -6,6 +6,8 @@
 // reference solution that the test suite proves reaches gold.
 import type { EnginePowerMechanic } from "../config";
 import type { DifferenceResult, EngineGrid, GridPartType, PlacedPart, Rot, Terrain } from "../types";
+import { occupancy } from "./layouts";
+import { footprint } from "./parts";
 import { solveGrid } from "./solver";
 
 export type DiffPart = { x: number; y: number; type: GridPartType; rot: Rot };
@@ -56,18 +58,17 @@ export const DIFF_CHALLENGES: DiffChallenge[] = [
   {
     id: "d-rock",
     name: "Around the Rock",
-    blurb: "The straight line is blocked. Turn two corners.",
+    blurb: "The short way down is blocked. Go around the rock — two corners.",
     terrain: [row("......."), row("......."), row("......."), row("......."), row(".###..."), row("......C"), row(".......")],
-    fixed: [{ x: 0, y: 1, type: "windmill", rot: E }],
+    fixed: [{ x: 0, y: 2, type: "windmill", rot: E }],
     coreMinPU: 4,
     allowed: { axle: 8, gearbox: 3 },
-    par: { gold: 9, silver: 11 },
+    par: { gold: 8, silver: 10 },
     solution: [
-      { x: 1, y: 1, type: "axle", rot: E },
-      { x: 2, y: 1, type: "axle", rot: E },
-      { x: 3, y: 1, type: "axle", rot: E },
-      { x: 4, y: 1, type: "gearbox", rot: W },
-      { x: 4, y: 2, type: "axle", rot: N },
+      { x: 1, y: 2, type: "axle", rot: E },
+      { x: 2, y: 2, type: "axle", rot: E },
+      { x: 3, y: 2, type: "axle", rot: E },
+      { x: 4, y: 2, type: "gearbox", rot: W },
       { x: 4, y: 3, type: "axle", rot: N },
       { x: 4, y: 4, type: "axle", rot: N },
       { x: 4, y: 5, type: "gearbox", rot: N },
@@ -116,32 +117,29 @@ export const DIFF_CHALLENGES: DiffChallenge[] = [
     blurb: "Both windmills, one core. Don't let them meet in a gearbox.",
     terrain: [row("......."), row("......."), row("......."), row("...C..."), row("......."), row("......."), row(".......")],
     fixed: [
-      { x: 0, y: 1, type: "windmill", rot: E },
-      { x: 0, y: 5, type: "windmill", rot: E },
+      { x: 0, y: 2, type: "windmill", rot: E },
+      { x: 3, y: 6, type: "windmill", rot: N },
     ],
     coreMinPU: 8,
     allowed: { axle: 8, gearbox: 4 },
-    par: { gold: 8, silver: 10 },
+    par: { gold: 5, silver: 7 },
     solution: [
-      { x: 1, y: 1, type: "axle", rot: E },
-      { x: 2, y: 1, type: "axle", rot: E },
-      { x: 3, y: 1, type: "gearbox", rot: W },
-      { x: 3, y: 2, type: "axle", rot: N },
-      { x: 1, y: 5, type: "axle", rot: E },
-      { x: 2, y: 5, type: "axle", rot: E },
-      { x: 3, y: 5, type: "gearbox", rot: W },
+      { x: 1, y: 2, type: "axle", rot: E },
+      { x: 2, y: 2, type: "axle", rot: E },
+      { x: 3, y: 2, type: "gearbox", rot: W },
+      { x: 3, y: 5, type: "axle", rot: N },
       { x: 3, y: 4, type: "axle", rot: N },
     ],
   },
   {
     id: "d-brownout",
-    name: "Brownout",
-    blurb: "One windmill, three machines. Exactly enough — if nothing's wasted.",
+    name: "Three Machines",
+    blurb: "One windmill, three machines. Reach them all with as little as you can.",
     terrain: [row("......."), row("......."), row("......."), row("......."), row("......."), row("......."), row(".......")],
     fixed: [
       { x: 0, y: 3, type: "windmill", rot: E },
       { x: 2, y: 2, type: "saw", rot: S },
-      { x: 2, y: 4, type: "millstone", rot: N },
+      { x: 2, y: 4, type: "detector", rot: N },
       { x: 4, y: 3, type: "bellows", rot: W },
     ],
     coreMinPU: 0,
@@ -156,24 +154,22 @@ export const DIFF_CHALLENGES: DiffChallenge[] = [
   {
     id: "d-long-way",
     name: "The Long Way Round",
-    blurb: "Corner to corner. Count your axles.",
+    blurb: "Top of the board to the far corner. Count your axles.",
     terrain: [row("......."), row("......."), row("......."), row("......."), row("......."), row("......."), row("......C")],
-    fixed: [{ x: 0, y: 0, type: "windmill", rot: S }],
+    fixed: [{ x: 2, y: 0, type: "windmill", rot: S }],
     coreMinPU: 4,
     allowed: { axle: 10, gearbox: 4 },
-    par: { gold: 11, silver: 13 },
+    par: { gold: 9, silver: 11 },
     solution: [
-      { x: 0, y: 1, type: "axle", rot: N },
-      { x: 0, y: 2, type: "axle", rot: N },
-      { x: 0, y: 3, type: "axle", rot: N },
-      { x: 0, y: 4, type: "gearbox", rot: N },
-      { x: 1, y: 4, type: "axle", rot: E },
-      { x: 2, y: 4, type: "axle", rot: E },
+      { x: 2, y: 1, type: "axle", rot: N },
+      { x: 2, y: 2, type: "axle", rot: N },
+      { x: 2, y: 3, type: "axle", rot: N },
+      { x: 2, y: 4, type: "gearbox", rot: N },
       { x: 3, y: 4, type: "axle", rot: E },
-      { x: 4, y: 4, type: "gearbox", rot: W },
-      { x: 4, y: 5, type: "axle", rot: N },
-      { x: 4, y: 6, type: "gearbox", rot: N },
-      { x: 5, y: 6, type: "axle", rot: E },
+      { x: 4, y: 4, type: "axle", rot: E },
+      { x: 5, y: 4, type: "axle", rot: E },
+      { x: 6, y: 4, type: "gearbox", rot: W },
+      { x: 6, y: 5, type: "axle", rot: N },
     ],
   },
   {
@@ -254,33 +250,28 @@ export const DIFF_CHALLENGES: DiffChallenge[] = [
   {
     id: "d-difference",
     name: "The Difference",
-    blurb: "Everything at once: wind and water, saw and stone, and the core in the middle.",
+    blurb: "Everything at once: wind and water, saw and detector, and the core in the middle.",
     terrain: [row("......."), row("......."), row("......."), row("...C..."), row("......."), row("......."), row("~......")],
     fixed: [
-      { x: 0, y: 0, type: "windmill", rot: E },
-      { x: 0, y: 6, type: "waterWheel", rot: E },
-      { x: 6, y: 0, type: "saw", rot: W },
-      { x: 6, y: 6, type: "millstone", rot: W },
+      { x: 3, y: 0, type: "windmill", rot: N },
+      { x: 0, y: 5, type: "waterWheel", rot: E },
+      { x: 6, y: 2, type: "saw", rot: W },
+      { x: 6, y: 5, type: "detector", rot: W },
     ],
     coreMinPU: 8,
     allowed: { axle: 12, gearbox: 3, sfGearbox: 1 },
-    par: { gold: 15, silver: 18 },
+    par: { gold: 10, silver: 13 },
     solution: [
-      { x: 1, y: 0, type: "axle", rot: E },
-      { x: 2, y: 0, type: "axle", rot: E },
-      { x: 3, y: 0, type: "axle", rot: E },
-      { x: 4, y: 0, type: "gearbox", rot: W },
-      { x: 5, y: 0, type: "axle", rot: E },
-      { x: 4, y: 1, type: "axle", rot: N },
-      { x: 4, y: 2, type: "axle", rot: N },
-      { x: 4, y: 3, type: "gearbox", rot: N },
-      { x: 1, y: 6, type: "axle", rot: E },
-      { x: 2, y: 6, type: "axle", rot: E },
-      { x: 3, y: 6, type: "sfGearbox", rot: W },
-      { x: 4, y: 6, type: "axle", rot: E },
-      { x: 5, y: 6, type: "axle", rot: E },
-      { x: 3, y: 5, type: "axle", rot: N },
+      { x: 3, y: 1, type: "axle", rot: N },
+      { x: 3, y: 2, type: "gearbox", rot: N },
+      { x: 4, y: 2, type: "axle", rot: E },
+      { x: 5, y: 2, type: "axle", rot: E },
+      { x: 1, y: 5, type: "axle", rot: E },
+      { x: 2, y: 5, type: "axle", rot: E },
+      { x: 3, y: 5, type: "sfGearbox", rot: W },
       { x: 3, y: 4, type: "axle", rot: N },
+      { x: 4, y: 5, type: "axle", rot: E },
+      { x: 5, y: 5, type: "axle", rot: E },
     ],
   },
 ];
@@ -298,11 +289,25 @@ export function diffTerrain(c: DiffChallenge): Terrain[] {
 export function diffGrid(c: DiffChallenge, placed: DiffPart[]): EngineGrid {
   const cells: (PlacedPart | null)[] = Array.from({ length: DIFF_SIZE * DIFF_SIZE }, () => null);
   c.fixed.forEach((p, i) => (cells[p.y * DIFF_SIZE + p.x] = { uid: `fixed-${i}`, type: p.type, rot: p.rot }));
+  // Placed parts are all 1×1; one on a square something already covers is ignored.
+  const occ = occupancy(cells, DIFF_SIZE, DIFF_SIZE);
   placed.forEach((p, i) => {
     const idx = p.y * DIFF_SIZE + p.x;
-    if (!cells[idx]) cells[idx] = { uid: `placed-${i}`, type: p.type, rot: p.rot };
+    if (occ[idx] < 0) {
+      cells[idx] = { uid: `placed-${i}`, type: p.type, rot: p.rot };
+      occ[idx] = idx;
+    }
   });
   return { w: DIFF_SIZE, h: DIFF_SIZE, cells, clutch: true, rev: 0 };
+}
+
+/** Squares covered by the challenge's fixed parts (big sources span several). */
+export function fixedSquares(c: DiffChallenge): Set<number> {
+  const out = new Set<number>();
+  for (const p of c.fixed) {
+    for (const j of footprint(p.type, p.rot, p.y * DIFF_SIZE + p.x, DIFF_SIZE, DIFF_SIZE) ?? []) out.add(j);
+  }
+  return out;
 }
 
 export type DiffScore = { success: boolean; parts: number; pops: number; medal: DifferenceResult["medal"] | null; corePU: number };
@@ -311,12 +316,11 @@ export function scoreChallenge(c: DiffChallenge, placed: DiffPart[], power: Engi
   const terrain = diffTerrain(c);
   const r = solveGrid(diffGrid(c, placed), terrain, {
     crankActive: false,
-    crankBoost: false,
     winter: !!c.winter,
     thawed: false,
     power,
   });
-  const fixedTargets = c.fixed.filter((p) => ["saw", "millstone", "detector", "bellows", "hibachi"].includes(p.type));
+  const fixedTargets = c.fixed.filter((p) => ["saw", "detector", "bellows", "hibachi"].includes(p.type));
   const fixedUids = fixedTargets.map((p) => `fixed-${c.fixed.indexOf(p)}`);
   const allPowered = fixedUids.every((uid) => r.powered.includes(uid));
   const coreCells = terrain.map((t, i) => (t === "core" ? i : -1)).filter((i) => i >= 0);

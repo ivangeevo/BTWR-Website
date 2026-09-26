@@ -3,14 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useAchievements } from "../../../AchievementsProvider";
 import { crankBoostAt, crankRevMs, formatInsight } from "../../economy";
+import { crankCanTurn } from "../../grid/solver";
 import { useEngine } from "../EngineProvider";
 
 type Floater = { id: number; text: string };
 
-// The hand crank — hold to turn. Every full revolution is one "click" of
-// the clicker (1 insight + a share of insight/sec from research) and keeps
-// the grid crank-powered for a few seconds. Feeding it a Cooked Food turns
-// it twice as fast for a while (BTW's hand crank costs hunger).
+// The hand crank on the grid — hold to turn (shown in the Body tab once a
+// crank is placed). Every full revolution is one "click" of insight (plus a
+// share of insight/sec from research) and powers the Engine for a few
+// seconds; any Millstone, Saw or Bellows right next to a crank turns too,
+// and every few turns yields Stone, Wood or ore. A crank also next to
+// another power source is overloaded and breaks on the first turn. Feeding
+// it a Cooked Food turns it twice as fast for a while (BTW's hand crank
+// costs hunger).
 export default function CrankButton() {
   const { e, cfg, fx, crankRev, feedCrank, toast } = useEngine();
   const { resources } = useAchievements();
@@ -22,6 +27,12 @@ export default function CrankButton() {
   const nextId = useRef(0);
   const eRef = useRef(e);
   eRef.current = e;
+  const canTurn = crankCanTurn(e.grid.cells);
+
+  // Let go the moment there's nothing left to turn (e.g. the crank just broke).
+  useEffect(() => {
+    if (!canTurn) setHolding(false);
+  }, [canTurn]);
 
   useEffect(() => {
     if (!holding) {
@@ -35,9 +46,11 @@ export default function CrankButton() {
       if (p >= 1) {
         startRef.current = t;
         const gained = crankRev();
-        const id = nextId.current++;
-        setFloaters((prev) => [...prev.slice(-5), { id, text: `+${formatInsight(gained)}` }]);
-        window.setTimeout(() => setFloaters((prev) => prev.filter((f) => f.id !== id)), 900);
+        if (gained > 0) {
+          const id = nextId.current++;
+          setFloaters((prev) => [...prev.slice(-5), { id, text: `+${formatInsight(gained)}` }]);
+          window.setTimeout(() => setFloaters((prev) => prev.filter((f) => f.id !== id)), 900);
+        }
         setProgress(0);
       } else {
         setProgress(p);
@@ -52,18 +65,27 @@ export default function CrankButton() {
 
   const boosted = crankBoostAt(e, Date.now());
   const stop = () => setHolding(false);
-
-  // From Stage 4 the crank is a part on the grid: turning it only powers the
-  // core once it is wired (crank → gearbox input → core) and the clutch is in.
-  const crankPU = e.grid.clutch ? ((boosted ? e.solved?.boosted.corePU : e.solved?.cranked.corePU) ?? 0) : 0;
-  const wiringHint =
-    e.stage < 4
-      ? null
-      : !e.grid.clutch
-        ? "The clutch is disengaged, so turning this doesn't reach my core. Engage it in the Body tab."
-        : crankPU <= 0
-          ? "The crank isn't wired to my core. Body tab: point it into a gearbox's input face, gearbox touching the ◎."
-          : null;
+  // What the crank turns by hand, and what that yields every few turns.
+  const handTypes = new Map<string, number>();
+  if (e.grid.clutch) {
+    const byUid = new Map(e.grid.cells.filter(Boolean).map((c) => [c!.uid, c!.type]));
+    for (const uid of e.solved?.cranked.handTurned ?? []) {
+      const t = byUid.get(uid);
+      if (t) handTypes.set(t, (handTypes.get(t) ?? 0) + 1);
+    }
+  }
+  const handYield = [
+    handTypes.get("millstone") ? `${handTypes.get("millstone")} Stone` : "",
+    handTypes.get("saw") ? `${handTypes.get("saw")} Wood` : "",
+    handTypes.get("bellows") ? `${handTypes.get("bellows")} ore` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const hint = !canTurn
+    ? "The crank is broken — take it off the grid and place a new one."
+    : !e.grid.clutch
+      ? "Engage the clutch to put the crank to work."
+      : null;
 
   return (
     <div data-no-drag>
@@ -72,8 +94,10 @@ export default function CrankButton() {
           <button
             type="button"
             data-engine-target="crank"
-            className="outpost-hold-button"
+            className="outpost-hold-button disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!canTurn}
             onPointerDown={(ev) => {
+              if (!canTurn) return;
               ev.currentTarget.setPointerCapture(ev.pointerId);
               setHolding(true);
             }}
@@ -81,7 +105,7 @@ export default function CrankButton() {
             onPointerCancel={stop}
             onPointerLeave={stop}
             onKeyDown={(ev) => {
-              if (ev.key === " " || ev.key === "Enter") {
+              if (canTurn && (ev.key === " " || ev.key === "Enter")) {
                 ev.preventDefault();
                 setHolding(true);
               }
@@ -119,13 +143,18 @@ export default function CrankButton() {
           {"\u{1F372}"} Feed
         </button>
       </div>
-      {wiringHint ? (
-        <p className="mt-1 text-[0.65rem] text-amber-300/80">{wiringHint}</p>
-      ) : e.stage >= 4 ? (
+      {hint ? (
+        <p className="mt-1 text-[0.65rem] text-amber-300/80">{hint}</p>
+      ) : (
         <p className="mt-1 text-[0.65rem] text-slate-500">
-          While turning: <span className="text-white">+{crankPU} PU</span> at the core.
+          While turning: <span className="text-white">+{cfg.power.crankPU} PU</span>
+          {handYield && (
+            <>
+              {" "}· every {cfg.buffs.handYieldRevs} turns: <span className="text-white">+{handYield}</span>
+            </>
+          )}
         </p>
-      ) : null}
+      )}
     </div>
   );
 }

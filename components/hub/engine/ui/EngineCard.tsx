@@ -15,7 +15,6 @@ import { WhileAwaySummary } from "./overlays/EngineOverlays";
 import GuidedHighlight from "./overlays/GuidedHighlight";
 import StageGatePanel from "./overlays/StageGatePanel";
 import { useReducedMotion } from "./use-reduced-motion";
-import CrankButton from "./visuals/CrankButton";
 import EngineSvg from "./visuals/EngineSvg";
 import InsightCounter from "./visuals/InsightCounter";
 import WorksTab from "./works/WorksTab";
@@ -46,8 +45,8 @@ function writeSeen(tabs: Tab[]) {
 
 // Ponder → The Contraption → The Analytical Engine. At Day One this is just a
 // word puzzle; every stage adds one more thing. Its tabs sit under the
-// caption and appear as they unlock: Mind (the puzzle, the crank and the
-// cipher pages — home), then Logbook, Works and Body. Any tab but Mind
+// caption and appear as they unlock: Mind (the puzzle and the cipher
+// pages — home), then Logbook, Works and Body (the gear grid and its crank). Any tab but Mind
 // widens the card over the Outpost's middle column (the "Workshop"); going
 // back to Mind shrinks it again.
 export default function EngineCard() {
@@ -72,7 +71,6 @@ export default function EngineCard() {
   const tabs = TAB_ORDER.filter((t) => e.stage >= TAB_STAGE[t]);
   // A tab can vanish (prestige takes the Engine back a stage): fall back to Mind.
   const current: Tab = tabs.includes(tab) ? tab : "mind";
-  const crankReady = e.stage >= 3 && e.blueprints.includes("handCrank");
   const sizeClass = workshopOpen ? "" : e.stage >= 4 ? "outpost-card-lg" : "outpost-card-md";
   const stageDef = STAGES[e.stage];
   const frenzyOn = !!e.frenzy && new Date(e.frenzy.until).getTime() > Date.now();
@@ -142,7 +140,7 @@ export default function EngineCard() {
             </div>
             {e.stage >= 4 && (
               <p className="text-[0.65rem] text-slate-400">
-                Core: <span className="text-white">{corePU} PU</span>
+                Power: <span className="text-white">{corePU} PU</span>
                 {!e.grid.clutch && " · clutch disengaged"}
               </p>
             )}
@@ -159,7 +157,6 @@ export default function EngineCard() {
         {current === "mind" && (
           <div className="space-y-4">
             <MindPuzzle />
-            {crankReady && <CrankButton />}
             {e.stage >= 3 && <CipherPanel />}
           </div>
         )}

@@ -1,9 +1,10 @@
 import type { ComponentId, EngineStage } from "../types";
 
 // The Engine's "buildings" — BTW blocks the Engine learns to run as part of
-// its own thinking apparatus, each producing insight/sec while the core has
-// power to spare. Deliberately distinct from the grid's own parts (axles,
-// gearboxes, windmills...), which move power rather than think with it.
+// its own thinking apparatus, each producing insight/sec while the Engine has
+// power to spare (none needed before it has a body). Deliberately distinct
+// from the grid's own parts (axles, gearboxes, windmills...), which move
+// power rather than think with it.
 // All of base cost / rate / draw are admin-tunable (config.ts).
 export type ComponentDef = {
   id: ComponentId;
@@ -13,7 +14,7 @@ export type ComponentDef = {
   baseCost: number;
   /** Insight/sec per owned unit, before multipliers. */
   rate: number;
-  /** Power units the core must spare for this TYPE (charged once per type owned, not per unit). */
+  /** Power units the Engine needs for this TYPE to run flat out (charged once per type owned, not per unit). */
   draw: number;
   /** Engine stage at which it appears in the shop. */
   stage: EngineStage;

@@ -38,13 +38,10 @@ export const TUTORIALS: Tutorial[] = [
     ],
   },
   {
-    id: "t-crank",
-    title: "The crank",
-    when: (e) => e.stage >= 3 && e.blueprints.includes("handCrank"),
-    steps: [
-      { target: "crank", line: "Hold this. Every turn is a thought — and while you turn it, my core has power." },
-      { target: "tab-works", line: "Spend thoughts on Hoppers in the Works tab. They think for me — faster when I'm powered." },
-    ],
+    id: "t-works",
+    title: "Hoppers",
+    when: (e) => e.stage >= 3,
+    steps: [{ target: "tab-works", line: "Spend thoughts on Hoppers in the Works tab. They think for me, even while you don't." }],
   },
   {
     id: "t-grid",
@@ -52,9 +49,15 @@ export const TUTORIALS: Tutorial[] = [
     when: (e) => e.stage >= 4,
     steps: [
       { target: "tab-body", line: "I have a body now. The Body tab is where you build it." },
-      { target: "part-tray", line: "Pick a part, then tap a square to place it. Tap it again to turn it. Hold to take it back." },
-      { target: "clutch", line: "When it's built, engage the clutch. Point the crank into a gearbox's input face, and the gearbox toward my core (the ◎)." },
+      { target: "part-tray", line: "Pick a part, then tap a square to place it. Tap it again to turn it, drag it to move it, right-click to take it back." },
+      { target: "clutch", line: "Put the crank right next to the Millstone, then engage the clutch. Windmills and wheels only power me if axles and gearboxes carry it to my ◎ core on the right edge." },
     ],
+  },
+  {
+    id: "t-crank",
+    title: "The crank",
+    when: (e) => e.stage >= 4 && e.grid.cells.some((c) => c?.type === "handCrank"),
+    steps: [{ target: "crank", line: "Hold this. Every turn is a thought and a little power — and a Millstone, Saw or Bellows right next to it makes Stone, Wood or ore every few turns." }],
   },
   {
     id: "t-pop",
@@ -65,36 +68,44 @@ export const TUTORIALS: Tutorial[] = [
   {
     id: "t-windmill",
     title: "Windmill & attachments",
-    when: (e) => e.stage >= 5,
+    when: (e) => e.stage >= 4 && e.blueprints.includes("windmill"),
     steps: [
-      { target: "part-tray", line: "A windmill: steady power, no hands. It needs clear air all around, except along its axle." },
-      { target: "tab-works", line: "Research lives in Works now. And the Saw and Millstone help the rest of the Outpost while powered." },
+      { target: "part-tray", line: "A windmill: steady power, no hands. Its sails span five squares, and power only leaves the middle one, front and back — run that to my core." },
+      { target: "tab-works", line: "Research lives in Works. And a powered Saw helps the rest of the Outpost chop wood." },
     ],
   },
   {
     id: "t-dial",
     title: "Dial ciphers",
-    when: (e) => e.stage >= 5 && !!e.ciphers.current && e.ciphers.current.kind === "caesar",
+    when: (e) => !!e.ciphers.current && e.ciphers.current.kind === "caesar",
     steps: [{ target: "cipher", line: "This one's a shifted alphabet. Turn the dial until the words make sense. One word is already given." }],
+  },
+  {
+    id: "t-water",
+    title: "The water wheel",
+    when: (e) => e.stage >= 5 && e.blueprints.includes("waterWheel"),
+    steps: [{ target: "part-tray", line: "A water wheel: more power than a windmill. It spans three squares and needs one of them on the water. A plain gearbox can't take it until Hardwood Teeth in Works — or a soulforged one." }],
   },
   {
     id: "t-idle",
     title: "Thinking while you're away",
     when: (e) => e.stage >= 6,
     steps: [
-      { target: "part-tray", line: "A water wheel: more power than a windmill, but only on the water squares." },
       { target: "drum", line: "The Ledger Drum is how long I can keep thinking while you're gone. Bigger drum, longer thoughts." },
       { target: "spec", line: "And — I think I know what I want to become. Look at what you told me." },
     ],
   },
   {
+    id: "t-hibachi",
+    title: "Hibachi & Bellows",
+    when: (e) => e.stage >= 6 && (e.blueprints.includes("hibachi") || e.blueprints.includes("bellows")),
+    steps: [{ target: "part-tray", line: "A Hibachi, lit by power, will let me forge soulforged parts. Powered Bellows keep the campfire burning — or pump them by hand, with a crank right next to them." }],
+  },
+  {
     id: "t-crucible",
     title: "The Crucible",
     when: (e) => e.stage >= 7,
-    steps: [
-      { target: "part-tray", line: "A Hibachi, lit by power, lets me forge soulforged parts. Bellows keep the campfire burning." },
-      { target: "cipher", line: "The last blueprints need a keyword. It's in three pieces, hidden around the site. I've left you hints." },
-    ],
+    steps: [{ target: "cipher", line: "The last blueprints need a keyword. It's in three pieces, hidden around the site. I've left you hints." }],
   },
   {
     id: "t-end",

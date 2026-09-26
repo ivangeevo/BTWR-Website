@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { DIFF_CHALLENGES, DIFF_SIZE, diffGrid, diffTerrain, type DiffChallenge, type DiffPart } from "../../grid/difference";
-import { PART_DEFS } from "../../grid/parts";
+import { occupancy } from "../../grid/layouts";
+import { nextRot, PART_DEFS } from "../../grid/parts";
 import { solveGrid } from "../../grid/solver";
-import type { GridPartType, Rot } from "../../types";
+import type { GridPartType } from "../../types";
 import { useEngine } from "../EngineProvider";
-import { PartGlyph } from "./BodyTab";
+import { popFixText, popReasonText } from "../../content/voice";
+import { PartIcon } from "../visuals/PartArt";
+import { PartGlyph, PartPreview } from "./BodyTab";
+import { useGridDrag } from "./use-grid-drag";
 
 const MEDAL_ICON = { gold: "\u{1F947}", silver: "\u{1F948}", bronze: "\u{1F949}" } as const;
-const HOLD_MS = 500;
 
 // Stage 8's efficiency puzzles — virtual parts, fixed layouts, par medals.
 export default function DifferenceEngine() {
@@ -57,36 +60,53 @@ function Board({ c, onBack }: { c: DiffChallenge; onBack: () => void }) {
   const { cfg, submitDifference } = useEngine();
   const [placed, setPlaced] = useState<DiffPart[]>([]);
   const [selected, setSelected] = useState<GridPartType | null>(null);
-  const holdTimer = useRef<number | null>(null);
-  const held = useRef(false);
   const terrain = useMemo(() => diffTerrain(c), [c]);
   const grid = useMemo(() => diffGrid(c, placed), [c, placed]);
+  const occ = useMemo(() => occupancy(grid.cells, DIFF_SIZE, DIFF_SIZE), [grid]);
   const preview = useMemo(
-    () => solveGrid(grid, terrain, { crankActive: false, crankBoost: false, winter: !!c.winter, thawed: false, power: cfg.power }),
+    () => solveGrid(grid, terrain, { crankActive: false, winter: !!c.winter, thawed: false, power: cfg.power }),
     [grid, terrain, c.winter, cfg.power]
   );
   const used: Partial<Record<GridPartType, number>> = {};
   for (const p of placed) used[p.type] = (used[p.type] ?? 0) + 1;
   const turning = new Set(preview.turning);
   const willPop = new Set(preview.pops.map((p) => p.uid));
-
-  function at(x: number, y: number) {
-    return placed.findIndex((p) => p.x === x && p.y === y);
+  // What will pop, and why.
+  const popText = new Map<string, string>();
+  for (const pop of preview.pops) {
+    const type = grid.cells.find((c) => c?.uid === pop.uid)?.type;
+    if (type) popText.set(pop.uid, `${PART_DEFS[type].name} will pop: ${popReasonText(pop, cfg.power.maxChain)}.${popFixText(pop, type)}`);
   }
 
-  function tap(x: number, y: number) {
-    if (held.current) {
-      held.current = false;
+  /** Index into `placed` of the placed (not fixed) part at cell `i`, or -1. */
+  function placedAt(i: number) {
+    return placed.findIndex((p) => p.y * DIFF_SIZE + p.x === i);
+  }
+
+  // Only your own (placed) parts move; fixed ones stay put.
+  const { drag, onPointerDown, consumeClick } = useGridDrag({
+    w: DIFF_SIZE,
+    h: DIFF_SIZE,
+    hubAt: (i) => (placedAt(occ[i]) >= 0 ? occ[i] : -1),
+    canDrop: (from, to) => terrain[to] === "ground" && (occ[to] < 0 || occ[to] === from),
+    onDrop: (from, to) =>
+      setPlaced((prev) =>
+        prev.map((p) => (p.y * DIFF_SIZE + p.x === from ? { ...p, x: to % DIFF_SIZE, y: Math.floor(to / DIFF_SIZE) } : p))
+      ),
+  });
+  const dragPart = drag ? grid.cells[drag.from] : null;
+
+  function tap(i: number) {
+    if (consumeClick()) return;
+    const owner = occ[i];
+    if (owner >= 0) {
+      const k = placedAt(owner);
+      if (k >= 0) setPlaced((prev) => prev.map((p, j) => (j === k ? { ...p, rot: nextRot(p.type, p.rot) } : p)));
       return;
     }
-    const i = at(x, y);
-    if (i >= 0) {
-      setPlaced((prev) => prev.map((p, j) => (j === i ? { ...p, rot: ((p.rot + 1) % 4) as Rot } : p)));
-      return;
-    }
-    if (!selected || terrain[y * DIFF_SIZE + x] !== "ground" || c.fixed.some((f) => f.x === x && f.y === y)) return;
+    if (!selected || terrain[i] !== "ground") return;
     if ((used[selected] ?? 0) >= (c.allowed[selected] ?? 0)) return;
-    setPlaced((prev) => [...prev, { x, y, type: selected, rot: 1 }]);
+    setPlaced((prev) => [...prev, { x: i % DIFF_SIZE, y: Math.floor(i / DIFF_SIZE), type: selected, rot: 1 }]);
   }
 
   return (
@@ -106,44 +126,52 @@ function Board({ c, onBack }: { c: DiffChallenge; onBack: () => void }) {
         {c.winter ? " (Winter.)" : ""}
       </p>
       <div className="mt-2 flex flex-col gap-3 sm:flex-row">
-        <div className="engine-grid" style={{ gridTemplateColumns: `repeat(${DIFF_SIZE}, var(--engine-cell))` }}>
+        <div className="engine-grid" data-size={DIFF_SIZE} style={{ gridTemplateColumns: `repeat(${DIFF_SIZE}, var(--engine-cell))` }}>
           {terrain.map((t, i) => {
-            const x = i % DIFF_SIZE;
-            const y = Math.floor(i / DIFF_SIZE);
-            const part = grid.cells[i];
+            const owner = occ[i];
+            const part = owner >= 0 ? grid.cells[owner] : null;
+            const isHub = owner === i;
             const fixed = part?.uid.startsWith("fixed-");
+            const ghost = !!drag && owner === drag.from;
+            const drop = !!dragPart && drag?.to === i;
+            const cls = [
+              "engine-cell",
+              `engine-cell-${t}`,
+              part ? "engine-cell-filled" : "",
+              part && !isHub ? "engine-cell-span" : "",
+              part && turning.has(part.uid) ? "engine-cell-turning" : "",
+              part && willPop.has(part.uid) ? "engine-cell-danger" : "",
+              fixed ? "engine-cell-fixed opacity-90 ring-1 ring-inset ring-white/20" : "",
+              ghost ? "engine-cell-ghost" : "",
+              drop ? (drag?.valid ? "engine-cell-drop" : "engine-cell-drop-bad") : "",
+            ].join(" ");
             return (
               <button
                 key={i}
                 type="button"
-                className={`engine-cell engine-cell-${t} ${part && turning.has(part.uid) ? "engine-cell-turning" : ""} ${
-                  part && willPop.has(part.uid) ? "engine-cell-danger" : ""
-                } ${fixed ? "opacity-90 ring-1 ring-inset ring-white/20" : ""}`}
-                onPointerDown={() => {
-                  held.current = false;
-                  if (at(x, y) < 0) return;
-                  holdTimer.current = window.setTimeout(() => {
-                    held.current = true;
-                    setPlaced((prev) => prev.filter((p) => !(p.x === x && p.y === y)));
-                  }, HOLD_MS);
-                }}
-                onPointerUp={() => holdTimer.current && window.clearTimeout(holdTimer.current)}
-                onPointerLeave={() => holdTimer.current && window.clearTimeout(holdTimer.current)}
+                data-cell={i}
+                className={cls}
+                onPointerDown={(ev) => onPointerDown(ev, i)}
                 onContextMenu={(ev) => {
                   ev.preventDefault();
-                  setPlaced((prev) => prev.filter((p) => !(p.x === x && p.y === y)));
+                  const k = placedAt(owner);
+                  if (k >= 0) setPlaced((prev) => prev.filter((_, j) => j !== k));
                 }}
-                onClick={() => tap(x, y)}
-                aria-label={part ? `${PART_DEFS[part.type].name}${fixed ? " (fixed)" : ""}` : t === "core" ? "Core" : `Empty ${t}`}
+                onClick={() => tap(i)}
+                title={part ? popText.get(part.uid) : undefined}
+                aria-label={
+                  part ? `${PART_DEFS[part.type].name}${fixed ? " (fixed)" : ""}${isHub ? "" : " (part of it)"}` : t === "core" ? "Core" : `Empty ${t}`
+                }
               >
                 {t === "core" ? (
                   <span className="text-lg text-[var(--outpost-accent)]">{"\u{25CE}"}</span>
                 ) : t === "rock" ? (
                   <span className="text-lg text-white/30">{"\u{1FAA8}"}</span>
-                ) : part ? (
+                ) : part && isHub ? (
                   <PartGlyph part={part} />
                 ) : null}
-                {part && (part.type === "axle" || part.type === "sfAxle") && preview.chainAt[part.uid] !== undefined && (
+                {drop && dragPart && <PartPreview part={dragPart} />}
+                {part && isHub && (part.type === "axle" || part.type === "sfAxle") && preview.chainAt[part.uid] !== undefined && (
                   <span className="engine-cell-chain">{preview.chainAt[part.uid]}</span>
                 )}
               </button>
@@ -160,7 +188,7 @@ function Board({ c, onBack }: { c: DiffChallenge; onBack: () => void }) {
                 selected === t ? "border-[var(--outpost-accent)] bg-[var(--outpost-accent-soft)]/20" : "border-white/10 bg-white/5"
               }`}
             >
-              <span aria-hidden="true">{PART_DEFS[t].icon}</span>
+              <PartIcon type={t} />
               <span className="flex-1 text-white">{PART_DEFS[t].name}</span>
               <span className="text-white/50">
                 {n - (used[t] ?? 0)}/{n}
@@ -180,6 +208,11 @@ function Board({ c, onBack }: { c: DiffChallenge; onBack: () => void }) {
             </button>
           </div>
           <p className="text-[0.62rem] text-slate-500">Parts here are free and imaginary — only the count matters.</p>
+          {[...new Set(popText.values())].map((line) => (
+            <p key={line} className="text-[0.62rem] text-red-300/80">
+              ! {line}
+            </p>
+          ))}
         </div>
       </div>
     </div>

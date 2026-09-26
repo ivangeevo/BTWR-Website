@@ -85,17 +85,17 @@ const SPECIALS: ResearchDef[] = [
   { id: "r-offline-3", name: "Dreaming Machine", description: "+10% insight earned while away.", cost: 1e9, stage: 7, effect: { kind: "offlineEff", add: 0.1 } },
   { id: "r-offline-4", name: "It Never Sleeps", description: "+10% insight earned while away.", cost: 1e11, stage: 8, effect: { kind: "offlineEff", add: 0.1 } },
   // Power
-  { id: "r-source-1", name: "Canvas Sails", description: "Windmills and water wheels give 25% more power.", cost: 200_000, stage: 5, effect: { kind: "sourcePct", pct: 25 } },
+  { id: "r-source-1", name: "Canvas Sails", description: "Windmills and water wheels give 25% more power.", cost: 200_000, stage: 4, effect: { kind: "sourcePct", pct: 25 } },
   { id: "r-source-2", name: "Soulforged Bearings", description: "Windmills and water wheels give 25% more power.", cost: 5e9, stage: 7, effect: { kind: "sourcePct", pct: 25 } },
   { id: "r-gear-1", name: "Hardwood Teeth", description: "Gearboxes are rated for 2 more power.", cost: 100_000, stage: 5, effect: { kind: "gearboxCap", add: 2 } },
   { id: "r-gear-2", name: "Iron Teeth", description: "Gearboxes are rated for 2 more power.", cost: 5e7, stage: 6, effect: { kind: "gearboxCap", add: 2 } },
   { id: "r-gear-3", name: "Steel Teeth", description: "Gearboxes are rated for 2 more power.", cost: 1e10, stage: 7, effect: { kind: "gearboxCap", add: 2 } },
-  // Attachments
-  { id: "r-saw", name: "Sharpened Blade", description: "The Saw's bonus to Wood Gathering is 50% stronger.", cost: 100_000, stage: 5, effect: { kind: "sawPct", pct: 50 } },
-  { id: "r-mill", name: "Dressed Millstone", description: "The Millstone's bonuses are 50% stronger.", cost: 100_000, stage: 5, effect: { kind: "millPct", pct: 50 } },
-  { id: "r-detector-1", name: "Second Sense", description: "The Detector Block holds one more charge.", cost: 1e7, stage: 6, effect: { kind: "detectorCharges", add: 1 } },
-  { id: "r-detector-2", name: "Quick Study", description: "Detector charges refill twice as fast.", cost: 5e7, stage: 6, effect: { kind: "detectorRecharge", mult: 0.5 } },
-  { id: "r-bellows", name: "Double-Chamber Bellows", description: "The Bellows keep the fire alive 50% longer still.", cost: 5e9, stage: 7, effect: { kind: "bellowsPct", pct: 50 } },
+  // Millstone & attachments
+  { id: "r-saw", name: "Sharpened Blade", description: "The Saw's bonus to Wood Gathering is 50% stronger.", cost: 100_000, stage: 4, effect: { kind: "sawPct", pct: 50 } },
+  { id: "r-mill", name: "Dressed Millstone", description: "The Millstone's Stone bonus is 50% stronger.", cost: 20_000, stage: 4, effect: { kind: "millPct", pct: 50 } },
+  { id: "r-detector-1", name: "Second Sense", description: "The Detector Block holds one more charge.", cost: 1e7, stage: 5, effect: { kind: "detectorCharges", add: 1 } },
+  { id: "r-detector-2", name: "Quick Study", description: "Detector charges refill twice as fast.", cost: 5e7, stage: 5, effect: { kind: "detectorRecharge", mult: 0.5 } },
+  { id: "r-bellows", name: "Double-Chamber Bellows", description: "The Bellows' ore bonus is 50% stronger.", cost: 5e9, stage: 6, effect: { kind: "bellowsPct", pct: 50 } },
   // Mind
   { id: "r-global-1", name: "Punch-Card Memory", description: "+10% insight/sec.", cost: 1e6, stage: 5, effect: { kind: "globalPct", pct: 10 } },
   { id: "r-global-2", name: "Store Drum", description: "+15% insight/sec.", cost: 1e8, stage: 6, effect: { kind: "globalPct", pct: 15 } },
@@ -124,9 +124,11 @@ export type ResearchEffects = {
   sourceMult: number;
   gearboxCapBonus: number;
   sawMult: number;
+  /** Multiplier on the Millstone's Stone bonus. */
   millMult: number;
   detectorChargeBonus: number;
   detectorRechargeMult: number;
+  /** Multiplier on the Bellows' ore bonus. */
   bellowsMult: number;
   lorePct: number;
   governsSky: boolean;

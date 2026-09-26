@@ -988,14 +988,11 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // Advances from wherever the fire *currently* is (after decay), not from
   // its last raw stored value — so tending after a long absence starts
   // from the ember you'd actually see, not a stale high stage.
-  // The Campfire's decay rate as it stands right now — the admin-tuned base,
-  // slowed while the Engine's Bellows are powered (engine/buffs.ts). Every
+  // The Campfire's decay rate as it stands right now (admin-tuned). Every
   // decay read in this file goes through here so they can never disagree.
   const campfireDecayMinutes = useCallback(
-    (): number =>
-      resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire").decayMinutes *
-      currentEngineBuffs().bellowsDecayMult,
-    [currentEngineBuffs]
+    (): number => resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire").decayMinutes,
+    []
   );
 
   // --- Survival: Health, Hunger, Gloom, Hardcore Spawn (survival.ts) ---
@@ -1147,29 +1144,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     return true;
   }, [strandedNow]);
 
-  // When the Bellows start or stop, the decay rate changes — re-anchor the
-  // fire so its visible stage stays put instead of jumping (decay is derived
-  // from elapsed time ÷ rate, so a new rate would reinterpret the past).
-  const rebaseCampfire = useCallback((oldMinutes: number, newMinutes: number) => {
-    const c = campfireRef.current;
-    if (!c.lastTendedAt || oldMinutes === newMinutes) return;
-    const elapsedMin = (Date.now() - new Date(c.lastTendedAt).getTime()) / 60_000;
-    const steps = Math.floor(elapsedMin / oldMinutes);
-    const shown = Math.max(0, c.stage - steps) as CampfireStage;
-    const frac = shown === 0 ? 0 : (elapsedMin - steps * oldMinutes) / oldMinutes;
-    const campfire = {
-      ...c,
-      stage: shown,
-      lastTendedAt: new Date(Date.now() - frac * newMinutes * 60_000).toISOString(),
-    };
-    campfireRef.current = campfire;
-    setState((prev) => {
-      const next = { ...prev, campfire };
-      saveState(next);
-      return next;
-    });
-  }, []);
-
   // Only succeeds while the fire's real (decay-aware) stage is Medium — the
   // one stage that's ever actually cooked anything, per the campfire's own
   // long-standing flavor text (campfire-stage.ts). Shares the same rest
@@ -1179,23 +1153,12 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     const campfireMechanic = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire");
     if (currentCampfireStage(campfireRef.current, campfireDecayMinutes()) !== 3) return false;
     if ((resourcesRef.current.food ?? 0) < campfireMechanic.cookFoodCost) return false;
-    const buffs = currentEngineBuffs();
     const resources = { ...resourcesRef.current };
     resources.food -= campfireMechanic.cookFoodCost;
-    resources.cookedFood = (resources.cookedFood ?? 0) + campfireMechanic.cookYield + buffs.millstoneCook;
+    resources.cookedFood = (resources.cookedFood ?? 0) + campfireMechanic.cookYield;
     resourcesRef.current = resources;
-    // Every meal counts toward the Engine's stage gates; Millstone-ground ones also count for its commissions.
-    updateEngine(
-      (e) => ({
-        ...e,
-        counters: {
-          ...e.counters,
-          mealsCooked: e.counters.mealsCooked + 1,
-          millstoneMeals: e.counters.millstoneMeals + (buffs.millstonePowered ? 1 : 0),
-        },
-      }),
-      "soon"
-    );
+    // Every meal counts toward the Engine's stage gates.
+    updateEngine((e) => ({ ...e, counters: { ...e.counters, mealsCooked: e.counters.mealsCooked + 1 } }), "soon");
     const gatheringMechanic = resolvedMechanic<GatheringMechanic>(adminConfigRef.current, "gathering");
     const cooldownMs = effectiveCooldownMs(gatheringMechanic.activityCooldownMs, legacyRef.current.perks);
     const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
@@ -1214,7 +1177,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       return next;
     });
     return true;
-  }, [campfireDecayMinutes, currentEngineBuffs, updateEngine]);
+  }, [campfireDecayMinutes, updateEngine]);
 
   // Unlike every other resource mutator here, deliberately NOT gated behind
   // the shared activity cooldown — eating a meal you already cooked should
@@ -1283,7 +1246,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
-  // The Engine's Saw / Millstone add to these while powered (engine/buffs.ts).
+  // The Engine's Saw adds to Wood Gathering while powered (engine/buffs.ts).
   const completeWoodGathering = useCallback(() => {
     const { wood } = resolvedCollectAmounts(adminConfigRef.current);
     const buffs = currentEngineBuffs();
@@ -1298,12 +1261,11 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
   const completeHunting = useCallback(() => {
     const { food } = resolvedCollectAmounts(adminConfigRef.current);
-    const buffs = currentEngineBuffs();
-    const amount = food + collectBonus(legacyRef.current.perks) + buffs.millstoneFood;
+    const amount = food + collectBonus(legacyRef.current.perks);
     const meta = resolvedResourceMeta(adminConfigRef.current);
     applyResourceGain({ food: amount }, `Hunting: +${amount} ${meta.food.name}`);
     afterActivity("hunting");
-  }, [afterActivity, applyResourceGain, currentEngineBuffs]);
+  }, [afterActivity, applyResourceGain]);
 
   // Resource bridge for the Engine: spending (parts, commissions, feeding the
   // crank) and granting (Eureka/commission rewards), without the gathering
@@ -1361,15 +1323,46 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
   // Rolled off toolsRef (always current) so the caller gets back the exact
   // amounts applied, for its own completion feedback.
+  // The Engine's powered Millstones add Stone, its Bellows add to every ore
+  // found (engine/buffs.ts).
   const completeMining = useCallback((): Partial<ResourceState> => {
     const order = resolvedToolOrder(adminConfigRef.current);
     const gain = rollMiningYield(toolsRef.current.tier, order);
+    const buffs = currentEngineBuffs();
+    const helpers: string[] = [];
+    if (gain.stone !== undefined && buffs.millStone > 0) {
+      gain.stone += buffs.millStone;
+      helpers.push("Millstone");
+    }
+    if (buffs.bellowsOre > 0) {
+      let boosted = false;
+      for (const ore of ["coal", "copper", "iron"] as const) {
+        if (gain[ore] !== undefined) {
+          gain[ore] = gain[ore]! + buffs.bellowsOre;
+          boosted = true;
+        }
+      }
+      if (boosted) helpers.push("Bellows");
+    }
     if (Object.keys(gain).length > 0) {
-      applyResourceGain(gain, `Mining: +${formatYield(gain)}`);
+      applyResourceGain(gain, `Mining: +${formatYield(gain)}${helpers.length ? ` (${helpers.join(", ")})` : ""}`);
+    }
+    if (helpers.length > 0) {
+      updateEngine(
+        (e) => ({
+          ...e,
+          counters: {
+            ...e.counters,
+            millMines: e.counters.millMines + (helpers.includes("Millstone") ? 1 : 0),
+            bellowsMines: e.counters.bellowsMines + (helpers.includes("Bellows") ? 1 : 0),
+          },
+        }),
+        "soon"
+      );
     }
     afterActivity("mining");
     return gain;
-  }, [afterActivity, applyResourceGain]);
+  }, [afterActivity, applyResourceGain, currentEngineBuffs, updateEngine]);
 
   // A one-off craft beside the tool ladder: halves every later trek home.
   const craftCompass = useCallback((): boolean => {
@@ -1942,36 +1935,15 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     () => computeBuffs(state.engine, engineConfig, researchEffects(state.engine.research)),
     [state.engine, engineConfig]
   );
-  const bellowsMult = engineBuffs.bellowsDecayMult;
   const mechanicsResolved = useMemo(() => {
-    const campfire = resolvedMechanic<CampfireMechanic>(adminConfig, "campfire");
-    // Everything that reads the Campfire's decay (its card, the Engine's
-    // live sentences) sees the Bellows-slowed rate — see campfireDecayMinutes.
-    campfire.decayMinutes *= bellowsMult;
     return {
-      campfire,
+      campfire: resolvedMechanic<CampfireMechanic>(adminConfig, "campfire"),
       gathering: resolvedMechanic<GatheringMechanic>(adminConfig, "gathering"),
       prestige: resolvedMechanic<PrestigeMechanic>(adminConfig, "prestige"),
       upgrades: resolvedMechanic<UpgradesMechanic>(adminConfig, "upgrades"),
       survival: resolvedMechanic<SurvivalMechanic>(adminConfig, "survival"),
     };
-  }, [adminConfig, bellowsMult]);
-  // Bellows started/stopped: keep the fire's visible stage where it is.
-  const prevBellowsMultRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (!mounted) return;
-    // The first pass after load just records the rate the save was already
-    // living under — only a change during this session re-anchors the fire.
-    if (prevBellowsMultRef.current === null) {
-      prevBellowsMultRef.current = bellowsMult;
-      return;
-    }
-    const prevMult = prevBellowsMultRef.current;
-    prevBellowsMultRef.current = bellowsMult;
-    if (prevMult === bellowsMult) return;
-    const base = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire").decayMinutes;
-    rebaseCampfire(base * prevMult, base * bellowsMult);
-  }, [bellowsMult, mounted, rebaseCampfire]);
+  }, [adminConfig]);
   const stageTipsResolved = useMemo(() => resolvedStageTips(adminConfig, engineStage), [adminConfig, engineStage]);
   const canPrestige = engineStage >= 8;
   // The camp's open (survival's stage) with survival switched on: time to

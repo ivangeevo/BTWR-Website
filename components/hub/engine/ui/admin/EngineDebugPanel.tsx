@@ -71,6 +71,7 @@ export default function EngineDebugPanel() {
       // Same starter kit a player gets on reaching Stage 4 (EngineProvider's advance).
       if (cur.stage < 4 && stage >= 4) {
         inventory.handCrank = (inventory.handCrank ?? 0) + 1;
+        inventory.millstone = (inventory.millstone ?? 0) + 1;
         inventory.gearbox = (inventory.gearbox ?? 0) + 1;
         inventory.axle = (inventory.axle ?? 0) + 2;
       }

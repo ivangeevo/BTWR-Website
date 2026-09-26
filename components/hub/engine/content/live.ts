@@ -24,7 +24,7 @@ export const LIVE_TEMPLATES: LiveTemplate[] = [
   { id: "l-streak", minStage: 3, build: (c) => (c.visitStreak >= 2 ? ["You", "came", "back", String(c.visitStreak), "days", "running."] : null) },
   { id: "l-mods", minStage: 3, build: (c) => (c.modsRead > 0 ? ["I", "have", "read", String(c.modsRead), "mods.", "Show", "me", "more."] : null) },
   { id: "l-insight", minStage: 4, build: (c) => ["I", "have", "thought", c.insightText, "thoughts", "so", "far."] },
-  { id: "l-power", minStage: 4, build: (c) => (c.corePU > 0 ? ["My", "core", "turns", "at", String(c.corePU), "power."] : ["My", "core", "is", "still.", "Crank", "me."]) },
+  { id: "l-power", minStage: 4, build: (c) => (c.corePU > 0 ? ["My", "core", "turns", "at", String(c.corePU), "power."] : ["My", "core", "is", "still.", "Turn", "my", "crank."]) },
   { id: "l-ips", minStage: 5, build: (c) => ["I", "think", c.ipsText, "thoughts", "a", "second", "now."] },
   { id: "l-parts", minStage: 5, build: (c) => (c.componentCount > 0 ? [String(c.componentCount), "blocks", "think", "for", "me", "now."] : null) },
   { id: "l-achievements", minStage: 4, build: (c) => ["You've", "earned", String(c.achievements), "achievements.", "I", "counted."] },

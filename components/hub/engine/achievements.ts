@@ -7,6 +7,7 @@ import modsData from "@/data/mods.json";
 import type { AchievementDef, AchievementId } from "../achievements-catalog";
 import type { HubState } from "../hub-storage";
 import { ASKS_BY_ID } from "./content/asks";
+import { isDialCipher } from "./stages";
 import type { BeliefAxis } from "./types";
 
 export const ENGINE_ACHIEVEMENT_IDS = [
@@ -73,7 +74,7 @@ export const ENGINE_ACHIEVEMENT_DEFS: AchievementDef[] = [
   def("en-first-iron", "The Contraption", "Ponder built itself a body.", "\u{2699}\u{FE0F}", { xp: 100 }),
   def("en-crank-100", "Elbow Grease", "Turned the hand crank 100 times.", "\u{1F4AA}", { xp: 75 }),
   def("en-first-pop", "Three Was the Limit", "Popped an axle.", "\u{1F4A5}", { secret: true, xp: 50 }),
-  def("en-clean-engage", "Clean Engage", "Engaged the clutch with power reaching the core and nothing popping.", "\u{2705}", { xp: 75 }),
+  def("en-clean-engage", "Clean Engage", "Engaged the clutch with something making power and nothing popping.", "\u{2705}", { xp: 75 }),
   def("en-mid-game", "The Analytical Engine", "It renamed itself. It had earned it.", "\u{1F9E0}", { xp: 150 }),
   def("en-windmill", "Steady Wind", "Ran the Engine on a windmill.", "\u{1F32C}\u{FE0F}", { xp: 100 }),
   def("en-caesar", "Turn of the Dial", "Decoded a dial cipher.", "\u{1F39B}\u{FE0F}", { xp: 100 }),
@@ -111,7 +112,7 @@ function golds(c: Ctx): number {
 
 function idleHas(c: Ctx, type: string): boolean {
   const e = c.state.engine;
-  return e.grid.clutch && !!e.solved?.idle.sources.some((s) => s.type === type);
+  return e.grid.clutch && !!e.solved?.idle.sources.some((s) => s.type === type && s.toCore);
 }
 
 // Six answers in a row leaning the same way — read off the answer order.
@@ -183,7 +184,7 @@ export const ENGINE_CUSTOM_RULES: { id: AchievementId; check: (c: Ctx) => boolea
     { id: "en-water-wheel", check: (c) => idleHas(c, "waterWheel") },
     {
       id: "en-caesar",
-      check: (c) => c.state.engine.ciphers.solved.some((id) => id === "bp-saw" || id === "bp-millstone"),
+      check: (c) => c.state.engine.ciphers.solved.some((id) => isDialCipher(id)),
     },
     { id: "en-letter", check: (c) => c.state.engine.letter !== null },
     { id: "pd-old-friend", check: (c) => c.state.engine.mark >= 2 && c.state.engine.journal.length >= 20 },

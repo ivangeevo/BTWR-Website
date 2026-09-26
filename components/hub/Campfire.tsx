@@ -10,7 +10,6 @@ import {
   type CampfireStage,
 } from "./campfire-stage";
 import { useAchievements } from "./AchievementsProvider";
-import { useEngineOptional } from "./engine/ui/EngineProvider";
 
 // Live decay refresh — the fire's displayed stage used to only recompute
 // when `campfire` itself changed (i.e. right after tending), so a visitor
@@ -32,10 +31,8 @@ export default function Campfire() {
     mechanics,
     activityCooldownUntil,
     mounted,
-    engineBuffs,
     survivalActive,
   } = useAchievements();
-  const engine = useEngineOptional();
   const { decayMinutes, cookFoodCost, cookYield, eatXpReward, relightWoodCost, craftWoodCost } = mechanics.campfire;
   const { eatHunger } = mechanics.survival;
   const [stage, setStage] = useState<CampfireStage | null>(null);
@@ -58,7 +55,7 @@ export default function Campfire() {
 
   function handleCook() {
     if (completeCooking()) {
-      flash(`${resourceMeta.cookedFood.icon} +${cookYield + engineBuffs.millstoneCook} ${resourceMeta.cookedFood.name}`);
+      flash(`${resourceMeta.cookedFood.icon} +${cookYield} ${resourceMeta.cookedFood.name}`);
     }
   }
 
@@ -130,24 +127,6 @@ export default function Campfire() {
             <p className="mt-1 text-[10px] leading-snug text-white/35">
               Needs {relightWoodCost} {resourceMeta.wood.name}. Chop some in Gathering.
             </p>
-          )}
-          {engineBuffs.bellowsPowered && (
-            <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--outpost-accent)]">
-              <span>
-                {"\u{1FAAD}"} The Engine&apos;s Bellows are pumping — the fire lasts {engineBuffs.bellowsDecayMult}× longer.
-              </span>
-              {engine && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (engine.stokeCampfire()) setStage((s) => (s === null ? s : (Math.min(4, s + 1) as CampfireStage)));
-                  }}
-                  className="ml-auto shrink-0 rounded-md border border-[var(--outpost-accent)] px-2 py-0.5 font-semibold hover:bg-[var(--outpost-accent-soft)]"
-                >
-                  Stoke
-                </button>
-              )}
-            </div>
           )}
 
           {foodAvailable && (

@@ -3,6 +3,7 @@
 // something the visitor did elsewhere on the site, plus an insight cost.
 // Gate numbers are admin-tunable (config.ts's EngineGateMechanic).
 import type { EngineGateMechanic } from "./config";
+import { BLUEPRINTS_BY_ID } from "./content/blueprints";
 import type { EngineStage, EngineState, GridPartType, SolveSummary } from "./types";
 
 export type StageDef = { stage: EngineStage; chapter: string; caption: string };
@@ -91,7 +92,7 @@ function flag(id: string, label: string, done: boolean, site = false): GateReq {
 }
 
 function hasSource(s: SolveSummary | undefined, type: GridPartType): boolean {
-  return !!s?.sources.some((x) => x.type === type);
+  return !!s?.sources.some((x) => x.type === type && x.toCore);
 }
 
 function poweredTypes(e: EngineState): GridPartType[] {
@@ -99,6 +100,12 @@ function poweredTypes(e: EngineState): GridPartType[] {
   if (!idle) return [];
   const byUid = new Map(e.grid.cells.filter(Boolean).map((c) => [c!.uid, c!.type]));
   return idle.powered.map((uid) => byUid.get(uid)).filter((t): t is GridPartType => !!t);
+}
+
+/** A blueprint decoded with the dial (one- or two-dial Caesar). */
+export function isDialCipher(id: string): boolean {
+  const kind = BLUEPRINTS_BY_ID[id]?.kind;
+  return kind === "caesar" || kind === "caesar2";
 }
 
 function componentTypes(e: EngineState): number {
@@ -172,7 +179,13 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
       cost = g.s3Cost;
       break;
     case 4:
-      reqs.push(flag("bp-crank", "Decode the Hand Crank blueprint", e.blueprints.includes("handCrank")));
+      reqs.push(
+        flag(
+          "bp-body",
+          "Decode the Hand Crank and Millstone blueprints",
+          e.blueprints.includes("handCrank") && e.blueprints.includes("millstone")
+        )
+      );
       reqs.push(count("modfacts", "Solve sentences about mods", e.solvesByKind.modFact, g.s4ModFacts));
       reqs.push(count("hoppers", "Own Hoppers", e.components.hopper ?? 0, g.s4Hoppers));
       reqs.push(count("meals", "Cook a meal at the Campfire", site.mealsCooked, g.s4Meals, true));
@@ -180,9 +193,7 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
       cost = g.s4Cost;
       break;
     case 5:
-      reqs.push(
-        count("cranked", "Crank power into the Engine's core", engaged ? e.solved!.cranked.corePU : 0, g.s5CorePU)
-      );
+      reqs.push(count("grinds", "Grind stone: turn the crank with a Millstone next to it", e.counters.grinds, g.s5Grinds));
       reqs.push(flag("bp-windmill", "Decode the Windmill blueprint", e.blueprints.includes("windmill")));
       reqs.push(count("types", "Own different components", componentTypes(e), g.s5ComponentTypes));
       reqs.push(toolReq(site, "copper"));
@@ -191,9 +202,9 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
       break;
     case 6: {
       const types = poweredTypes(e);
-      const caesar = e.ciphers.solved.filter((id) => id === "bp-saw" || id === "bp-millstone").length;
+      const caesar = e.ciphers.solved.filter((id) => isDialCipher(id)).length;
       reqs.push(flag("windmill", "Run the Engine on a windmill", engaged && hasSource(e.solved?.idle, "windmill")));
-      reqs.push(flag("attach", "Power a Saw or Millstone", types.includes("saw") || types.includes("millstone")));
+      reqs.push(flag("attach", "Power a Saw", types.includes("saw")));
       reqs.push(count("caesar", "Decode dial ciphers", caesar, g.s6Caesar));
       reqs.push(count("quiz-correct", "Guess mods correctly", site.quizCorrect, g.s6QuizCorrect, true));
       cost = g.s6Cost;
@@ -210,7 +221,7 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
       break;
     case 8:
       reqs.push(count("soulforged", "Forge a soulforged part", e.counters.soulforged, 1));
-      reqs.push(count("idle", "Steady power into the core", engaged ? e.solved!.idle.corePU : 0, g.s8CorePU));
+      reqs.push(count("idle", "Steady power for the Engine", engaged ? e.solved!.idle.corePU : 0, g.s8CorePU));
       reqs.push(flag("bp-final", "Decode the last blueprint", e.ciphers.solved.includes("bp-final")));
       reqs.push(count("quiz50", "Guess mods correctly", site.quizCorrect, g.s8QuizCorrect, true));
       reqs.push(toolReq(site, "diamond"));

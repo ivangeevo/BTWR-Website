@@ -1,73 +1,78 @@
-// What the Engine gives back to the rest of the Outpost. Only the STEADY
-// (idle) solve counts — never the crank — so a buff can't flicker on and off
-// mid-hold, and the Campfire's decay math only changes on an engage.
+// What the Engine gives back to the rest of the Outpost. Machines only count
+// here when grid power (a windmill or water wheel line) keeps them turning —
+// the STEADY (idle) solve, never the crank — so a per-run bonus can't flicker
+// on and off mid-hold. Each powered copy stacks. What the crank turns by
+// hand yields directly instead (see crankRev in EngineProvider).
 import type { ResearchEffects } from "./catalog/research";
 import type { EngineConfig } from "./config";
 import type { EngineState, GridPartType } from "./types";
 
 export type EngineBuffs = {
   sawPowered: boolean;
-  millstonePowered: boolean;
   detectorPowered: boolean;
+  millPowered: boolean;
   bellowsPowered: boolean;
   hibachiLit: boolean;
-  /** Extra wood per Wood Gathering. */
+  /** Extra wood per Wood Gathering (all powered Saws). */
   sawWood: number;
   /** Multiplier on how long a Wood Gathering run takes (< 1 = faster). */
   sawHoldMult: number;
-  millstoneFood: number;
-  millstoneCook: number;
-  /** Multiplier on the Campfire's decayMinutes (> 1 = slower decay). */
-  bellowsDecayMult: number;
+  /** Extra stone per Mining run (all powered Millstones). */
+  millStone: number;
+  /** Extra of each ore found per Mining run (all powered Bellows). */
+  bellowsOre: number;
   detectorMaxCharges: number;
 };
 
 export const NO_BUFFS: EngineBuffs = {
   sawPowered: false,
-  millstonePowered: false,
   detectorPowered: false,
+  millPowered: false,
   bellowsPowered: false,
   hibachiLit: false,
   sawWood: 0,
   sawHoldMult: 1,
-  millstoneFood: 0,
-  millstoneCook: 0,
-  bellowsDecayMult: 1,
+  millStone: 0,
+  bellowsOre: 0,
   detectorMaxCharges: 0,
 };
 
-export function poweredPartTypes(e: EngineState): Set<GridPartType> {
-  const out = new Set<GridPartType>();
+/** How many unbroken parts of each type the steady (idle) solve powers. */
+export function poweredPartCounts(e: EngineState): Map<GridPartType, number> {
+  const out = new Map<GridPartType, number>();
   if (!e.grid.clutch || !e.solved) return out;
   const byUid = new Map<string, GridPartType>();
   for (const c of e.grid.cells) if (c && !c.broken) byUid.set(c.uid, c.type);
   for (const uid of e.solved.idle.powered) {
     const t = byUid.get(uid);
-    if (t) out.add(t);
+    if (t) out.set(t, (out.get(t) ?? 0) + 1);
   }
   return out;
 }
 
+export function poweredPartTypes(e: EngineState): Set<GridPartType> {
+  return new Set(poweredPartCounts(e).keys());
+}
+
 export function computeBuffs(e: EngineState, cfg: EngineConfig, fx: ResearchEffects): EngineBuffs {
-  const types = poweredPartTypes(e);
-  if (types.size === 0) return NO_BUFFS;
+  const counts = poweredPartCounts(e);
+  if (counts.size === 0) return NO_BUFFS;
   const b = cfg.buffs;
   const home = e.specialization === "homesteader" ? 1 + b.homesteaderAttachPct / 100 : 1;
-  const saw = types.has("saw");
-  const mill = types.has("millstone");
-  const bellows = types.has("bellows");
+  const saws = counts.get("saw") ?? 0;
+  const mills = counts.get("millstone") ?? 0;
+  const bellows = counts.get("bellows") ?? 0;
   return {
-    sawPowered: saw,
-    millstonePowered: mill,
-    detectorPowered: types.has("detector"),
-    bellowsPowered: bellows,
-    hibachiLit: types.has("hibachi"),
-    sawWood: saw ? Math.round(b.sawWood * fx.sawMult * home) : 0,
-    sawHoldMult: saw ? Math.max(0.1, 1 - (b.sawHoldPct / 100) * fx.sawMult * home) : 1,
-    millstoneFood: mill ? Math.round(b.millstoneFood * fx.millMult * home) : 0,
-    millstoneCook: mill ? Math.round(b.millstoneCook * fx.millMult * home) : 0,
-    bellowsDecayMult: bellows ? b.bellowsDecayMult * fx.bellowsMult : 1,
-    detectorMaxCharges: types.has("detector") ? b.detectorMaxCharges + fx.detectorChargeBonus : 0,
+    sawPowered: saws > 0,
+    detectorPowered: counts.has("detector"),
+    millPowered: mills > 0,
+    bellowsPowered: bellows > 0,
+    hibachiLit: counts.has("hibachi"),
+    sawWood: Math.round(saws * b.sawWood * fx.sawMult * home),
+    sawHoldMult: saws > 0 ? Math.max(0.1, 1 - (b.sawHoldPct / 100) * fx.sawMult * home) : 1,
+    millStone: Math.round(mills * b.millstoneStone * fx.millMult * home),
+    bellowsOre: Math.round(bellows * b.bellowsOre * fx.bellowsMult * home),
+    detectorMaxCharges: counts.has("detector") ? b.detectorMaxCharges + fx.detectorChargeBonus : 0,
   };
 }
 

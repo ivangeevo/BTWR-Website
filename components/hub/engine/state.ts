@@ -1,15 +1,23 @@
 // The Engine's save slice: defaults, a tolerant loader, what a prestige
 // keeps vs. dismantles, and the small public snapshot other pages read.
+import { layoutFor, remapGrid } from "./grid/layouts";
 import { stageTitle } from "./stages";
 import type {
   BeliefAxis,
+  CommissionInstance,
   EngineCounterKey,
   EngineCounters,
+  EngineGrid,
   EnginePublic,
   EngineStage,
   EngineState,
+  GridPartType,
   SolveSummary,
 } from "./types";
+
+// Commissions that no longer exist (cooking moved off the Engine; the
+// Bellows no longer stoke the Campfire) — dropped from a saved day's list.
+const RETIRED_COMMISSIONS = ["c-meal", "c-stoke"];
 
 const COUNTER_KEYS: EngineCounterKey[] = [
   "cranks",
@@ -26,7 +34,10 @@ const COUNTER_KEYS: EngineCounterKey[] = [
   "componentsBought",
   "commissionsDone",
   "sawChops",
-  "millstoneMeals",
+  "grinds",
+  "millMines",
+  "bellowsMines",
+  "handYields",
   "mealsCooked",
   "asksAnswered",
   "engages",
@@ -43,7 +54,7 @@ export function defaultCounters(): EngineCounters {
 }
 
 export function emptySummary(): SolveSummary {
-  return { corePU: 0, supplyPU: 0, powered: [], broken: [], warnings: [], sources: [] };
+  return { corePU: 0, supplyPU: 0, powered: [], grinding: 0, broken: [], warnings: [], sources: [] };
 }
 
 export const JOURNAL_MAX = 40;
@@ -120,6 +131,47 @@ function num(v: unknown, fallback: number): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
+// Brings an older body up to date: the grid grew (5×5 / 6×6 / 7×7) and lost
+// its fixed core, and every body starts from a hand crank + Millstone (both
+// decoded at Stage 3). Anything that no longer fits goes back to the tray;
+// a changed grid is disengaged so it's re-solved on the next engage.
+const BODY_BLUEPRINTS: GridPartType[] = ["handCrank", "millstone"];
+
+function migrateBody(
+  stage: EngineStage,
+  grid: EngineGrid,
+  inventory: EngineState["inventory"],
+  rawBlueprints: string[],
+  rawSolvedCiphers: string[]
+): { grid: EngineGrid; inventory: EngineState["inventory"]; blueprints: GridPartType[]; solvedCiphers: string[]; reset: boolean } {
+  const blueprints = [...rawBlueprints] as GridPartType[];
+  const solvedCiphers = [...rawSolvedCiphers];
+  if (stage >= 4) {
+    for (const t of BODY_BLUEPRINTS) {
+      if (!blueprints.includes(t)) blueprints.push(t);
+      if (!solvedCiphers.includes(`bp-${t}`)) solvedCiphers.push(`bp-${t}`);
+    }
+  }
+  const inv = { ...inventory };
+  let reset = false;
+  let next: EngineGrid = grid;
+  const layout = layoutFor(stage);
+  // Re-lay the grid on every load: a new size, or a save from before big
+  // sources spanned several squares, sends anything that no longer fits
+  // back to the inventory.
+  if (layout) {
+    const r = remapGrid(grid, stage);
+    if (grid.w !== layout.w || grid.h !== layout.h || r.returned.length > 0) {
+      next = r.grid;
+      for (const p of r.returned) inv[p.type] = (inv[p.type] ?? 0) + 1;
+      reset = true;
+    }
+  }
+  if (stage >= 4 && !next.cells.some((c) => c?.type === "handCrank") && !(inv.handCrank ?? 0)) inv.handCrank = 1;
+  if (reset) next = { ...next, clutch: false, rev: next.rev + 1 };
+  return { grid: next, inventory: inv, blueprints, solvedCiphers, reset };
+}
+
 // Deep-ish merge over defaults, so a save from an older build of the Engine
 // (missing newer nested fields) never crashes a consumer.
 export function normalizeEngineState(raw: unknown): EngineState {
@@ -139,10 +191,34 @@ export function normalizeEngineState(raw: unknown): EngineState {
   if (grid.cells.length !== grid.w * grid.h) {
     grid.cells = Array.from({ length: grid.w * grid.h }, (_, i) => grid.cells[i] ?? null);
   }
-  const solved =
-    isObj(r.solved) && isObj(r.solved.idle) && isObj(r.solved.cranked) && isObj(r.solved.boosted)
-      ? (r.solved as EngineState["solved"])
-      : null;
+  const cipherState: Record<string, unknown> = isObj(r.ciphers) ? r.ciphers : {};
+  const migrated = migrateBody(
+    stage,
+    grid,
+    isObj(r.inventory) ? (r.inventory as EngineState["inventory"]) : {},
+    arr<string>(r.blueprints, []),
+    arr<string>(cipherState.solved, [])
+  );
+  // A solve cached by an older build (no crank-turned summary, no Millstone
+  // count, or from before power had to reach the core) is stale: disengage
+  // so the next engage re-solves.
+  const cached = isObj(r.solved) ? r.solved : null;
+  const coreAware = (s: unknown) =>
+    isObj(s) && Array.isArray(s.sources) && s.sources.every((x) => isObj(x) && typeof x.toCore === "boolean");
+  const fresh =
+    !!cached &&
+    isObj(cached.idle) &&
+    isObj(cached.cranked) &&
+    typeof cached.idle.grinding === "number" &&
+    coreAware(cached.idle) &&
+    coreAware(cached.cranked) &&
+    !migrated.reset;
+  const solved: EngineState["solved"] = fresh
+    ? { idle: cached.idle as SolveSummary, cranked: cached.cranked as SolveSummary, rev: num(cached.rev, 0) }
+    : null;
+  if (!fresh) migrated.grid = { ...migrated.grid, clutch: false };
+  const current = isObj(cipherState.current) ? (cipherState.current as EngineState["ciphers"]["current"]) : null;
+  const commissions = { ...base.commissions, ...(isObj(r.commissions) ? r.commissions : {}) };
   return {
     ...base,
     ...r,
@@ -163,11 +239,11 @@ export function normalizeEngineState(raw: unknown): EngineState {
       ? (r.specialization as BeliefAxis)
       : null,
     specsTried: arr(r.specsTried, []),
-    blueprints: arr(r.blueprints, []),
+    blueprints: migrated.blueprints,
     ciphers: {
-      solved: arr(isObj(r.ciphers) ? r.ciphers.solved : [], []),
-      keyFragments: arr(isObj(r.ciphers) ? r.ciphers.keyFragments : [], []),
-      current: isObj(r.ciphers) && isObj(r.ciphers.current) ? (r.ciphers.current as EngineState["ciphers"]["current"]) : null,
+      solved: migrated.solvedCiphers,
+      keyFragments: arr(cipherState.keyFragments, []),
+      current,
     },
     research: arr(r.research, []),
     modsRead: arr(r.modsRead, []),
@@ -177,13 +253,14 @@ export function normalizeEngineState(raw: unknown): EngineState {
     ledgerDrumLevel: num(r.ledgerDrumLevel, 0),
     mark: Math.max(1, num(r.mark, 1)),
     components: isObj(r.components) ? (r.components as EngineState["components"]) : {},
-    grid,
-    inventory: isObj(r.inventory) ? (r.inventory as EngineState["inventory"]) : {},
+    grid: migrated.grid,
+    inventory: migrated.inventory,
     solved,
     hibachi: { ...base.hibachi, ...(isObj(r.hibachi) ? r.hibachi : {}) },
     detector: { ...base.detector, ...(isObj(r.detector) ? r.detector : {}) },
     eureka: { ...base.eureka, ...(isObj(r.eureka) ? r.eureka : {}) },
-    commissions: { ...base.commissions, ...(isObj(r.commissions) ? r.commissions : {}) },
+    // The Millstone-meals commission is gone (the Millstone makes power now).
+    commissions: { ...commissions, daily: arr<CommissionInstance>(commissions.daily, []).filter((c) => !RETIRED_COMMISSIONS.includes(c.tplId)) },
     difference: isObj(r.difference) ? (r.difference as EngineState["difference"]) : {},
     counters: { ...base.counters, ...(isObj(r.counters) ? r.counters : {}) },
     public: { ...base.public, ...(isObj(r.public) ? r.public : {}) },

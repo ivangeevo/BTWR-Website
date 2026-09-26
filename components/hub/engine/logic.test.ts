@@ -49,11 +49,11 @@ describe("stage gates", () => {
     expect(evaluateGate(3, e, cfg.gates, ok).reqs.filter((r) => r.site)).toHaveLength(3);
   });
 
-  it("First Iron needs the crank blueprint, mod facts, hoppers, a cooked meal and a stone tool", () => {
+  it("First Iron needs the crank and millstone blueprints, mod facts, hoppers, a cooked meal and a stone tool", () => {
     const e: EngineState = {
       ...defaultEngineState(),
       stage: 3,
-      blueprints: ["handCrank"],
+      blueprints: ["handCrank", "millstone"],
       solvesByKind: { tiles: 0, fork: 0, modFact: 10, live: 0, paragraph: 0 },
       components: { hopper: 5 },
     };
@@ -66,18 +66,35 @@ describe("stage gates", () => {
     expect(evaluateGate(4, e, cfg.gates, noFire).met).toBe(true);
     expect(evaluateGate(4, e, cfg.gates, noFire).reqs.some((r) => r.id === "meals")).toBe(false);
     expect(evaluateGate(4, { ...e, blueprints: [] }, cfg.gates, ok).met).toBe(false);
+    expect(evaluateGate(4, { ...e, blueprints: ["handCrank"] }, cfg.gates, ok).met).toBe(false);
   });
 
-  it("Road to Mid-Game reads the engaged crank solve", () => {
-    const base: EngineState = { ...defaultEngineState(), stage: 4, blueprints: ["handCrank", "windmill"], components: { hopper: 1, dispenser: 1, turntable: 1 } };
+  it("Road to Mid-Game needs thoughts ground at the Millstone", () => {
+    const base: EngineState = {
+      ...defaultEngineState(),
+      stage: 4,
+      blueprints: ["handCrank", "millstone", "windmill"],
+      components: { hopper: 1, dispenser: 1, turntable: 1 },
+    };
     const ok = site({ toolIndex: 2, iron: 3 });
     expect(evaluateGate(5, base, cfg.gates, ok).met).toBe(false);
-    const engaged: EngineState = {
-      ...base,
-      grid: { ...base.grid, clutch: true },
-      solved: { idle: emptySummary(), cranked: { ...emptySummary(), corePU: 1 }, boosted: { ...emptySummary(), corePU: 2 }, rev: 0 },
+    const ground: EngineState = { ...base, counters: { ...base.counters, grinds: cfg.gates.s5Grinds } };
+    expect(evaluateGate(5, ground, cfg.gates, ok).met).toBe(true);
+  });
+
+  it("The End reads steady power reaching the core, not the crank", () => {
+    const e: EngineState = {
+      ...defaultEngineState(),
+      stage: 7,
+      grid: { ...defaultEngineState().grid, clutch: true },
+      solved: {
+        idle: { ...emptySummary(), corePU: 4, supplyPU: 6 },
+        cranked: { ...emptySummary(), corePU: 99, supplyPU: 99 },
+        rev: 0,
+      },
     };
-    expect(evaluateGate(5, engaged, cfg.gates, ok).met).toBe(true);
+    const req = evaluateGate(8, e, cfg.gates, site()).reqs.find((r) => r.id === "idle")!;
+    expect(req.progress).toBe(4);
   });
 });
 

@@ -4,7 +4,7 @@ import type { EngineStage } from "../../types";
 
 // The Engine's body, drawn — a small inline-SVG machine that gains a part per
 // stage (cog → crank → frame & axles → windmill → water wheel → hibachi
-// glow). Everything turns at a speed set by the power reaching the core;
+// glow). Everything turns at a speed set by the Engine's power;
 // colours come from the Outpost's accent vars so it follows the skin.
 function Cog({ cx, cy, r, teeth = 8, className = "", duration }: { cx: number; cy: number; r: number; teeth?: number; className?: string; duration?: string }) {
   return (

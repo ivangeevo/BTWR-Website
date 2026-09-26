@@ -45,24 +45,38 @@ export type SolveWarningCode =
   | "frozen"
   | "wrongFace"
   | "notWater"
-  | "brownout"
-  | "crankNeedsGearbox"
+  | "crankJammed"
   | "backfedUnpowered";
 
-export type PopReason = "chain" | "opposed" | "twoSources" | "overload";
+export type PopReason = "chain" | "opposed" | "twoSources" | "overload" | "crankOverload";
+
+/** A part that pops, and the numbers behind it (for telling the player why). */
+export type PopInfo = {
+  uid: string;
+  reason: PopReason;
+  /** "overload": power going into the gearbox, and what it's rated for. */
+  load?: number;
+  cap?: number;
+  /** "chain": how long the axle run got (soulforged axles count half). */
+  run?: number;
+};
 
 export type SolveSummary = {
-  /** Power left over for the Engine's core (and so its components). */
+  /** The Engine's power: what reaches ◎ core cells, plus turning hand cranks. */
   corePU: number;
-  /** Total power the working sources produced. */
+  /** Total power the working sources produced, reaching the core or not. */
   supplyPU: number;
-  /** uids of attachments/consumers that received their full draw. */
+  /** uids of machines (attachments/consumers) that power reached. */
   powered: string[];
+  /** uids of Millstones / Saws / Bellows turned by a hand crank right next to them (older saves: missing). */
+  handTurned?: string[];
+  /** How many of those are Millstones, grinding thoughts. */
+  grinding: number;
   /** uids broken by this solve (or already broken going in). */
   broken: string[];
   warnings: { uid: string; code: SolveWarningCode }[];
   /** Working sources in this solve, for the gate checklist + visuals. */
-  sources: { uid: string; type: GridPartType; pu: number }[];
+  sources: { uid: string; type: GridPartType; pu: number; /** Its power reaches the Engine (a core, or a turning crank). */ toCore: boolean }[];
 };
 
 export type ComponentId =
@@ -107,7 +121,10 @@ export type EngineCounterKey =
   | "componentsBought"
   | "commissionsDone"
   | "sawChops"
-  | "millstoneMeals"
+  | "grinds"
+  | "millMines"
+  | "bellowsMines"
+  | "handYields"
   | "mealsCooked"
   | "asksAnswered"
   | "engages"
@@ -199,8 +216,8 @@ export type EngineState = {
   components: Partial<Record<ComponentId, number>>;
   grid: EngineGrid;
   inventory: Partial<Record<GridPartType, number>>;
-  /** Cached at engage time: steady power only, while cranking, while cranking fed. */
-  solved: { idle: SolveSummary; cranked: SolveSummary; boosted: SolveSummary; rev: number } | null;
+  /** Cached at engage time: steady (crank still) and while the crank turns. */
+  solved: { idle: SolveSummary; cranked: SolveSummary; rev: number } | null;
   hibachi: { litUntil: string | null };
   detector: { charges: number; chargedAt: string | null };
 
