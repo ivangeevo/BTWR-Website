@@ -1018,7 +1018,8 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
 
   const stokeCampfire = useCallback((): boolean => {
     if (!aRef.current.engineBuffs.bellowsPowered) return false;
-    aRef.current.tendCampfire();
+    // Fails with no Campfire crafted, or on a dead fire without the Wood to relight it.
+    if (!aRef.current.tendCampfire()) return false;
     act((cur) => ({ ...cur, counters: { ...cur.counters, stokes: cur.counters.stokes + 1 } }));
     return true;
   }, [act]);

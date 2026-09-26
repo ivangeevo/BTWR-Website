@@ -1,4 +1,5 @@
 import { ENGINE_ACHIEVEMENT_DEFS, type EngineAchievementId } from "./engine/achievements";
+import { SURVIVAL_ACHIEVEMENT_DEFS, type SurvivalAchievementId } from "./survival-achievements";
 
 export type BuiltinAchievementId =
   // Tier 1 (12) — the original, simple hangout-spot achievements.
@@ -73,7 +74,9 @@ export type BuiltinAchievementId =
   | "pd-automated" | "pd-oracle" | "pd-old-friend"
   | "pd-insight-1" | "pd-insight-10" | "pd-insight-50" | "pd-insight-200"
   // The Analytical Engine's own category (engine/achievements.ts).
-  | EngineAchievementId;
+  | EngineAchievementId
+  // Hardcore Spawn's own category (survival-achievements.ts).
+  | SurvivalAchievementId;
 
 // Achievements added in /outpost-admin (see custom-achievements.ts) carry
 // a "custom-" prefix, so they can never collide with a built-in id.
@@ -97,6 +100,7 @@ export type AchievementCategory =
   | "soul-forge"
   | "husbandry-harvest"
   | "mob-moonphase"
+  | "hardcore-spawn"
   | "nether-reachievement"
   | "rtfm-wiki"
   | "bureaucracy"
@@ -116,6 +120,7 @@ export const CATEGORY_LABELS: Record<AchievementCategory, string> = {
   "soul-forge": "Soul Forge & Hellfire Forge",
   "husbandry-harvest": "Husbandry & Harvest",
   "mob-moonphase": "Mob & Moonphase",
+  "hardcore-spawn": "Hardcore Spawn",
   "nether-reachievement": "Nether Reachievement",
   "rtfm-wiki": "RTFM",
   bureaucracy: "Bureaucracy & Paperwork",
@@ -137,6 +142,7 @@ export const CATEGORY_ORDER: AchievementCategory[] = [
   "soul-forge",
   "husbandry-harvest",
   "mob-moonphase",
+  "hardcore-spawn",
   "nether-reachievement",
   "rtfm-wiki",
   "bureaucracy",
@@ -250,6 +256,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     xp: 200,
   },
   ...ENGINE_ACHIEVEMENT_DEFS,
+  ...SURVIVAL_ACHIEVEMENT_DEFS,
   {
     id: "first-visit",
     title: "Welcome to the Outpost",

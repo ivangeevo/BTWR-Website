@@ -17,7 +17,8 @@ import { useEngineOptional } from "./engine/ui/EngineProvider";
 // who left the tab open could see a stale stage. Now matters more than
 // before: cooking's own eligibility depends on catching the real stage,
 // not a stale one.
-const REFRESH_MS = 15_000;
+// Kept short now that a stage only lasts about a minute (mechanics.ts).
+const REFRESH_MS = 2_000;
 
 export default function Campfire() {
   const {
@@ -32,9 +33,11 @@ export default function Campfire() {
     activityCooldownUntil,
     mounted,
     engineBuffs,
+    survivalActive,
   } = useAchievements();
   const engine = useEngineOptional();
-  const { decayMinutes, cookFoodCost, cookYield, eatXpReward } = mechanics.campfire;
+  const { decayMinutes, cookFoodCost, cookYield, eatXpReward, relightWoodCost, craftWoodCost } = mechanics.campfire;
+  const { eatHunger } = mechanics.survival;
   const [stage, setStage] = useState<CampfireStage | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -60,7 +63,11 @@ export default function Campfire() {
   }
 
   function handleEat() {
-    if (eatCookedFood()) flash(`+${eatXpReward} XP`);
+    if (eatCookedFood()) flash(survivalActive ? `+${eatHunger / 2} \u{1F357}  +${eatXpReward} XP` : `+${eatXpReward} XP`);
+  }
+
+  function handleTend() {
+    if (tendCampfire()) setStage((s) => (s === null ? s : (Math.min(4, s + 1) as CampfireStage)));
   }
 
   // Cooking only exists once Food is actually gatherable — gated by the
@@ -69,13 +76,30 @@ export default function Campfire() {
   const foodAvailable = upgrades.purchased.includes("hunting");
 
   const canCook = stage === 3 && resources.food >= cookFoodCost && remainingMs <= 0;
+  // A dead fire takes Wood to relight (mechanics.ts); tending a lit one is free.
+  const relighting = stage === 0 && relightWoodCost > 0;
+  const canTend = !relighting || resources.wood >= relightWoodCost;
 
+  // .outpost-lit: the fire is the one light in the gloom (GloomLayer.tsx).
   return (
-    <div className="outpost-panel outpost-card-md rounded-xl p-4">
+    <div className="outpost-panel outpost-lit outpost-card-md rounded-xl p-4">
       <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-[var(--outpost-accent)]">
         The Campfire
       </h3>
-      {stage === null ? (
+      {mounted && !campfire.built ? (
+        <div className="mt-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl leading-none opacity-40 grayscale" aria-hidden="true">
+              {"\u{1FAB5}"}
+            </span>
+            <p className="text-sm font-semibold text-white">No fire yet</p>
+          </div>
+          <p className="mt-1.5 text-xs leading-snug text-slate-400">
+            Craft a Campfire in Crafting&apos;s 2×2 Player Crafting grid for {craftWoodCost} {resourceMeta.wood.name}.
+            It&apos;s the only thing that keeps the gloom away on a New Moon night.
+          </p>
+        </div>
+      ) : stage === null ? (
         <div className="mt-2 flex items-center gap-3">
           <div className="h-12 w-12 shrink-0 animate-pulse rounded-lg bg-white/10" />
           <div className="flex-1 space-y-2">
@@ -94,14 +118,19 @@ export default function Campfire() {
           <p className="mt-1.5 text-xs leading-snug text-slate-400">{CAMPFIRE_CAPTIONS[stage]}</p>
           <button
             type="button"
-            onClick={() => {
-              tendCampfire();
-              setStage((s) => (s === null ? s : (Math.min(4, s + 1) as CampfireStage)));
-            }}
-            className="btn-glow btn-gradient mt-2 rounded-lg px-3 py-1 text-xs font-semibold text-white"
+            onClick={handleTend}
+            disabled={!canTend}
+            className={`mt-2 rounded-lg px-3 py-1 text-xs font-semibold ${
+              canTend ? "btn-glow btn-gradient text-white" : "border border-white/15 text-white/30"
+            }`}
           >
-            Tend the Fire
+            {relighting ? `Relight (${resourceMeta.wood.icon} ${relightWoodCost})` : "Tend the Fire"}
           </button>
+          {relighting && resources.wood < relightWoodCost && (
+            <p className="mt-1 text-[10px] leading-snug text-white/35">
+              Needs {relightWoodCost} {resourceMeta.wood.name}. Chop some in Gathering.
+            </p>
+          )}
           {engineBuffs.bellowsPowered && (
             <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--outpost-accent)]">
               <span>

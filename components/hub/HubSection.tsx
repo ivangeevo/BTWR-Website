@@ -8,6 +8,7 @@ import AchievementToastStack from "./AchievementToastStack";
 import Campfire from "./Campfire";
 import CraftingCard from "./CraftingCard";
 import DailyBriefing from "./DailyBriefing";
+import ExperiencePicker from "./ExperiencePicker";
 import Gathering from "./Gathering";
 import OutpostCorners from "./OutpostCorners";
 import OutpostSettings from "./OutpostSettings";
@@ -15,9 +16,11 @@ import OutpostTabs, { OutpostTabPanel, useOutpostTabs } from "./OutpostTabs";
 import PatchNotes from "./PatchNotes";
 import Ponder from "./Ponder";
 import PrestigeBadge from "./PrestigeBadge";
+import GloomLayer from "./GloomLayer";
 import GuessTheMod from "./GuessTheMod";
 import ResourceToolStrip from "./ResourceToolStrip";
 import StageTip from "./StageTip";
+import StrandedPanel from "./StrandedPanel";
 import UpgradesPanel, { useUpgradesShown } from "./UpgradesPanel";
 import YourProgressSection from "./YourProgressSection";
 import { type ModuleId } from "./module-registry";
@@ -28,8 +31,8 @@ import { SKINS_BY_ID } from "./tier2";
 import { END_KEY, useCardReorder, type CardReorder } from "./use-card-reorder";
 import { useReducedMotion } from "./engine/ui/use-reduced-motion";
 
-// The Outpost, on its own page (/outpost) and exactly one screen tall, like
-// Cookie Clicker: the page never scrolls, each part scrolls inside itself.
+// The Outpost, on its own page (/outpost) and exactly one screen tall.
+// The page never scrolls, each part scrolls inside itself.
 // - A slim top bar: title, the Basecamp/Progress/Achievements tabs, rank, settings.
 // - Basecamp is three columns. Left, "the cookie": the Engine (the Ponder
 //   card), with the stage tip above it. Its Workshop, when open, widens over
@@ -111,7 +114,9 @@ function TopBar({ tabs }: { tabs: ReturnType<typeof useOutpostTabs> }) {
   return (
     <div
       id="outpost"
-      className="relative z-30 grid shrink-0 items-center gap-3 border-b border-white/10 px-4 py-2.5 sm:grid-cols-[1fr_auto_1fr]"
+      // z-40: its dropdowns (settings, Prestige, Upgrades) must open over the
+      // gloom (z-30) and the panels lit above it (.outpost-lit, z-31).
+      className="relative z-40 grid shrink-0 items-center gap-3 border-b border-white/10 px-4 py-2.5 sm:grid-cols-[1fr_auto_1fr]"
     >
       <div className="flex min-w-0 items-center gap-3">
         <span className="outpost-status-tag">
@@ -340,6 +345,8 @@ function Basecamp({ mods, packReleases }: { mods: Mod[]; packReleases: PackRelea
             <StageTip />
           </div>
         </ModuleGate>
+        {/* Hardcore Spawn: only there while a respawn's trek home is underway. */}
+        <StrandedPanel className={centred} />
         <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:flex-row">
           <div
             data-outpost-scroll
@@ -406,6 +413,7 @@ function OutpostFrame({ mods, packReleases }: { mods: Mod[]; packReleases: PackR
         className="relative lg:min-h-0 lg:flex-1"
       >
         <Basecamp mods={mods} packReleases={packReleases} />
+        <GloomLayer />
       </OutpostTabPanel>
       {tabs.tab === "progress" && (
         <OutpostTabPanel id="progress" active labelled className="outpost-tab-scroll lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
@@ -422,6 +430,7 @@ function OutpostFrame({ mods, packReleases }: { mods: Mod[]; packReleases: PackR
       </span>
       <EngineToasts />
       <EurekaLayer />
+      <ExperiencePicker />
       <AchievementToastStack />
     </div>
   );

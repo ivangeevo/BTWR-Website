@@ -11,9 +11,9 @@ export type EngineBuffs = {
   detectorPowered: boolean;
   bellowsPowered: boolean;
   hibachiLit: boolean;
-  /** Extra wood per Wood Chopping. */
+  /** Extra wood per Wood Gathering. */
   sawWood: number;
-  /** Multiplier on how long a Wood Chopping run takes (< 1 = faster). */
+  /** Multiplier on how long a Wood Gathering run takes (< 1 = faster). */
   sawHoldMult: number;
   millstoneFood: number;
   millstoneCook: number;

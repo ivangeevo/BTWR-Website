@@ -1066,10 +1066,10 @@ function ResourcesTab({ config, update }: { config: AdminConfig; update: Update 
       </div>
 
       <div>
-        <p className="text-sm text-slate-400">How much Wood Chopping and Hunting each collect per completion.</p>
+        <p className="text-sm text-slate-400">How much Wood Gathering and Hunting each collect per completion.</p>
         <div className="mt-3 flex flex-wrap gap-4">
           <label className="flex items-center gap-2 text-xs text-white/60">
-            <span aria-hidden="true">{meta.wood.icon}</span> Wood Chopping yields
+            <span aria-hidden="true">{meta.wood.icon}</span> Wood Gathering yields
             <input
               type="number"
               min={0}
@@ -1162,7 +1162,7 @@ function ToolRow({ tool, isCustom, update }: { tool: ToolTier; isCustom: boolean
       </div>
       <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
         <label className="flex flex-col gap-1 text-white/40">
-          Wood Chopping (ms)
+          Wood Gathering (ms)
           <input
             type="number"
             min={200}
@@ -1235,7 +1235,7 @@ function ToolsTab({ config, update }: { config: AdminConfig; update: Update }) {
   return (
     <div>
       <p className="text-sm text-slate-400">
-        The shared tool tier that speeds up Wood Chopping/Hunting and unlocks better Mining yields. Tiers you add here
+        The shared tool tier that speeds up Wood Gathering/Hunting and unlocks better Mining yields. Tiers you add here
         go beyond Netherite, craft in the Soulforge, and scale mining yields up automatically.
       </p>
       <div className="mt-3 space-y-2">
@@ -1262,7 +1262,7 @@ function ToolsTab({ config, update }: { config: AdminConfig; update: Update }) {
         </div>
         <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
           <label className="flex flex-col gap-1 text-white/40">
-            Wood Chopping (ms)
+            Wood Gathering (ms)
             <input
               type="number"
               min={200}
@@ -1329,7 +1329,7 @@ function ToolsTab({ config, update }: { config: AdminConfig; update: Update }) {
 // omit `enabled`/`onToggle` for a feature that only ever has a tier
 // requirement, no real "off" state (Hunting/Mining: Gathering itself is
 // already hideable as a whole card via the Modules tab, and there's no
-// separate concept of "Mining off but Wood Chopping/Hunting still on" worth a
+// separate concept of "Mining off but Wood Gathering/Hunting still on" worth a
 // dedicated switch). The tier dropdown disables along with the switch when
 // there is one, since a tier requirement is meaningless for something off
 // entirely.
@@ -1432,6 +1432,15 @@ function FeaturesTab({ config, update }: { config: AdminConfig; update: Update }
         enabled={features.prestigeEnabled}
         onToggle={(v) => setFeature("prestigeEnabled", v)}
         extra={<MechanicSettingsMenu moduleId="prestige" config={config} update={update} />}
+      />
+      <FeatureRow
+        title="Hardcore Spawn"
+        description="Health, Hunger, and the gloom on New Moon nights. A death respawns the visitor far from camp: Crafting is out of reach until a short trek home finishes (halved with a Compass). The Campfire goes with them. Turning this on also forces the Day/Night Cycle on. Nothing ticks while the Outpost is closed."
+        enabled={features.survivalEnabled}
+        onToggle={(v) => setFeature("survivalEnabled", v)}
+        tierId={String(features.survivalStage)}
+        onTierChange={(v) => setFeature("survivalStage", Number(v))}
+        extra={<MechanicSettingsMenu moduleId="survival" config={config} update={update} />}
       />
     </div>
   );

@@ -79,8 +79,16 @@ const themeBootScript = `
     // Desktop-only Outpost — keep in sync with components/hub/device.ts.
     var phone = window.matchMedia("(hover: none) and (pointer: coarse)").matches
       || /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle|BlackBerry|Opera Mini|IEMobile/i.test(navigator.userAgent);
-    var cycleActive = !phone && !!(hub && hub.enabled && hub.settings && hub.settings.dayNightCycleEnabled)
-      && purchased.indexOf("day-night-cycle") !== -1;
+    // Full survival forces the cycle on — keep in sync with day-night-cycle.ts's
+    // isDayNightCycleActive/survivalForcesCycle (defaults: enabled, Engine stage 3).
+    var adminRaw = localStorage.getItem("btwr:hub:admin:v1");
+    var features = (adminRaw && JSON.parse(adminRaw).features) || {};
+    var survivalStage = typeof features.survivalStage === "number" ? features.survivalStage : 3;
+    var survivalOn = features.survivalEnabled !== false
+      && !!(hub && hub.experience && hub.experience.mode === "survival")
+      && !!(hub && hub.engine && hub.engine.stage >= survivalStage);
+    var cycleActive = !phone && !!(hub && hub.enabled) && (survivalOn
+      || (!!(hub.settings && hub.settings.dayNightCycleEnabled) && purchased.indexOf("day-night-cycle") !== -1));
     var overrideAllowed = !!(hub && hub.settings && hub.settings.themeOverrideAllowed);
     document.documentElement.setAttribute("data-daynight-active", String(cycleActive));
 
@@ -95,7 +103,7 @@ const themeBootScript = `
         localStorage.setItem("btwr:hub:cycle:v1", JSON.stringify({ startedAt: startedAt }));
       }
       var elapsed = Math.max(0, Date.now() - startedAt);
-      var segmentMs = 186000; // PHASE_MS (180000) + TWILIGHT_MS (6000) — keep in sync with day-night-cycle.ts
+      var segmentMs = 306000; // PHASE_MS (300000) + TWILIGHT_MS (6000) — keep in sync with day-night-cycle.ts
       var isDay = Math.floor(elapsed / segmentMs) % 2 === 0;
       theme = isDay ? "light" : "dark";
     } else {

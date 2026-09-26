@@ -1,30 +1,11 @@
 "use client";
 
 import { useAchievements } from "./AchievementsProvider";
-import { findToolTier, RESOURCE_IDS, type ResourceState, type ToolTier } from "./resources";
+import { findToolTier, type ToolTier } from "./resources";
 import { rankIconForLevel, rankTitleForLevel } from "./tier2";
 
-// Sits on the left of the level badge row — what's been gathered so far
-// from Wood Chopping/Hunting/Mining. Zero-amount resources stay hidden so a
-// fresh save doesn't show six "0" chips before you've collected anything.
-function ResourceStrip({ resources }: { resources: ResourceState }) {
-  const { resourceMeta } = useAchievements();
-  const collected = RESOURCE_IDS.filter((id) => resources[id] > 0);
-  if (collected.length === 0) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-1.5" title="Resources collected">
-      {collected.map((id) => (
-        <span key={id} className="outpost-resource-chip">
-          <span aria-hidden="true">{resourceMeta[id].icon}</span>
-          {resources[id]}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 // Sits on the right of the level badge row — the shared tool tier that
-// speeds up Wood Chopping/Hunting and unlocks better Mining yields, crafted
+// speeds up Wood Gathering/Hunting and unlocks better Mining yields, crafted
 // in the Crafting card.
 function ToolBadge({ tool }: { tool: ToolTier }) {
   return (
@@ -59,14 +40,13 @@ function relativeTime(iso: string): string {
 }
 
 export default function Tier2Overview() {
-  const { tier2, xpInfo, unlocked, achievements, quiz, visits, ledgerProgress, resources, tools, toolTiersList } =
+  const { tier2, xpInfo, unlocked, achievements, quiz, visits, ledgerProgress, tools, toolTiersList } =
     useAchievements();
   const accuracy = quiz.totalAnswered > 0 ? Math.round((quiz.totalCorrect / quiz.totalAnswered) * 100) : 0;
 
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3">
-        <ResourceStrip resources={resources} />
         <div className="flex min-w-[12rem] flex-1 items-center gap-4">
           <div className="tier2-rank-ring">
             <span className="font-heading text-xl font-extrabold text-white">{xpInfo.level}</span>

@@ -10,6 +10,7 @@ import {
   type ResourceId,
   type ToolTier,
 } from "./resources";
+import { FarFromCamp } from "./StrandedPanel";
 
 // One fixed-size square block whatever the grid (2×2, 3×3 or 4×4) — its
 // squares divide it evenly, so they're always square and a bigger grid
@@ -50,6 +51,7 @@ function GridSection({
       </div>
 
       <div className="mt-1.5 space-y-0.5">
+        {grid.id === "player" && <CampfireRow />}
         {craftableIds.map((tierId) => {
           const targetIndex = order.indexOf(tierId);
           const tool: ToolTier = findToolTier(toolTiersList, tierId);
@@ -104,8 +106,94 @@ function GridSection({
   );
 }
 
+// The Campfire itself — the first thing on the 2×2 grid, before any tool.
+// Crafting it reveals the fire in the Campfire card, already lit.
+function CampfireRow() {
+  const { campfire, resources, resourceMeta, mechanics, craftCampfire } = useAchievements();
+  const cost = mechanics.campfire.craftWoodCost;
+  const canAfford = resources.wood >= cost;
+
+  return (
+    <div
+      className={`flex items-center justify-between gap-2 rounded-md bg-white/5 px-1.5 py-0.5 text-[10px] ${
+        campfire.built ? "text-white/40" : ""
+      }`}
+    >
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span aria-hidden="true">{"\u{1F525}"}</span>
+        <span className="font-semibold text-white">Campfire</span>
+        {!campfire.built && (
+          <span className="text-white/40">
+            {resourceMeta.wood.icon} {cost}
+          </span>
+        )}
+      </div>
+      {campfire.built ? (
+        <span className="shrink-0 text-white/40">Crafted</span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => craftCampfire()}
+          disabled={!canAfford}
+          className={`shrink-0 rounded-md border px-1.5 py-px text-[10px] font-semibold transition-colors ${
+            canAfford
+              ? "border-[var(--outpost-accent)] text-[var(--outpost-accent)] hover:bg-[var(--outpost-accent-soft)]"
+              : "border-white/15 text-white/30"
+          }`}
+        >
+          Craft
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Hardcore Spawn's one-off craft (survival.ts): halves every later trek home.
+function CompassRow() {
+  const { survival, resources, resourceMeta, mechanics, craftCompass } = useAchievements();
+  const { compassIron, compassCopper } = mechanics.survival;
+  const cost: [ResourceId, number][] = (
+    [
+      ["iron", compassIron],
+      ["copper", compassCopper],
+    ] as [ResourceId, number][]
+  ).filter(([, n]) => n > 0);
+  const canAfford = cost.every(([id, n]) => (resources[id] ?? 0) >= n);
+
+  return (
+    <div className="mt-1.5 flex items-center justify-between gap-2 rounded-md bg-white/5 px-1.5 py-0.5 text-[10px]">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span aria-hidden="true">{"\u{1F9ED}"}</span>
+        <span className="font-semibold text-white">Compass</span>
+        <span className="text-white/40">
+          {survival.compass
+            ? "Halves the walk home"
+            : cost.map(([id, n]) => `${resourceMeta[id].icon} ${n}`).join(" ")}
+        </span>
+      </div>
+      {survival.compass ? (
+        <span className="shrink-0 text-white/40">Crafted</span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => craftCompass()}
+          disabled={!canAfford}
+          title="Halves the trek back to camp after a respawn"
+          className={`shrink-0 rounded-md border px-1.5 py-px text-[10px] font-semibold transition-colors ${
+            canAfford
+              ? "border-[var(--outpost-accent)] text-[var(--outpost-accent)] hover:bg-[var(--outpost-accent-soft)]"
+              : "border-white/15 text-white/30"
+          }`}
+        >
+          Craft
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function CraftingCard() {
-  const { xpInfo, tools, toolTiersList } = useAchievements();
+  const { xpInfo, tools, toolTiersList, survivalActive, stranded } = useAchievements();
   // Admin-added tiers beyond Netherite have nowhere hand-authored to live,
   // so they default into the Soulforge grid (the pack's "advanced/late-game"
   // slot already).
@@ -169,6 +257,8 @@ export default function CraftingCard() {
           )}
         </>
       )}
+      {survivalActive && <CompassRow />}
+      {stranded && <FarFromCamp />}
     </div>
   );
 }

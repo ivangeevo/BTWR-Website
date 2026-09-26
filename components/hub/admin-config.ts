@@ -48,6 +48,10 @@ export type FeaturesConfig = {
   upgradesStage: number;
   /** Master switch — off means the Prestige badge never shows in the header. Otherwise it appears once the Engine reaches Stage 8. */
   prestigeEnabled: boolean;
+  /** Master switch for Health/Hunger/Gloom and Hardcore Spawn (survival.ts). */
+  survivalEnabled: boolean;
+  /** Engine stage at which survival switches on (default: The Stump, when the camp opens). */
+  survivalStage: number;
 };
 
 export function defaultFeatures(): FeaturesConfig {
@@ -55,6 +59,8 @@ export function defaultFeatures(): FeaturesConfig {
     upgradesEnabled: true,
     upgradesStage: 2,
     prestigeEnabled: true,
+    survivalEnabled: true,
+    survivalStage: 3,
   };
 }
 
@@ -79,7 +85,7 @@ export type AdminConfig = {
    * whatever cost they were created with). */
   craftCostEdits: Partial<Record<string, Partial<ResourceState>>>;
   resourceEdits: Partial<Record<ResourceId, ResourceMetaEdit>>;
-  /** Flat amount Wood Chopping/Hunting grant per completed chop/trip. */
+  /** Flat amount Wood Gathering/Hunting grant per completed chop/trip. */
   collectAmounts: { wood: number; food: number };
   /** Tip strings shown (rotating every 60s if more than one) while the
    * Engine is at that stage — see StageTip.tsx. Empty/missing means no tip
@@ -118,7 +124,7 @@ export function defaultAdminConfig(): AdminConfig {
         "Keep an eye on the rest of the site too... not everything announces itself.",
       ],
       3: [
-        "The camp is open. Chop Wood in Gathering, keep the Campfire at Medium to cook, and spend Skill Points in the Upgrades shop (top-left badge) — Hunting and Mining are in there.",
+        "The camp is open. Chop Wood in Gathering, craft a Campfire (4 Wood) in Crafting and keep it at Medium to cook, and spend Skill Points in the Upgrades shop (top-left badge) — Hunting and Mining are in there.",
         "Cooked food feeds the Engine's hand crank. Mining needs a Stone Tool first.",
       ],
       4: ["Guess the Mod is open, and the Engine has a body now — build its gear grid from the Body tab."],

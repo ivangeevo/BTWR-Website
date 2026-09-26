@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Ticks down the shared activity cooldown (Wood Chopping / Hunting / Mining
+// Ticks down the shared activity cooldown (Wood Gathering / Hunting / Mining
 // all set the same `activity.cooldownUntil`) so each card can show its own
 // "resting" countdown without re-deriving the math three times.
 export function useCooldownRemaining(cooldownUntil: string | null): number {

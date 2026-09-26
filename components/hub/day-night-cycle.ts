@@ -10,7 +10,7 @@ import { loadState } from "./hub-storage";
 const CYCLE_KEY = "btwr:hub:cycle:v1";
 
 /** How long the sun/moon takes to arc from rise to set. */
-export const PHASE_MS = 180_000;
+export const PHASE_MS = 300_000;
 // A brief pause after the body sets, before the next one rises — sky colors
 // keep drifting (deepening toward midnight, or lightening toward midday)
 // through this gap instead of handing off instantly, same as real dusk/dawn
@@ -90,10 +90,143 @@ export function isDayNightCycleActive(): boolean {
   if (typeof window === "undefined") return false;
   try {
     const state = loadState();
-    if (!state.enabled || isPhoneDevice() || !state.settings.dayNightCycleEnabled) return false;
+    if (!state.enabled || isPhoneDevice()) return false;
+    // Survival's gloom runs on this clock, so while it's on the sky is too —
+    // otherwise the page could look like midday while a New Moon night
+    // darkens it (GloomLayer.tsx). The visitor's toggle can't hide it.
+    if (state.experience.mode === "survival" && survivalForcesCycle(state.engine.stage)) return true;
+    if (!state.settings.dayNightCycleEnabled) return false;
     return state.upgrades.purchased.includes("day-night-cycle");
   } catch {
     return false;
+  }
+}
+
+// Read straight off the admin save instead of importing admin-config.ts:
+// this module ships on every page (DayNightSky, ThemeToggle), and that one
+// pulls in the whole achievement catalog. Defaults mirror admin-config.ts's
+// defaultFeatures() — keep in sync (and with app/layout.tsx's boot script).
+const ADMIN_KEY = "btwr:hub:admin:v1";
+
+export function survivalForcesCycle(engineStage: number): boolean {
+  let enabled = true;
+  let stage = 3;
+  try {
+    const features = JSON.parse(window.localStorage.getItem(ADMIN_KEY) ?? "null")?.features;
+    if (typeof features?.survivalEnabled === "boolean") enabled = features.survivalEnabled;
+    if (typeof features?.survivalStage === "number") stage = features.survivalStage;
+  } catch {
+    // defaults
+  }
+  return enabled && engineStage >= stage;
+}
+
+// --- Gloom (see survival.ts) ---
+// The cycle's own moon (moonPhaseIndex) advances once per full day+night, so
+// a day and the night after it share an index. New Moon nights are gloom
+// nights: with the Campfire out, the gloom hurts. Survival runs off the
+// cycle's clock whether or not its visuals are switched on.
+
+const NEW_MOON_INDEX = 0;
+
+export function isGloomNight(phase: CyclePhase): boolean {
+  return !phase.isDay && phase.moonPhaseIndex === NEW_MOON_INDEX;
+}
+
+// Where along the sun's arc the gloom starts creeping in (the sun's low on
+// the horizon), and how dark it's got by the time night actually falls.
+const GLOOM_DUSK_START = 0.9;
+const GLOOM_AT_NIGHTFALL = 0.4;
+
+/**
+ * 0..1 darkness over the Outpost for a gloom night. Daytime stays clear: it
+ * only creeps in once the sun is setting on the day before a New Moon night,
+ * deepens to full over the first stretch of the night, holds, and lifts
+ * over the last stretch before dawn. Only visual — gloom only hurts at night.
+ */
+export function gloomDarkness(phase: CyclePhase): number {
+  if (phase.moonPhaseIndex !== NEW_MOON_INDEX) return 0;
+  if (phase.isDay) {
+    // bodyProgress holds at 1 through the twilight gap after the sun sets.
+    if (phase.bodyProgress < GLOOM_DUSK_START) return 0;
+    return ((phase.bodyProgress - GLOOM_DUSK_START) / (1 - GLOOM_DUSK_START)) * GLOOM_AT_NIGHTFALL;
+  }
+  if (phase.progress < 0.1) return GLOOM_AT_NIGHTFALL + (phase.progress / 0.1) * (1 - GLOOM_AT_NIGHTFALL);
+  return phase.progress < 0.9 ? 1 : 1 - (phase.progress - 0.9) / 0.1;
+}
+
+export type NightForecast = {
+  isNight: boolean;
+  /** The moon of the current night, or of tonight if it's still day. */
+  moonPhaseIndex: number;
+  isGloom: boolean;
+  /** Time until tonight starts (0 once it's night). */
+  msUntilNight: number;
+  /** Time until the current night ends (0 during the day). */
+  msUntilDawn: number;
+};
+
+export function nightForecast(startedAt: number, now: number = Date.now()): NightForecast {
+  const elapsed = Math.max(0, now - startedAt);
+  const elapsedInSegment = elapsed % SEGMENT_MS;
+  const phase = computeCyclePhase(startedAt, now);
+  return {
+    isNight: !phase.isDay,
+    moonPhaseIndex: phase.moonPhaseIndex,
+    isGloom: phase.moonPhaseIndex === NEW_MOON_INDEX,
+    msUntilNight: phase.isDay ? SEGMENT_MS - elapsedInSegment : 0,
+    msUntilDawn: phase.isDay ? 0 : SEGMENT_MS - elapsedInSegment,
+  };
+}
+
+/**
+ * Hardcore Spawn's "reset to morning": a new anchor for the cycle landing at
+ * the start of a day — the current one if it's already day, the next one if
+ * it's night. Always moves the clock to a day start rather than restarting
+ * it, so the moon keeps its place instead of snapping back to New Moon.
+ */
+export function skipToMorning(startedAt: number, now: number = Date.now()): number {
+  const elapsed = Math.max(0, now - startedAt);
+  const segment = Math.floor(elapsed / SEGMENT_MS);
+  const target = segment % 2 === 0 ? segment : segment + 1;
+  return now - target * SEGMENT_MS;
+}
+
+export type CycleJump = "dusk" | "dawn" | "gloom-sunset" | "gloom-night";
+
+/**
+ * Admin testing (Engine Debug tab): a new anchor that puts the cycle a few
+ * seconds before the chosen moment, always moving forward in time.
+ * "gloom-sunset" lands where the darkness starts creeping in, on the day
+ * before the next New Moon night; "gloom-night" just before that night falls.
+ */
+export function jumpCycle(startedAt: number, target: CycleJump, now: number = Date.now()): number {
+  const LEAD_MS = 5_000;
+  const elapsed = Math.max(0, now - startedAt);
+  const segment = Math.floor(elapsed / SEGMENT_MS);
+  let targetElapsed: number;
+  if (target === "dusk" || target === "dawn") {
+    // Next night segment (odd) for dusk, next day segment (even) for dawn.
+    const wantOdd = target === "dusk";
+    let s = segment + 1;
+    if ((s % 2 === 1) !== wantOdd) s++;
+    targetElapsed = s * SEGMENT_MS;
+  } else {
+    // The next full cycle whose moon is New (index 0).
+    const cycle = Math.floor(elapsed / FULL_CYCLE_MS);
+    const nextNewMoon = Math.ceil((cycle + 1) / MOON_PHASES.length) * MOON_PHASES.length;
+    const cycleStart = nextNewMoon * FULL_CYCLE_MS;
+    targetElapsed = target === "gloom-sunset" ? cycleStart + PHASE_MS * GLOOM_DUSK_START : cycleStart + SEGMENT_MS;
+  }
+  return now - (targetElapsed - LEAD_MS);
+}
+
+export function saveCycleStartedAt(startedAt: number) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(CYCLE_KEY, JSON.stringify({ startedAt }));
+  } catch {
+    // Same tolerance as loadCycleStartedAt.
   }
 }
 

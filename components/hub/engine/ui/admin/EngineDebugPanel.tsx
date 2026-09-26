@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { jumpCycle, loadCycleStartedAt, saveCycleStartedAt, type CycleJump } from "../../../day-night-cycle";
 import { loadState, saveState, type HubState } from "../../../hub-storage";
 import { RESOURCE_IDS } from "../../../resources";
 import { readEngineDebug, writeEngineDebug, type EngineDebug } from "../../bridge-storage";
@@ -11,6 +12,13 @@ import { PART_ORDER } from "../../grid/parts";
 import { STAGES } from "../../stages";
 import { defaultEngineState } from "../../state";
 import { ENGINE_STAGES, type EngineStage, type EngineState } from "../../types";
+
+const JUMPS: [CycleJump, string, string][] = [
+  ["dusk", "Next dusk", "Night falls in 5s."],
+  ["dawn", "Next dawn", "The sun rises in 5s."],
+  ["gloom-sunset", "Gloom sunset", "Sunset before a New Moon night: the Outpost starts darkening in 5s."],
+  ["gloom-night", "Gloom night", "A New Moon night falls in 5s. Let the fire go out to feel the gloom."],
+];
 
 // Testing tools for a month-long arc. Writes the Outpost save directly, so
 // close (or reload after) any open Outpost tab — a live Outpost would
@@ -94,6 +102,14 @@ export default function EngineDebugPanel() {
     const next = { ...debug, ...patch };
     writeEngineDebug(next);
     setDebug(next);
+  }
+
+  // One-shot flags the open Outpost consumes (clears) on its next tick —
+  // written straight to storage, never kept in this panel's copy, so a later
+  // toggle can't send them again.
+  function fireOnce(patch: Pick<EngineDebug, "killNow" | "finishTrek">, msg: string) {
+    writeEngineDebug({ ...readEngineDebug(), ...patch });
+    setNote(msg);
   }
 
   return (
@@ -221,6 +237,48 @@ export default function EngineDebugPanel() {
           <Btn onClick={() => setDebugFlag({ forceFullMoon: debug.forceFullMoon ? undefined : true })}>
             Force full moon: {debug.forceFullMoon ? "on" : "off"}
           </Btn>
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-white/50">Hardcore Spawn</h3>
+        <p className="mt-1 text-[11px] text-slate-400">
+          These run on the open Outpost&apos;s next tick, so keep it open in another tab.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <Btn
+            onClick={() =>
+              applyHub(
+                (s) => ({ ...s, experience: { mode: null, chosenAt: null } }),
+                "Experience choice cleared: reload the Outpost (Engine at The Stump or later) to pick again."
+              )
+            }
+          >
+            Ask the experience question again
+          </Btn>
+          <Btn onClick={() => fireOnce({ killNow: true }, "The Outpost will kill you on its next tick.")}>Kill me</Btn>
+          <Btn onClick={() => fireOnce({ finishTrek: true }, "Any trek home ends on the Outpost's next tick.")}>
+            Finish trek
+          </Btn>
+          <Btn onClick={() => setDebugFlag({ forceGloom: debug.forceGloom ? undefined : true })}>
+            Every night is a gloom night: {debug.forceGloom ? "on" : "off"}
+          </Btn>
+        </div>
+        <p className="mt-2 text-[11px] text-slate-400">
+          Jump the day/night clock (lands 5s before the moment, always forward). The whole site follows within a second.
+        </p>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {JUMPS.map(([target, label, msg]) => (
+            <Btn
+              key={target}
+              onClick={() => {
+                saveCycleStartedAt(jumpCycle(loadCycleStartedAt(), target));
+                setNote(msg);
+              }}
+            >
+              {label}
+            </Btn>
+          ))}
         </div>
       </section>
 

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import type { Mod } from "@/lib/mods";
 import { MISC_SUBCATEGORIES } from "@/data/mod-categories.mjs";
+import { isDayNightCycleActive, loadCycleStartedAt, MOON_PHASES, nightForecast } from "./day-night-cycle";
 import { FIELD_NOTES } from "./field-notes";
 import { pickByDate, pickModOfDay, todayUTC } from "./hub-storage";
 import { isFullMoon, isNewMoon } from "./tier2";
@@ -43,7 +44,38 @@ function categoryLabel(mod: Mod) {
   return "Misc";
 }
 
-type SkyReading = { label: string; caption: string; icon: string };
+type SkyReading = { label: string; caption: string; icon: string; warn?: boolean };
+
+function formatClock(ms: number): string {
+  const total = Math.ceil(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+// The Outpost's own sky (day-night-cycle.ts), once there's a cycle to read:
+// this is where a visitor sees a gloom night coming. Nothing else warns
+// them — the page just starts to darken at sunset (GloomLayer.tsx).
+function readCycleSky(): SkyReading {
+  const f = nightForecast(loadCycleStartedAt());
+  const moon = MOON_PHASES[f.moonPhaseIndex];
+  if (f.isNight) {
+    return {
+      label: `${moon.name} tonight`,
+      caption: f.isGloom
+        ? `Gloom night. Keep the fire lit until dawn (${formatClock(f.msUntilDawn)}).`
+        : `Dawn in ${formatClock(f.msUntilDawn)}.`,
+      icon: moon.icon,
+      warn: f.isGloom,
+    };
+  }
+  return {
+    label: `Tonight: ${moon.name}`,
+    caption: f.isGloom
+      ? `Gloom tonight. Keep the fire lit. Dusk in ${formatClock(f.msUntilNight)}.`
+      : `Dusk in ${formatClock(f.msUntilNight)}.`,
+    icon: moon.icon,
+    warn: f.isGloom,
+  };
+}
 
 function readSky(now: Date): SkyReading {
   if (isFullMoon(now)) {
@@ -76,7 +108,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function DailyBriefing({ mods }: { mods: Mod[] }) {
-  const { unlock } = useAchievements();
+  const { unlock, survivalActive } = useAchievements();
   const [mod, setMod] = useState<Mod | null>(null);
   const [sky, setSky] = useState<SkyReading | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -86,9 +118,17 @@ export default function DailyBriefing({ mods }: { mods: Mod[] }) {
   }, [mods]);
 
   useEffect(() => {
-    setSky(readSky(new Date()));
     setNote(pickByDate(FIELD_NOTES));
   }, []);
+
+  // The Outpost's own cycle once it's running (survival forces it on), else
+  // the real-world moon. Re-read every second for the dusk/dawn countdown.
+  useEffect(() => {
+    const read = () => setSky(survivalActive || isDayNightCycleActive() ? readCycleSky() : readSky(new Date()));
+    read();
+    const id = window.setInterval(read, 1000);
+    return () => window.clearInterval(id);
+  }, [survivalActive]);
 
   useEffect(() => {
     if (mod) unlock("mod-of-day-viewed");
@@ -152,7 +192,9 @@ export default function DailyBriefing({ mods }: { mods: Mod[] }) {
             </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white">{sky.label}</p>
-              <p className="truncate text-xs text-slate-400">{sky.caption}</p>
+              <p className={`truncate text-xs ${sky.warn ? "font-semibold text-rose-300" : "text-slate-400"}`}>
+                {sky.caption}
+              </p>
             </div>
           </div>
         ) : (

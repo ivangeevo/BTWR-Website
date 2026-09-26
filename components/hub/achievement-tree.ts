@@ -176,6 +176,14 @@ const ROWS: Row[] = [
   ["mm-moon-regular", "mm-blood-moon"],
   ["mm-new-moon", "mm-night-watch"],
 
+  // Hardcore Spawn
+  ["hs-first-death", null],
+  ["hs-way-back", "hs-first-death"],
+  ["hs-compass", "hs-way-back", "goal"],
+  ["hs-gloom", "hs-first-death"],
+  ["hs-frequent-flyer", "hs-first-death"],
+  ["hs-ten-deaths", "hs-first-death", "goal"],
+
   // Nether Reachievement
   ["nr-milestone-25", null, "goal"],
   ["nr-milestone-50", "nr-milestone-25", "goal"],

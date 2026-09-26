@@ -9,11 +9,13 @@ function ToggleRow({
   label,
   description,
   checked,
+  disabled = false,
   onChange,
 }: {
   label: string;
   description: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: (next: boolean) => void;
 }) {
   return (
@@ -27,8 +29,9 @@ function ToggleRow({
         role="switch"
         aria-checked={checked}
         aria-label={label}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors duration-200 [forced-color-adjust:none] ${
+        className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors duration-200 [forced-color-adjust:none] disabled:cursor-not-allowed disabled:opacity-50 ${
           checked ? "border-[var(--outpost-accent)] bg-[var(--outpost-accent)]" : "border-white/25 bg-white/10"
         }`}
       >
@@ -48,7 +51,7 @@ function ToggleRow({
 // achievement/tool editor. This one is for ordinary visitors, always
 // reachable right from the Outpost itself.
 export default function OutpostSettings() {
-  const { settings, updateSettings } = useAchievements();
+  const { settings, updateSettings, survivalActive } = useAchievements();
   const [open, setOpen] = useState(false);
   const [bouncing, setBouncing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,8 +123,13 @@ export default function OutpostSettings() {
             />
             <ToggleRow
               label="Day/night cycle"
-              description="A sun and moon cross the top of the site, forcing the theme to match."
-              checked={settings.dayNightCycleEnabled}
+              description={
+                survivalActive
+                  ? "Always on while Hardcore Spawn is: the gloom comes with the New Moon."
+                  : "A sun and moon cross the top of the site, forcing the theme to match."
+              }
+              checked={survivalActive || settings.dayNightCycleEnabled}
+              disabled={survivalActive}
               onChange={(v) => set({ dayNightCycleEnabled: v })}
             />
             <ToggleRow

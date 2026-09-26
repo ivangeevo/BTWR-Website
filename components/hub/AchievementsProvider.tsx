@@ -22,7 +22,10 @@ import {
   applyVisit,
   defaultState,
   loadState,
+  normalizeCampfire,
+  normalizeExperience,
   saveState as saveStateRaw,
+  type ExperienceMode,
   todayUTC,
   type HubState,
   type QuizStats,
@@ -35,7 +38,30 @@ import { resolveEngineConfig, type EngineConfig } from "./engine/config";
 import { settle } from "./engine/economy";
 import { ENGINE_CUSTOM_RULES, ENGINE_NUMERIC_RULES } from "./engine/achievements";
 import { engineOnPrestige, normalizeEngineState } from "./engine/state";
-import { takeQueuedSecrets } from "./engine/bridge-storage";
+import { readEngineDebug, takeQueuedSecrets, writeEngineDebug } from "./engine/bridge-storage";
+import {
+  computeCyclePhase,
+  gloomDarkness,
+  isGloomNight,
+  loadCycleStartedAt,
+  saveCycleStartedAt,
+  skipToMorning,
+} from "./day-night-cycle";
+import {
+  applyDamage,
+  completeTrekIfDone,
+  DEATH_CAUSE_TEXT,
+  defaultSurvivalState,
+  eat,
+  formatHalves,
+  respawn,
+  rollActivityDamage,
+  spendHunger,
+  tickVitals,
+  type DeathCause,
+  type SurvivalState,
+} from "./survival";
+import { SURVIVAL_NUMERIC_RULES } from "./survival-achievements";
 import type { EngineState } from "./engine/types";
 import {
   collectBonus,
@@ -79,6 +105,7 @@ import type {
   CampfireMechanic,
   GatheringMechanic,
   PrestigeMechanic,
+  SurvivalMechanic,
   UpgradesMechanic,
 } from "./mechanics";
 import { DEFAULT_CARD_ORDER, type ModuleId } from "./module-registry";
@@ -161,14 +188,17 @@ type AchievementsContextValue = {
   grantResources: (gain: Partial<ResourceState>, logText?: string) => void;
   logActivity: (text: string) => void;
   campfire: HubState["campfire"];
-  tendCampfire: () => void;
+  /** Raises the fire a stage. Relighting an Extinguished fire costs Wood; false if unaffordable or not crafted yet. */
+  tendCampfire: () => boolean;
+  /** Crafts the Campfire (2×2 Player Crafting, Wood). False if already built, unaffordable, or stranded. */
+  craftCampfire: () => boolean;
   /** Only succeeds while the fire is at the Medium stage and there's enough Food — see resources.ts. */
   completeCooking: () => boolean;
   eatCookedFood: () => boolean;
   resources: HubState["resources"];
   tools: HubState["tools"];
   activityCooldownUntil: string | null;
-  completeTreeMining: () => void;
+  completeWoodGathering: () => void;
   completeHunting: () => void;
   completeMining: () => Partial<ResourceState>;
   craftTool: (tier: string) => boolean;
@@ -193,7 +223,26 @@ type AchievementsContextValue = {
     gathering: GatheringMechanic;
     prestige: PrestigeMechanic;
     upgrades: UpgradesMechanic;
+    survival: SurvivalMechanic;
   };
+  /** Health, Hunger, and Hardcore Spawn — see survival.ts. */
+  survival: SurvivalState;
+  /** Whether survival is switched on (Features tab) and the Engine has reached its stage. */
+  survivalActive: boolean;
+  /** True while a respawn's trek home is underway — Crafting is out of reach (the Campfire comes along). */
+  stranded: boolean;
+  /** 0..1 gloom darkness over the Outpost right now (0 while the fire's lit). */
+  gloomLevel: number;
+  /** A New Moon night on the cycle (or forced by the admin debug tab). */
+  gloomNight: boolean;
+  /** The admin Engine Debug tab makes every night a gloom night. */
+  gloomForced: boolean;
+  craftCompass: () => boolean;
+  /** "Full survival" or "Casual idle", picked once when the camp opens (null until then). */
+  experience: HubState["experience"];
+  /** The Engine has reached The Stump and the visitor hasn't picked an experience yet. */
+  needsExperienceChoice: boolean;
+  chooseExperience: (mode: ExperienceMode) => void;
   settings: HubState["settings"];
   updateSettings: (patch: Partial<HubState["settings"]>) => void;
   legacy: LegacyState;
@@ -359,6 +408,7 @@ const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) 
   // Ponder / The Analytical Engine — its own rules live beside its
   // definitions in engine/achievements.ts.
   ...ENGINE_NUMERIC_RULES,
+  ...SURVIVAL_NUMERIC_RULES,
 ];
 
 const COMMUNITY_EDITION_AT = 10;
@@ -522,6 +572,17 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // Read synchronously inside unlock() (a [addXp]-only useCallback) to
   // decide whether to push a toast — same reasoning as the other refs.
   const settingsRef = useRef<HubState["settings"]>(defaultState().settings);
+  // Health/Hunger/Hardcore Spawn — read and written synchronously by the
+  // survival tick and every mutator that spends hunger or deals damage, same
+  // reasoning as the other refs. Its fractional tick accumulators live here
+  // between saves; only whole-point changes get persisted.
+  const survivalRef = useRef<SurvivalState>(defaultState().survival);
+  // The visitor's pick on The Stump's experience screen — survival only
+  // ever runs for "survival". Read synchronously by survivalOn().
+  const experienceRef = useRef<ExperienceMode | null>(null);
+  const [gloomLevel, setGloomLevel] = useState(0);
+  const [gloomNight, setGloomNight] = useState(false);
+  const [gloomForced, setGloomForced] = useState(false);
   // Admin overrides (tiers/module placement/achievement tiers/tool ladder)
   // load once on mount, same as everything else — the admin panel lives on
   // its own page, so by the time a visitor reaches the Outpost again after
@@ -880,7 +941,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         quiz: { ...base.quiz, ...incoming.quiz },
         modOfDay: { ...base.modOfDay, ...incoming.modOfDay },
         visits: { ...base.visits, ...incoming.visits },
-        campfire: { ...base.campfire, ...incoming.campfire },
+        experience: normalizeExperience(incoming.experience),
+        campfire: normalizeCampfire(incoming.campfire),
         resources: { ...base.resources, ...incoming.resources },
         tools: { ...base.tools, ...incoming.tools },
         legacy: {
@@ -890,6 +952,11 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         },
         upgrades: { ...base.upgrades, ...incoming.upgrades },
         engine: normalizeEngineState(incoming.engine),
+        survival: {
+          ...base.survival,
+          ...incoming.survival,
+          acc: { ...base.survival.acc, ...incoming.survival?.acc },
+        },
         tier2,
         unlocked: { ...incoming.unlocked },
       };
@@ -899,6 +966,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       legacyRef.current = merged.legacy;
       campfireRef.current = merged.campfire;
       upgradesRef.current = merged.upgrades;
+      survivalRef.current = merged.survival;
+      experienceRef.current = merged.experience.mode;
       liveEngine.current = merged.engine;
       saveState(merged);
       return merged;
@@ -929,17 +998,154 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     [currentEngineBuffs]
   );
 
-  const tendCampfire = useCallback(() => {
-    const displayedStage = currentCampfireStage(campfireRef.current, campfireDecayMinutes());
-    const nextStage = Math.min(4, displayedStage + 1) as CampfireStage;
-    const campfire = { stage: nextStage, lastTendedAt: new Date().toISOString() };
-    campfireRef.current = campfire;
+  // --- Survival: Health, Hunger, Gloom, Hardcore Spawn (survival.ts) ---
+  const survivalMech = useCallback(
+    (): SurvivalMechanic => resolvedMechanic<SurvivalMechanic>(adminConfigRef.current, "survival"),
+    []
+  );
+  // On once the Features tab allows it, the Engine reaches its stage (The
+  // Stump by default, when the camp opens), and the visitor picked Full
+  // survival on the experience screen there.
+  const survivalOn = useCallback((): boolean => {
+    const f = resolvedFeatures(adminConfigRef.current);
+    return experienceRef.current === "survival" && f.survivalEnabled && liveEngine.current.stage >= f.survivalStage;
+  }, []);
+  const chooseExperience = useCallback((mode: ExperienceMode) => {
+    experienceRef.current = mode;
     setState((prev) => {
-      const next = { ...prev, campfire };
+      const activityLog = [
+        {
+          ts: new Date().toISOString(),
+          text: mode === "survival" ? "Started the journey: Full survival" : "Started the journey: Casual idle",
+        },
+        ...prev.tier2.activityLog,
+      ].slice(0, ACTIVITY_LOG_MAX);
+      const next: HubState = {
+        ...prev,
+        experience: { mode, chosenAt: new Date().toISOString() },
+        tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
+      };
       saveState(next);
       return next;
     });
+  }, []);
+  const strandedNow = useCallback(
+    (): boolean => survivalOn() && survivalRef.current.stranded !== null,
+    [survivalOn]
+  );
+  // Persists survivalRef (plus an optional Recent Activity line).
+  const commitSurvival = useCallback((logText?: string) => {
+    setState((prev) => {
+      const activityLog = logText
+        ? [{ ts: new Date().toISOString(), text: logText }, ...prev.tier2.activityLog].slice(0, ACTIVITY_LOG_MAX)
+        : prev.tier2.activityLog;
+      const next: HubState = {
+        ...prev,
+        survival: survivalRef.current,
+        tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + (logText ? 1 : 0) },
+      };
+      saveState(next);
+      return next;
+    });
+  }, []);
+  // Hardcore Spawn: respawn somewhere far off, stranded until the trek home
+  // finishes, and the clock skips to morning (BTW resets the time on respawn).
+  const die = useCallback(
+    (cause: DeathCause) => {
+      const nowMs = Date.now();
+      survivalRef.current = respawn(survivalRef.current, cause, nowMs, survivalMech());
+      saveCycleStartedAt(skipToMorning(loadCycleStartedAt(), nowMs));
+      const blocks = survivalRef.current.stranded?.blocks ?? 0;
+      commitSurvival(`Died to ${DEATH_CAUSE_TEXT[cause]} · woke up ~${blocks.toLocaleString()} blocks from spawn`);
+    },
+    [commitSurvival, survivalMech]
+  );
+  // Every Gathering run costs a little hunger; Hunting and Mining can also
+  // hurt (rarer with better tools, likelier at night).
+  const afterActivity = useCallback(
+    (kind: "wood" | "hunting" | "mining") => {
+      if (!survivalOn()) return;
+      const mech = survivalMech();
+      const hungerCost = kind === "wood" ? mech.woodHunger : kind === "hunting" ? mech.huntingHunger : mech.miningHunger;
+      survivalRef.current = spendHunger(survivalRef.current, hungerCost);
+      let logText: string | undefined;
+      if (kind !== "wood") {
+        const toolIndex = Math.max(0, resolvedToolOrder(adminConfigRef.current).indexOf(toolsRef.current.tier));
+        const night = readEngineDebug().forceNight ?? !computeCyclePhase(loadCycleStartedAt()).isDay;
+        const damage = rollActivityDamage(toolIndex, night, mech);
+        if (damage > 0) {
+          survivalRef.current = applyDamage(survivalRef.current, damage);
+          logText = `Took a hit ${kind === "hunting" ? "while hunting" : "in the mine"} (−${formatHalves(damage)} ♥)`;
+        }
+      }
+      // Chopping never hurts, so only a hunt or a dig can land the last blow.
+      if (survivalRef.current.health <= 0 && kind !== "wood") {
+        die(kind);
+        return;
+      }
+      commitSurvival(logText);
+    },
+    [commitSurvival, die, survivalMech, survivalOn]
+  );
+
+  // The fire goes wherever you do — tending, relighting, and cooking all
+  // work out on the trek home too; only Crafting waits for camp.
+  const tendCampfire = useCallback((): boolean => {
+    if (!campfireRef.current.built) return false;
+    const displayedStage = currentCampfireStage(campfireRef.current, campfireDecayMinutes());
+    // Relighting a dead fire takes fuel; tending a lit one stays free.
+    const relightCost =
+      displayedStage === 0 ? resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire").relightWoodCost : 0;
+    if (relightCost > 0 && (resourcesRef.current.wood ?? 0) < relightCost) return false;
+    const resources =
+      relightCost > 0 ? { ...resourcesRef.current, wood: resourcesRef.current.wood - relightCost } : resourcesRef.current;
+    resourcesRef.current = resources;
+    const nextStage = Math.min(4, displayedStage + 1) as CampfireStage;
+    const campfire = { ...campfireRef.current, stage: nextStage, lastTendedAt: new Date().toISOString() };
+    campfireRef.current = campfire;
+    setState((prev) => {
+      const activityLog =
+        relightCost > 0
+          ? [{ ts: new Date().toISOString(), text: "Relit the fire" }, ...prev.tier2.activityLog].slice(0, ACTIVITY_LOG_MAX)
+          : prev.tier2.activityLog;
+      const next = {
+        ...prev,
+        campfire,
+        resources,
+        tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + (relightCost > 0 ? 1 : 0) },
+      };
+      saveState(next);
+      return next;
+    });
+    return true;
   }, [campfireDecayMinutes]);
+
+  // The Campfire's own craft (2×2 Player Crafting). Crafting waits for camp
+  // like every other craft; the fire it makes comes out already lit (Low).
+  const craftCampfire = useCallback((): boolean => {
+    if (strandedNow() || campfireRef.current.built) return false;
+    const cost = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire").craftWoodCost;
+    if ((resourcesRef.current.wood ?? 0) < cost) return false;
+    const resources = { ...resourcesRef.current, wood: resourcesRef.current.wood - cost };
+    resourcesRef.current = resources;
+    const campfire: HubState["campfire"] = { built: true, stage: 2, lastTendedAt: new Date().toISOString() };
+    campfireRef.current = campfire;
+    setState((prev) => {
+      const activityLog = [
+        { ts: new Date().toISOString(), text: "Crafted a Campfire" },
+        ...prev.tier2.activityLog,
+      ].slice(0, ACTIVITY_LOG_MAX);
+      const next: HubState = {
+        ...prev,
+        campfire,
+        resources,
+        tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
+      };
+      saveState(next);
+      return next;
+    });
+    return true;
+  }, [strandedNow]);
 
   // When the Bellows start or stop, the decay rate changes — re-anchor the
   // fire so its visible stage stays put instead of jumping (decay is derived
@@ -952,6 +1158,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     const shown = Math.max(0, c.stage - steps) as CampfireStage;
     const frac = shown === 0 ? 0 : (elapsedMin - steps * oldMinutes) / oldMinutes;
     const campfire = {
+      ...c,
       stage: shown,
       lastTendedAt: new Date(Date.now() - frac * newMinutes * 60_000).toISOString(),
     };
@@ -966,8 +1173,9 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // Only succeeds while the fire's real (decay-aware) stage is Medium — the
   // one stage that's ever actually cooked anything, per the campfire's own
   // long-standing flavor text (campfire-stage.ts). Shares the same rest
-  // timer as Wood Chopping/Hunting/Mining so it can't be spammed back-to-back.
+  // timer as Wood Gathering/Hunting/Mining so it can't be spammed back-to-back.
   const completeCooking = useCallback((): boolean => {
+    if (!campfireRef.current.built) return false;
     const campfireMechanic = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire");
     if (currentCampfireStage(campfireRef.current, campfireDecayMinutes()) !== 3) return false;
     if ((resourcesRef.current.food ?? 0) < campfireMechanic.cookFoodCost) return false;
@@ -1010,13 +1218,17 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
   // Unlike every other resource mutator here, deliberately NOT gated behind
   // the shared activity cooldown — eating a meal you already cooked should
-  // never make you wait out the same rest timer gathering/cooking uses.
-  // Its reward is a placeholder: a small XP bump, standing in until a real
-  // hunger bar exists to actually feed.
+  // never make you wait out the same rest timer gathering/cooking uses. Not
+  // gated on being stranded either: you carry your food with you. Fills the
+  // hunger bar once survival is on, and keeps its small XP bump either way.
   const eatCookedFood = useCallback((): boolean => {
     if ((resourcesRef.current.cookedFood ?? 0) < 1) return false;
     const resources = { ...resourcesRef.current, cookedFood: resourcesRef.current.cookedFood - 1 };
     resourcesRef.current = resources;
+    if (survivalOn()) {
+      const mech = survivalMech();
+      survivalRef.current = eat(survivalRef.current, mech.eatHunger, mech);
+    }
     setState((prev) => {
       const activityLog = [
         { ts: new Date().toISOString(), text: "Ate a hot meal" },
@@ -1025,6 +1237,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       const next: HubState = {
         ...prev,
         resources,
+        survival: survivalRef.current,
         tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
       };
       saveState(next);
@@ -1032,7 +1245,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     });
     addXp(resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire").eatXpReward);
     return true;
-  }, [addXp]);
+  }, [addXp, survivalMech, survivalOn]);
 
   function formatYield(yieldAmounts: Partial<ResourceState>): string {
     const meta = resolvedResourceMeta(adminConfigRef.current);
@@ -1041,7 +1254,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       .join(", ");
   }
 
-  // Wood Chopping, Hunting, and Mining all funnel through this — computes the
+  // Wood Gathering, Hunting, and Mining all funnel through this — computes the
   // new resource totals synchronously off resourcesRef (so the ref and the
   // persisted state never disagree), sets the shared cooldown, and logs a
   // Recent Activity line.
@@ -1071,16 +1284,17 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   }, []);
 
   // The Engine's Saw / Millstone add to these while powered (engine/buffs.ts).
-  const completeTreeMining = useCallback(() => {
+  const completeWoodGathering = useCallback(() => {
     const { wood } = resolvedCollectAmounts(adminConfigRef.current);
     const buffs = currentEngineBuffs();
     const amount = wood + collectBonus(legacyRef.current.perks) + buffs.sawWood;
     const meta = resolvedResourceMeta(adminConfigRef.current);
-    applyResourceGain({ wood: amount }, `Wood Chopping: +${amount} ${meta.wood.name}${buffs.sawPowered ? " (Saw)" : ""}`);
+    applyResourceGain({ wood: amount }, `Wood Gathering: +${amount} ${meta.wood.name}${buffs.sawPowered ? " (Saw)" : ""}`);
     if (buffs.sawPowered) {
       updateEngine((e) => ({ ...e, counters: { ...e.counters, sawChops: e.counters.sawChops + 1 } }), "soon");
     }
-  }, [applyResourceGain, currentEngineBuffs, updateEngine]);
+    afterActivity("wood");
+  }, [afterActivity, applyResourceGain, currentEngineBuffs, updateEngine]);
 
   const completeHunting = useCallback(() => {
     const { food } = resolvedCollectAmounts(adminConfigRef.current);
@@ -1088,7 +1302,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     const amount = food + collectBonus(legacyRef.current.perks) + buffs.millstoneFood;
     const meta = resolvedResourceMeta(adminConfigRef.current);
     applyResourceGain({ food: amount }, `Hunting: +${amount} ${meta.food.name}`);
-  }, [applyResourceGain, currentEngineBuffs]);
+    afterActivity("hunting");
+  }, [afterActivity, applyResourceGain, currentEngineBuffs]);
 
   // Resource bridge for the Engine: spending (parts, commissions, feeding the
   // crank) and granting (Eureka/commission rewards), without the gathering
@@ -1152,10 +1367,40 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     if (Object.keys(gain).length > 0) {
       applyResourceGain(gain, `Mining: +${formatYield(gain)}`);
     }
+    afterActivity("mining");
     return gain;
-  }, [applyResourceGain]);
+  }, [afterActivity, applyResourceGain]);
+
+  // A one-off craft beside the tool ladder: halves every later trek home.
+  const craftCompass = useCallback((): boolean => {
+    if (strandedNow() || survivalRef.current.compass) return false;
+    const mech = survivalMech();
+    const cost: Partial<ResourceState> = { iron: mech.compassIron, copper: mech.compassCopper };
+    const entries = (Object.entries(cost) as [ResourceId, number][]).filter(([, n]) => n > 0);
+    if (!entries.every(([id, n]) => (resourcesRef.current[id] ?? 0) >= n)) return false;
+    const resources = { ...resourcesRef.current };
+    for (const [id, n] of entries) resources[id] -= n;
+    resourcesRef.current = resources;
+    survivalRef.current = { ...survivalRef.current, compass: true };
+    setState((prev) => {
+      const activityLog = [
+        { ts: new Date().toISOString(), text: "Crafted a Compass" },
+        ...prev.tier2.activityLog,
+      ].slice(0, ACTIVITY_LOG_MAX);
+      const next: HubState = {
+        ...prev,
+        resources,
+        survival: survivalRef.current,
+        tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
+      };
+      saveState(next);
+      return next;
+    });
+    return true;
+  }, [strandedNow, survivalMech]);
 
   const craftTool = useCallback((tier: string): boolean => {
+    if (strandedNow()) return false;
     const order = resolvedToolOrder(adminConfigRef.current);
     if (nextToolTier(toolsRef.current.tier, order) !== tier) return false;
     const rawCost = resolvedCraftCost(adminConfigRef.current, tier);
@@ -1194,7 +1439,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       return next;
     });
     return true;
-  }, []);
+  }, [strandedNow]);
 
   const buyLegacyPerk = useCallback((id: PerkId): boolean => {
     const cost = nextPerkCost(legacyRef.current.perks, id);
@@ -1243,6 +1488,16 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       points: legacyRef.current.points + pointsEarned,
       perks: legacyRef.current.perks,
     };
+    // A new loop starts fed, healthy, at camp, with no Compass — the
+    // lifetime death/trek counters (achievements) carry over.
+    const mech = resolvedMechanic<SurvivalMechanic>(adminConfigRef.current, "survival");
+    const prevSurvival = survivalRef.current;
+    survivalRef.current = {
+      ...defaultSurvivalState(mech.maxHealth, mech.maxHunger),
+      deaths: prevSurvival.deaths,
+      gloomDeaths: prevSurvival.gloomDeaths,
+      treksCompleted: prevSurvival.treksCompleted,
+    };
 
     setState((prev) => {
       const activityLog = [
@@ -1255,6 +1510,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         tools: toolsRef.current,
         activity: { cooldownUntil: null },
         legacy: legacyRef.current,
+        survival: survivalRef.current,
         engine: liveEngine.current,
         tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
       };
@@ -1376,6 +1632,11 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     upgradesRef.current = next.upgrades;
     settingsRef.current = next.settings;
     liveEngine.current = next.engine;
+    // A save can't hold a dead visitor (death respawns on the spot), but
+    // guard anyway so a hand-edited or imported save never starts at 0.
+    if (next.survival.health <= 0) next.survival = { ...next.survival, health: 1 };
+    survivalRef.current = next.survival;
+    experienceRef.current = next.experience.mode;
     const loadedAdminConfig = loadAdminConfig();
     adminConfigRef.current = loadedAdminConfig;
     catalogRef.current = resolvedAchievementCatalog(loadedAdminConfig);
@@ -1490,6 +1751,98 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     };
   }, [unlock]);
 
+  // Survival's heartbeat. Ticks once a second, but only counts time while
+  // this tab is actually visible — nothing drains while the Outpost is
+  // closed or in the background, so a visitor can never come back dead.
+  // Also runs the trek-home check, the gloom darkness, and the one-time
+  // grant of the Day/Night Cycle upgrade (gloom needs its nights).
+  useEffect(() => {
+    if (!mounted) return;
+    let lastMs = Date.now();
+    function tick() {
+      const nowMs = Date.now();
+      // Capped so a throttled/suspended timer can't land one big lump of damage.
+      const dtMs = document.visibilityState === "visible" ? Math.min(5000, nowMs - lastMs) : 0;
+      lastMs = nowMs;
+
+      const debug = readEngineDebug();
+      if (debug.killNow || debug.finishTrek) {
+        writeEngineDebug({ ...debug, killNow: undefined, finishTrek: undefined });
+      }
+      if (debug.finishTrek && survivalRef.current.stranded) {
+        survivalRef.current = {
+          ...survivalRef.current,
+          stranded: { ...survivalRef.current.stranded, trekEndsAt: new Date(nowMs).toISOString() },
+        };
+      }
+      // Always checked, even with survival off, so a trek never gets stuck.
+      const back = completeTrekIfDone(survivalRef.current, nowMs);
+      if (back) {
+        survivalRef.current = back;
+        commitSurvival("Found your way back to camp");
+      }
+
+      if (!survivalOn()) {
+        setGloomLevel(0);
+        setGloomNight(false);
+        setGloomForced(false);
+        return;
+      }
+
+      if (!upgradesRef.current.purchased.includes("day-night-cycle")) {
+        upgradesRef.current = {
+          ...upgradesRef.current,
+          purchased: [...upgradesRef.current.purchased, "day-night-cycle"],
+        };
+        setState((prev) => {
+          const activityLog = [
+            { ts: new Date().toISOString(), text: "Nights matter now: the day/night cycle turns on its own" },
+            ...prev.tier2.activityLog,
+          ].slice(0, ACTIVITY_LOG_MAX);
+          const next = {
+            ...prev,
+            upgrades: upgradesRef.current,
+            tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
+          };
+          saveState(next);
+          return next;
+        });
+      }
+
+      if (debug.killNow) {
+        die("starvation");
+        return;
+      }
+
+      // The admin debug flag makes every night a New Moon night — never the
+      // day: gloom only ever falls after sunset.
+      const cyclePhase = computeCyclePhase(loadCycleStartedAt(), nowMs);
+      const phase = debug.forceGloom ? { ...cyclePhase, moonPhaseIndex: 0 } : cyclePhase;
+      const gloom = isGloomNight(phase);
+      setGloomForced(debug.forceGloom === true);
+      // Only a lit fire keeps the gloom off — wherever you are, since the
+      // Campfire goes with you. No fire crafted yet means no shelter at all.
+      const sheltered =
+        campfireRef.current.built &&
+        currentCampfireStage(campfireRef.current, campfireDecayMinutes(), new Date(nowMs)) > 0;
+      const shown = sheltered ? 0 : Math.round(gloomDarkness(phase) * 100) / 100;
+      setGloomLevel(shown);
+      setGloomNight(gloom);
+
+      if (dtMs <= 0) return;
+      const before = survivalRef.current;
+      const { state: after, died } = tickVitals(before, dtMs, { gloomNight: gloom, fireLit: sheltered }, survivalMech());
+      survivalRef.current = after;
+      if (died) {
+        die(died);
+      } else if (after.health !== before.health || after.hunger !== before.hunger) {
+        commitSurvival();
+      }
+    }
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [mounted, campfireDecayMinutes, commitSurvival, die, survivalMech, survivalOn]);
+
   // The expansion's check engine — re-evaluates every numeric/custom rule
   // (and the Ledger Entries rank table) after each state change. unlock()
   // is idempotent, so re-checking already-unlocked ids is harmless; this is
@@ -1600,6 +1953,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       gathering: resolvedMechanic<GatheringMechanic>(adminConfig, "gathering"),
       prestige: resolvedMechanic<PrestigeMechanic>(adminConfig, "prestige"),
       upgrades: resolvedMechanic<UpgradesMechanic>(adminConfig, "upgrades"),
+      survival: resolvedMechanic<SurvivalMechanic>(adminConfig, "survival"),
     };
   }, [adminConfig, bellowsMult]);
   // Bellows started/stopped: keep the fire's visible stage where it is.
@@ -1620,6 +1974,12 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   }, [bellowsMult, mounted, rebaseCampfire]);
   const stageTipsResolved = useMemo(() => resolvedStageTips(adminConfig, engineStage), [adminConfig, engineStage]);
   const canPrestige = engineStage >= 8;
+  // The camp's open (survival's stage) with survival switched on: time to
+  // ask how the visitor wants to play (ExperiencePicker.tsx), once.
+  const survivalReached =
+    mounted && featuresResolved.survivalEnabled && engineStage >= featuresResolved.survivalStage;
+  const needsExperienceChoice = survivalReached && state.experience.mode === null;
+  const survivalActive = survivalReached && state.experience.mode === "survival";
 
   const value: AchievementsContextValue = {
     mounted,
@@ -1661,12 +2021,13 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     logActivity,
     campfire: state.campfire,
     tendCampfire,
+    craftCampfire,
     completeCooking,
     eatCookedFood,
     resources: state.resources,
     tools: state.tools,
     activityCooldownUntil: state.activity.cooldownUntil,
-    completeTreeMining,
+    completeWoodGathering: completeWoodGathering,
     completeHunting,
     completeMining,
     craftTool,
@@ -1691,6 +2052,16 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     buyUpgrade,
     reorderCard,
     cardOrder: state.upgrades.cardOrder ?? DEFAULT_CARD_ORDER,
+    survival: state.survival,
+    survivalActive,
+    stranded: survivalActive && state.survival.stranded !== null,
+    gloomLevel: survivalActive ? gloomLevel : 0,
+    gloomNight: survivalActive && gloomNight,
+    gloomForced: survivalActive && gloomForced,
+    craftCompass,
+    experience: state.experience,
+    needsExperienceChoice,
+    chooseExperience,
   };
 
   return (

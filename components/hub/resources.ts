@@ -1,5 +1,5 @@
 // Resource/tool/crafting data — small static tables, same pattern as
-// tier2.ts. Backs three new activity cards (Wood Chopping, Hunting, Mining)
+// tier2.ts. Backs three new activity cards (Wood Gathering, Hunting, Mining)
 // and a Crafting card that upgrades a single shared tool tier, which in
 // turn speeds up all three activities and unlocks better mining yields.
 
@@ -37,7 +37,7 @@ export type ToolTier = {
   id: string;
   name: string;
   icon: string;
-  /** How long one Wood Chopping run takes, in ms. */
+  /** How long one Wood Gathering run takes, in ms. */
   treeMiningMs: number;
   /** Loading-bar duration for Hunting, in ms. */
   huntingMs: number;
@@ -185,6 +185,6 @@ export const CRAFTING_GRIDS: CraftingGrid[] = [
   { id: "soulforge", name: "Soulforge", size: "4×4", unlockLevel: 20, crafts: ["diamond", "netherite"] },
 ];
 
-// Shared across Wood Chopping, Hunting, and Mining — finishing any one of
+// Shared across Wood Gathering, Hunting, and Mining — finishing any one of
 // them blocks starting any of the three again until this elapses.
 // Admin-configurable — see mechanics.ts's GatheringMechanic.

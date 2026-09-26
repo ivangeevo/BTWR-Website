@@ -23,7 +23,8 @@ export type ModuleId =
   | "your-progress"
   | "accomplishments"
   | "prestige"
-  | "upgrades";
+  | "upgrades"
+  | "survival";
 
 export type ModuleDef = { id: ModuleId; label: string; description: string };
 
@@ -45,7 +46,7 @@ export const MODULES: ModuleDef[] = [
     id: "gathering",
     label: "Gathering",
     description:
-      "Wood Chopping / Hunting / Mining combined into one card with tab toggles — Wood Chopping is always available, Hunting and Mining reveal as later tiers unlock.",
+      "Wood Gathering / Hunting / Mining combined into one card with tab toggles — Wood Gathering is always available, Hunting and Mining reveal as later tiers unlock.",
   },
   { id: "patch-notes", label: "Patch Notes", description: "Modpack/mod changelog feed." },
   { id: "crafting", label: "Crafting", description: "Spend resources on better tools." },
@@ -87,6 +88,10 @@ export const DEFAULT_MODULE_STAGE: Record<ModuleId, number> = {
   accomplishments: 1,
   prestige: 8,
   upgrades: 2,
+  // Not a card either: Health/Hunger/Hardcore Spawn switch on at
+  // FeaturesConfig.survivalStage (admin-config.ts). Here only so this stays
+  // a total Record over ModuleId, same as prestige/upgrades above.
+  survival: 3,
 };
 
 // Default order for the card grid (see HubSection.tsx; the Engine, "ponder",

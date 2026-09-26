@@ -4,8 +4,7 @@ import type { ComponentId, EngineStage } from "../types";
 // its own thinking apparatus, each producing insight/sec while the core has
 // power to spare. Deliberately distinct from the grid's own parts (axles,
 // gearboxes, windmills...), which move power rather than think with it.
-// Numbers follow Cookie Clicker's proven first nine buildings, reskinned;
-// all of base cost / rate / draw are admin-tunable (config.ts).
+// All of base cost / rate / draw are admin-tunable (config.ts).
 export type ComponentDef = {
   id: ComponentId;
   name: string;

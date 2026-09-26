@@ -5,16 +5,16 @@ import { CooldownNotice, LoadingBarButton, useCooldownRemaining } from "./activi
 import { useAchievements } from "./AchievementsProvider";
 import { findToolTier, type ResourceId, type ResourceState } from "./resources";
 
-type ActionId = "tree-mining" | "hunting" | "mining";
+type ActionId = "wood-gathering" | "hunting" | "mining";
 
-// Ordered simplest -> most involved: Wood Chopping needs nothing and is
+// Ordered simplest -> most involved: Wood Gathering needs nothing and is
 // always available (the "start very simple" baseline), Hunting and Mining
 // reveal as toggles once later tiers unlock, gradually turning this from a
 // one-button card into the full three-way gathering hub. Mining also keeps
 // its own separate "need a tool" gate below regardless of tier, same as
 // before.
 const ACTIONS: { id: ActionId; label: string; icon: string }[] = [
-  { id: "tree-mining", label: "Wood Chopping", icon: "\u{1FA93}" },
+  { id: "wood-gathering", label: "Wood Gathering", icon: "\u{1FA93}" },
   { id: "hunting", label: "Hunting", icon: "\u{1F3F9}" },
   { id: "mining", label: "Mining", icon: "\u{26CF}\u{FE0F}" },
 ];
@@ -22,7 +22,7 @@ const ACTIONS: { id: ActionId; label: string; icon: string }[] = [
 // All three activities used to be separate cards; combined into one so the
 // shared cooldown (only one can ever be "active" at a time anyway) reads as
 // one coherent hub instead of three cards that happen to fight over the
-// same timer. Wood Chopping is always available; Hunting and Mining each
+// same timer. Wood Gathering is always available; Hunting and Mining each
 // unlock as their own purchase in the Upgrades shop (upgrade-catalog.ts —
 // ids "hunting"/"mining"), each keeping its own tier requirement there
 // before it can even be bought.
@@ -31,21 +31,21 @@ export default function Gathering() {
     tools,
     toolTiersList,
     activityCooldownUntil,
-    completeTreeMining,
+    completeWoodGathering,
     completeHunting,
     completeMining,
     resourceMeta,
     upgrades,
     engineBuffs,
   } = useAchievements();
-  const [active, setActive] = useState<ActionId>("tree-mining");
+  const [active, setActive] = useState<ActionId>("wood-gathering");
   const remainingMs = useCooldownRemaining(activityCooldownUntil);
   const tool = findToolTier(toolTiersList, tools.tier);
   const [lastYield, setLastYield] = useState<string | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function isUnlocked(id: ActionId): boolean {
-    return id === "tree-mining" || upgrades.purchased.includes(id);
+    return id === "wood-gathering" || upgrades.purchased.includes(id);
   }
 
   function formatYield(gain: Partial<ResourceState>): string {
@@ -96,10 +96,10 @@ export default function Gathering() {
         })}
       </div>
 
-      {active === "tree-mining" && (
+      {active === "wood-gathering" && (
         <div className="mt-2.5">
           <p className="text-xs text-slate-300">
-            Chop down a tree for wood. Once you start swinging, it runs by itself.
+            Gather wood by chopping down trees. Once you start swinging, it runs by itself.
           </p>
           {engineBuffs.sawPowered && (
             <p className="mt-1 text-[11px] text-[var(--outpost-accent)]">
@@ -112,7 +112,7 @@ export default function Gathering() {
               disabled={remainingMs > 0}
               idleLabel="Chop wood"
               runningLabel="Chopping..."
-              onComplete={completeTreeMining}
+              onComplete={completeWoodGathering}
             />
           </div>
         </div>

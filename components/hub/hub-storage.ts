@@ -7,6 +7,7 @@ import type { EngineState } from "./engine/types";
 import { defaultLegacyState, type LegacyState } from "./legacy";
 import { DEFAULT_CARD_ORDER, type ModuleId } from "./module-registry";
 import type { ResourceState } from "./resources";
+import { defaultSurvivalState, type SurvivalState } from "./survival";
 import { SKINS_BY_ID, type SkinId, type Tier2TabId } from "./tier2";
 
 const STORAGE_KEY = "btwr:hub:v1";
@@ -78,9 +79,25 @@ export type Tier2State = {
 // value it was set to and when, so decay-since-then can be computed fresh
 // on every read without a live ticking timer.
 export type CampfireState = {
+  /** Crafted yet (2×2 Player Crafting, see CampfireMechanic.craftWoodCost)? Until then there's no fire to tend. */
+  built: boolean;
   stage: 0 | 1 | 2 | 3 | 4;
   lastTendedAt: string | null;
 };
+
+export function normalizeExperience(raw: Partial<HubState["experience"]> | undefined): HubState["experience"] {
+  const mode = raw?.mode === "survival" || raw?.mode === "casual" ? raw.mode : null;
+  return { mode, chosenAt: mode && typeof raw?.chosenAt === "string" ? raw.chosenAt : null };
+}
+
+// Saves from before the Campfire was a craft have no `built` — anyone who'd
+// ever tended theirs already has one, so they keep it.
+export function normalizeCampfire(raw: Partial<CampfireState> | undefined): CampfireState {
+  const base: CampfireState = { built: false, stage: 0, lastTendedAt: null };
+  const merged = { ...base, ...raw };
+  if (typeof raw?.built !== "boolean") merged.built = merged.lastTendedAt !== null;
+  return merged;
+}
 
 // The Outpost's meta-progression shop state (see upgrade-catalog.ts). cardOrder is
 // null until the visitor actually drags something (or before the
@@ -100,7 +117,7 @@ export type ToolState = {
   tier: string;
 };
 
-// Wood Chopping, Hunting, and Mining all share this single cooldown — see
+// Wood Gathering, Hunting, and Mining all share this single cooldown — see
 // mechanics.ts's GatheringMechanic.
 export type ActivityState = {
   cooldownUntil: string | null;
@@ -119,8 +136,15 @@ export type OutpostSettings = {
   themeOverrideAllowed: boolean;
 };
 
+// Picked once, on a full-Outpost screen when the Engine reaches The Stump
+// (ExperiencePicker.tsx): "survival" turns on Health/Hunger/Gloom/Hardcore
+// Spawn (survival.ts), "casual" leaves the Outpost a gentle idle game.
+// null until chosen.
+export type ExperienceMode = "survival" | "casual";
+
 export type HubState = {
   version: 1;
+  experience: { mode: ExperienceMode | null; chosenAt: string | null };
   // Controlled from the Community page's Outpost control panel, not from
   // the Outpost itself — the /outpost page (and the header link to it) just
   // read this to decide whether to open at all.
@@ -140,11 +164,14 @@ export type HubState = {
   /** Ponder / The Analytical Engine — see engine/types.ts and engine/state.ts.
    * Part of prestige: its mind survives, its body doesn't (engineOnPrestige). */
   engine: EngineState;
+  /** Health, Hunger, Gloom, and Hardcore Spawn — see survival.ts. Reset by prestige. */
+  survival: SurvivalState;
 };
 
 export function defaultState(): HubState {
   return {
     version: 1,
+    experience: { mode: null, chosenAt: null },
     enabled: false,
     unlocked: {},
     quiz: {
@@ -157,7 +184,7 @@ export function defaultState(): HubState {
     },
     modOfDay: { lastSeenDate: null },
     visits: { firstVisitAt: null, lastVisitDate: null, streakDays: 0 },
-    campfire: { stage: 0, lastTendedAt: null },
+    campfire: { built: false, stage: 0, lastTendedAt: null },
     resources: { wood: 0, food: 0, stone: 0, coal: 0, copper: 0, iron: 0, cookedFood: 0 },
     tools: { tier: "none" },
     activity: { cooldownUntil: null },
@@ -170,6 +197,7 @@ export function defaultState(): HubState {
     legacy: defaultLegacyState(),
     upgrades: { skillPoints: 0, purchased: [], cardOrder: null },
     engine: defaultEngineState(),
+    survival: defaultSurvivalState(),
     tier2: {
       xp: 0,
       prestigeCount: 0,
@@ -258,7 +286,8 @@ export function loadState(): HubState {
       quiz: { ...base.quiz, ...parsed.quiz },
       modOfDay: { ...base.modOfDay, ...parsed.modOfDay },
       visits: { ...base.visits, ...parsed.visits },
-      campfire: { ...base.campfire, ...parsed.campfire },
+      experience: normalizeExperience(parsed.experience),
+      campfire: normalizeCampfire(parsed.campfire),
       resources: { ...base.resources, ...parsed.resources },
       tools: { ...base.tools, ...parsed.tools },
       activity: { ...base.activity, ...parsed.activity },
@@ -270,6 +299,11 @@ export function loadState(): HubState {
       },
       upgrades: { ...base.upgrades, ...parsed.upgrades, cardOrder },
       engine: normalizeEngineState(parsed.engine),
+      survival: {
+        ...base.survival,
+        ...parsed.survival,
+        acc: { ...base.survival.acc, ...parsed.survival?.acc },
+      },
       tier2,
       unlocked,
     };

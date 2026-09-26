@@ -99,7 +99,17 @@ export function setSkyHold(untilMs: number): void {
 
 // --- Debug overrides (written by /outpost-admin's Engine Debug tab) ---
 
-export type EngineDebug = { forceNight?: boolean; forceFullMoon?: boolean; eurekaNow?: boolean };
+export type EngineDebug = {
+  forceNight?: boolean;
+  forceFullMoon?: boolean;
+  eurekaNow?: boolean;
+  /** Survival (survival.ts): treat every night as a New Moon gloom night (never the day). */
+  forceGloom?: boolean;
+  /** Survival: die on the Outpost's next tick (consumed once). */
+  killNow?: boolean;
+  /** Survival: end any trek home on the next tick (consumed once). */
+  finishTrek?: boolean;
+};
 
 export function readEngineDebug(): EngineDebug {
   return read<EngineDebug>(DEBUG_KEY, {});

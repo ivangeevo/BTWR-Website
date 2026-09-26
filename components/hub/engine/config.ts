@@ -100,9 +100,9 @@ export class EnginePowerMechanic {
 }
 
 export class EngineBuffMechanic {
-  /** Extra wood per Wood Chopping while a Saw is powered. */
+  /** Extra wood per Wood Gathering while a Saw is powered. */
   sawWood = 1;
-  /** Percent shorter Wood Chopping run while a Saw is powered. */
+  /** Percent shorter Wood Gathering run while a Saw is powered. */
   sawHoldPct = 25;
   /** Extra food per Hunting trip while a Millstone is powered. */
   millstoneFood = 1;
@@ -118,8 +118,8 @@ export class EngineBuffMechanic {
   homesteaderAttachPct = 100;
 
   static readonly configFields: MechanicConfigField[] = [
-    field("sawWood", "Saw: extra wood", "Extra wood per Wood Chopping while powered.", 0, 50, 1),
-    field("sawHoldPct", "Saw: faster chop", "Percent shorter Wood Chopping run.", 0, 90, 5, "%"),
+    field("sawWood", "Saw: extra wood", "Extra wood per Wood Gathering while powered.", 0, 50, 1),
+    field("sawHoldPct", "Saw: faster chop", "Percent shorter Wood Gathering run.", 0, 90, 5, "%"),
     field("millstoneFood", "Millstone: extra food", "Extra food per Hunting trip.", 0, 50, 1),
     field("millstoneCook", "Millstone: extra meal", "Extra Cooked Food per cook.", 0, 50, 1),
     field("bellowsDecayMult", "Bellows: slower decay", "Campfire decays N times slower.", 1, 20, 0.5, "x"),

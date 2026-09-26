@@ -91,7 +91,7 @@ const STARS: Star[] = [
 
 // Full-width band at the very top of every page — a sun (day) or the
 // current moon phase (night) crosses it along a parabolic arc once per
-// 3-minute-long phase (day-night-cycle.ts's PHASE_MS). Height is reserved
+// 5-minute-long phase (day-night-cycle.ts's PHASE_MS). Height is reserved
 // by app/layout.tsx's boot script
 // (html[data-daynight-active]) before hydration, so there's no layout
 // shift when this pops in; this component just re-confirms that same
@@ -135,7 +135,9 @@ export default function DayNightSky() {
         prevBodyVisibleRef.current = null;
         return;
       }
-      if (startedAtRef.current === null) startedAtRef.current = loadCycleStartedAt();
+      // Re-read every tick: a Hardcore Spawn respawn moves the anchor to the
+      // next morning (day-night-cycle.ts's skipToMorning).
+      startedAtRef.current = loadCycleStartedAt();
       const now = Date.now();
       const nextPhase = computeCyclePhase(startedAtRef.current, now);
       setJustRose(prevBodyVisibleRef.current === false && nextPhase.bodyVisible);

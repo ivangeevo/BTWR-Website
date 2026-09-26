@@ -23,11 +23,12 @@ export const CAMPFIRE_ICONS: Record<CampfireStage, string> = {
   4: "\u{2600}\u{FE0F}",
 };
 
-// One stage of decay per this many real minutes since the last tend —
-// gentle enough that a same-day return still finds embers, not ash. Admin-
-// configurable via CampfireMechanic (see mechanics.ts); this is just the
-// fallback for callers that don't have a resolved value on hand.
-const DECAY_MINUTES = 15;
+// One stage of decay per this many real minutes since the last tend — quick
+// enough that keeping the fire lit through a gloom night (survival.ts) is an
+// active job, not something one tend covers. Admin-configurable via
+// CampfireMechanic (see mechanics.ts); this is just the fallback for callers
+// that don't have a resolved value on hand.
+const DECAY_MINUTES = 1;
 
 /** The campfire's real, decayed stage right now — never stored directly. */
 export function currentCampfireStage(

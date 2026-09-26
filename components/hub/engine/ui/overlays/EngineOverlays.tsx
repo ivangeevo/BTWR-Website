@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useAchievements } from "../../../AchievementsProvider";
 import { formatInsight } from "../../economy";
 import { useEngine } from "../EngineProvider";
 
@@ -60,10 +61,17 @@ export function WhileAwaySummary() {
 // any card without living inside it.
 export function EurekaLayer() {
   const { e, catchEureka } = useEngine();
+  const { gloomLevel, needsExperienceChoice } = useAchievements();
   const active = e.eureka.active;
   const [mounted, setMounted] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   useEffect(() => setMounted(true), []);
+  // The spark lives on document.body, above the whole Outpost — so it has to
+  // hide itself behind whatever would cover its card: the playstyle screen
+  // (ExperiencePicker.tsx), and the gloom (GloomLayer.tsx) unless the card
+  // is one of the panels lit above it (.outpost-lit). Read by the frame loop.
+  const coverRef = useRef({ gloom: false, picker: false });
+  coverRef.current = { gloom: gloomLevel > 0, picker: needsExperienceChoice };
 
   // Tracks the card every frame by writing the position straight to the
   // button — no React state, so the spark follows scrolling for free.
@@ -85,7 +93,11 @@ export function EurekaLayer() {
         const col = el?.closest<HTMLElement>("[data-outpost-scroll]")?.getBoundingClientRect();
         const top = r && col ? Math.max(r.top, col.top) : r?.top ?? 0;
         const bottom = r && col ? Math.min(r.bottom, col.bottom) : r?.bottom ?? 0;
-        if (el && r && r.width > 0 && bottom - top > 24) {
+        const cover = coverRef.current;
+        // The target is the card's cell (HubSection's CardCell); the lit panel is the card inside it.
+        const lit = !!(el?.closest(".outpost-lit") || el?.querySelector(":scope > * > .outpost-lit"));
+        const covered = cover.picker || (cover.gloom && !lit);
+        if (el && r && r.width > 0 && bottom - top > 24 && !covered) {
           btn.style.top = `${top + (bottom - top) * fyr}px`;
           btn.style.left = `${r.left + r.width * fxr}px`;
           btn.style.visibility = "visible";

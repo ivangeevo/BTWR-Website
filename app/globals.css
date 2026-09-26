@@ -606,7 +606,7 @@ html.daynight-fighting .outpost-zone::after {
 }
 
 /* Homepage hub — advancement-style toasts. Slide/fade up from the bottom
-   of the pane (they stack there now, Cookie Clicker-style), the reverse on
+   of the pane (they stack there now), the reverse on
    the way out (driven by a `.leaving` class toggled just before removal so
    the exit animation gets to play). */
 @keyframes hub-toast-in {
@@ -851,6 +851,84 @@ html.daynight-fighting .outpost-zone::after {
     border-color 200ms ease,
     box-shadow 200ms ease,
     transform 200ms ease;
+}
+
+/* Survival (components/hub/survival.ts). The gloom darkens Basecamp on a
+   New Moon night (GloomLayer.tsx); .outpost-lit lifts the Campfire card and
+   the Materials panel (Health/Hunger) above it. Neither sits under anything
+   that makes its own stacking context, so a plain z-index is enough. */
+.outpost-gloom {
+  z-index: 30;
+  background: radial-gradient(ellipse at 50% 40%, rgba(2, 3, 8, 0.82), rgba(0, 0, 0, 0.97));
+  transition: opacity 1.5s ease;
+}
+
+.outpost-lit {
+  z-index: 31;
+}
+
+/* The Stump's experience screen (ExperiencePicker.tsx) — covers the whole
+   Outpost frame, gloom included, until a choice is made. */
+.outpost-experience {
+  background: rgba(8, 6, 4, 0.9);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.outpost-vital-row {
+  display: flex;
+  gap: 1px;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.outpost-vital {
+  position: relative;
+  display: inline-block;
+}
+
+.outpost-vital-empty {
+  opacity: 0.22;
+  filter: grayscale(1);
+}
+
+.outpost-vital-full {
+  position: absolute;
+  inset: 0;
+}
+
+.outpost-vital[data-fill="0"] .outpost-vital-full {
+  clip-path: inset(0 100% 0 0);
+}
+
+.outpost-vital[data-fill="1"] .outpost-vital-full {
+  clip-path: inset(0 50% 0 0);
+}
+
+.outpost-vitals-hit {
+  animation: outpost-vitals-hit 0.4s ease;
+}
+
+@keyframes outpost-vitals-hit {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .outpost-gloom {
+    transition: none;
+  }
+  .outpost-vitals-hit {
+    animation: none;
+  }
 }
 
 /* Size pass on the Outpost's main card grid — three fixed height buckets
@@ -2271,7 +2349,7 @@ html.outpost-card-dragging * {
 }
 
 /* ---------------------------------------------------------------------------
-   The Outpost page (/outpost) is one screen tall, Cookie Clicker style: the
+   The Outpost page (/outpost) is one screen tall. The
    page itself never scrolls; the Engine column, the card column, the store
    column and the Progress/Achievements tabs each scroll inside themselves
    (see HubSection.tsx). The footer steps aside while it's up. Only from lg
