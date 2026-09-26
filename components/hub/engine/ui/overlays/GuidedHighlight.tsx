@@ -51,7 +51,14 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
   // steps aside once that tab is the open one — the bubble stays put.
   const [ringOn, setRingOn] = useState(true);
 
-  useEffect(() => setStep(0), [tut?.id]);
+  // Back to step 0 when the tutorial changes, during render rather than in an
+  // effect: an effect would let one render index the new (possibly shorter)
+  // tutorial with the old step, and crash on steps[step] being undefined.
+  const [stepFor, setStepFor] = useState(tut?.id);
+  if (stepFor !== tut?.id) {
+    setStepFor(tut?.id);
+    setStep(0);
+  }
 
   const target = tut?.steps[step]?.target;
   const hasNext = !!tut && step < tut.steps.length - 1;
@@ -104,8 +111,8 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
     };
   }, [target, root, workshopOpen, e.stage]);
 
-  if (!tut || waiting) return null;
-  const s = tut.steps[step];
+  const s = tut?.steps[step];
+  if (!tut || !s || waiting) return null;
   const last = step >= tut.steps.length - 1;
 
   return (
