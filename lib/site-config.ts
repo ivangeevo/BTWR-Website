@@ -23,6 +23,10 @@ export const discordInviteUrl: string | null =
 
 export const githubRepoUrl: string | null = "https://github.com/BTWR-Team";
 
+// Where the Outpost's "Report a bug" link opens a new issue (HubSection.tsx
+// pre-fills the version). null hides the link.
+export const outpostBugReportUrl: string | null = "https://github.com/ivangeevo/BTWR-Website/issues/new";
+
 // Support page (/support) links — null shows a "Coming soon" card.
 export const kofiUrl: string | null = "https://ko-fi.com/btwremastered";
 // A personal Revolut.me link, e.g. https://revolut.me/<name>

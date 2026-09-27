@@ -142,6 +142,8 @@ export type ExperienceMode = "survival" | "casual";
 export type HubState = {
   version: 1;
   experience: { mode: ExperienceMode | null; chosenAt: string | null };
+  /** The early-alpha warning (AlphaNotice.tsx) has been read — once per save, so a reset shows it again. */
+  alphaNoticeSeen: boolean;
   // Controlled from the Community page's Outpost control panel, not from
   // the Outpost itself — the /outpost page (and the header link to it) just
   // read this to decide whether to open at all.
@@ -173,6 +175,7 @@ export function defaultState(): HubState {
   return {
     version: 1,
     experience: { mode: null, chosenAt: null },
+    alphaNoticeSeen: false,
     enabled: false,
     unlocked: {},
     quiz: {
@@ -317,6 +320,7 @@ export function normalizeState(raw: unknown): HubState | null {
       relic: normalizeRelic(parsed.relic),
       visits: { ...base.visits, ...parsed.visits },
       experience,
+      alphaNoticeSeen: parsed.alphaNoticeSeen === true,
       campfire: normalizeCampfire(parsed.campfire),
       resources: { ...base.resources, ...parsed.resources },
       tools: { ...base.tools, ...parsed.tools },

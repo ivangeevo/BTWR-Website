@@ -5,6 +5,7 @@ import type { Mod } from "@/lib/mods";
 import { AchievementsProvider, useAchievements } from "./AchievementsProvider";
 import AccomplishmentsSection from "./AccomplishmentsSection";
 import AchievementToastStack from "./AchievementToastStack";
+import AlphaNotice from "./AlphaNotice";
 import CampRail, { useCampRailShown } from "./CampRail";
 import ChapterBar from "./ChapterBar";
 import ExperiencePicker from "./ExperiencePicker";
@@ -19,8 +20,9 @@ import YourProgressSection from "./YourProgressSection";
 import { EngineProvider } from "./engine/ui/EngineProvider";
 import { EngineToasts, EurekaLayer } from "./engine/ui/overlays/EngineOverlays";
 import { STAGES } from "./engine/stages";
-import { OUTPOST_VERSION } from "./outpost-version";
+import { OUTPOST_VERSION, outpostBugReportHref as bugReportHref } from "./outpost-version";
 import { SKINS_BY_ID } from "./tier2";
+
 
 // The Outpost, on its own page (/outpost) and exactly one screen tall.
 // The page never scrolls, each part scrolls inside itself.
@@ -180,11 +182,25 @@ function OutpostFrame() {
         </OutpostTabPanel>
       )}
       <span className="pointer-events-none absolute bottom-1 right-2 z-10 select-none whitespace-nowrap text-[14px] leading-none text-slate-500">
-        v{OUTPOST_VERSION}
+        Alpha v{OUTPOST_VERSION}
+        {bugReportHref && (
+          <>
+            {" · "}
+            <a
+              href={bugReportHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pointer-events-auto underline-offset-2 hover:text-[var(--outpost-accent)] hover:underline"
+            >
+              Report a bug
+            </a>
+          </>
+        )}
       </span>
       <EngineToasts />
       <EurekaLayer />
       <ExperiencePicker />
+      <AlphaNotice />
       <AchievementToastStack />
     </div>
   );

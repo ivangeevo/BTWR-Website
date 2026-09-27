@@ -306,6 +306,9 @@ type AchievementsContextValue = {
   /** The Engine has reached The Stump and the visitor hasn't picked an experience yet. */
   needsExperienceChoice: boolean;
   chooseExperience: (mode: ExperienceMode) => void;
+  /** A save that hasn't read the early-alpha warning yet (AlphaNotice.tsx). */
+  needsAlphaNotice: boolean;
+  dismissAlphaNotice: () => void;
   settings: HubState["settings"];
   updateSettings: (patch: Partial<HubState["settings"]>) => void;
   legacy: LegacyState;
@@ -1073,6 +1076,13 @@ export function AchievementsProvider({ children, mods = NO_MODS }: { children: R
   const survivalOn = useCallback((): boolean => {
     const f = resolvedFeatures(adminConfigRef.current);
     return experienceRef.current === "survival" && f.survivalEnabled && liveEngine.current.stage >= f.survivalStage;
+  }, []);
+  const dismissAlphaNotice = useCallback(() => {
+    setState((prev) => {
+      const next: HubState = { ...prev, alphaNoticeSeen: true };
+      saveState(next);
+      return next;
+    });
   }, []);
   const chooseExperience = useCallback((mode: ExperienceMode) => {
     experienceRef.current = mode;
@@ -2258,6 +2268,8 @@ export function AchievementsProvider({ children, mods = NO_MODS }: { children: R
     mounted && featuresResolved.survivalEnabled && engineStage >= featuresResolved.survivalStage;
   const needsExperienceChoice = survivalReached && state.experience.mode === null;
   const survivalActive = survivalReached && state.experience.mode === "survival";
+  // Waits for mounted so a returning visitor's save is loaded before deciding.
+  const needsAlphaNotice = mounted && !state.alphaNoticeSeen;
 
   const value: AchievementsContextValue = {
     mounted,
@@ -2349,6 +2361,8 @@ export function AchievementsProvider({ children, mods = NO_MODS }: { children: R
     experience: state.experience,
     needsExperienceChoice,
     chooseExperience,
+    needsAlphaNotice,
+    dismissAlphaNotice,
   };
 
   return (
