@@ -8,7 +8,7 @@
 // added here over time rather than this being a one-shot finished list.
 import type { ResourceState } from "./resources";
 
-export type UpgradeId = "wolf" | "fishing" | "torches" | "farm";
+export type UpgradeId = "sky" | "wolf" | "fishing" | "torches" | "farm";
 
 export type UpgradeDef = {
   id: UpgradeId;
@@ -25,6 +25,16 @@ export type UpgradeDef = {
 };
 
 export const UPGRADES: UpgradeDef[] = [
+  {
+    id: "sky",
+    name: "Tonight's Sky",
+    icon: "\u{1F52D}",
+    description:
+      "A sky chart fixed by the camp, under your Stats: tonight's moon and the time to dusk or dawn, so a gloom night never catches you with the fire out.",
+    cost: 3,
+    build: { wood: 4 },
+    stage: 3,
+  },
   {
     id: "wolf",
     name: "Tame a Wolf",
@@ -77,8 +87,9 @@ export function isUpgradeId(id: string): id is UpgradeId {
 }
 
 // What the shop used to sell before it became capabilities-only: the
-// Day/Night Cycle now arrives at The Stump, Starry Sky and card reordering
-// are always on, Hunting opens at The Stump and Mining with Stone Tools.
+// Day/Night Cycle now arrives at The Stump, Starry Sky is always on, card
+// reordering went with Basecamp's card grid, Hunting opens at The Stump and
+// Mining with Stone Tools.
 // A save that bought any of them gets its Skill Points back (hub-storage.ts's
 // normalizeState) at these default prices.
 export const RETIRED_UPGRADE_REFUNDS: Record<string, number> = {

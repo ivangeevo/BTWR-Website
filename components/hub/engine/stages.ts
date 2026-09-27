@@ -129,18 +129,18 @@ function toolReq(site: GateSite, tierId: string): GateReq {
 }
 
 // Which Outpost card each site requirement is done on. If that card is
-// switched off in /outpost-admin, the requirement is left out, so a
-// disabled card can never stall the Engine.
+// switched off in /outpost-admin (or shelved, module-registry.ts), the
+// requirement is left out, so a disabled card can never stall the Engine.
+// Relics turn up in Gathering (relics.ts), so naming them — and the
+// Detector that helps — count as Gathering's.
 const REQ_CARD: Record<string, string> = {
-  motd: "daily-briefing",
   patch: "patch-notes",
   meals: "campfire",
   meals7: "campfire",
   iron: "gathering",
-  quiz: "guess-the-mod",
-  "quiz-correct": "guess-the-mod",
-  detector: "guess-the-mod",
-  quiz50: "guess-the-mod",
+  "quiz-correct": "gathering",
+  detector: "gathering",
+  quiz50: "gathering",
   "tool-stone": "crafting",
   "tool-copper": "crafting",
   "tool-iron": "crafting",
@@ -173,7 +173,6 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
     case 3:
       reqs.push(count("forks", "Choose how sentences end", e.choicesMade, g.s3Choices));
       reqs.push(count("asks", "Answer the Engine's questions", Object.keys(e.askAnswers).length, g.s3Asks));
-      reqs.push(flag("motd", "Read today's Mod of the Day", site.achieved("mod-of-day-viewed"), true));
       reqs.push(flag("patch", "Open the Patch Notes", site.achieved("patch-notes-opened"), true));
       reqs.push(count("mods", "Let it read mods on the Mods page", e.modsRead.length, g.s3ModsRead, true));
       cost = g.s3Cost;
@@ -206,13 +205,13 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
       reqs.push(flag("windmill", "Run the Engine on a windmill", engaged && hasSource(e.solved?.idle, "windmill")));
       reqs.push(flag("attach", "Power a Saw", types.includes("saw")));
       reqs.push(count("caesar", "Decode dial ciphers", caesar, g.s6Caesar));
-      reqs.push(count("quiz-correct", "Guess mods correctly", site.quizCorrect, g.s6QuizCorrect, true));
+      reqs.push(count("quiz-correct", "Name relics from Gathering", site.quizCorrect, g.s6QuizCorrect, true));
       cost = g.s6Cost;
       break;
     }
     case 7:
       reqs.push(flag("water", "Run the Engine on a water wheel", engaged && hasSource(e.solved?.idle, "waterWheel")));
-      reqs.push(count("detector", "Use the Detector Block in Guess the Mod", e.counters.detectorUses, g.s7DetectorUses));
+      reqs.push(count("detector", "Use the Detector Block on a relic", e.counters.detectorUses, g.s7DetectorUses));
       reqs.push(flag("spec", "Choose what the Engine becomes", e.specialization !== null));
       reqs.push(count("components", "Own components in total", componentTotal(e), g.s7Components));
       reqs.push(count("meals7", "Cook meals at the Campfire", site.mealsCooked, g.s7Meals, true));
@@ -223,7 +222,7 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
       reqs.push(count("soulforged", "Forge a soulforged part", e.counters.soulforged, 1));
       reqs.push(count("idle", "Steady power for the Engine", engaged ? e.solved!.idle.corePU : 0, g.s8CorePU));
       reqs.push(flag("bp-final", "Decode the last blueprint", e.ciphers.solved.includes("bp-final")));
-      reqs.push(count("quiz50", "Guess mods correctly", site.quizCorrect, g.s8QuizCorrect, true));
+      reqs.push(count("quiz50", "Name relics from Gathering", site.quizCorrect, g.s8QuizCorrect, true));
       reqs.push(toolReq(site, "diamond"));
       cost = g.s8Cost;
       break;

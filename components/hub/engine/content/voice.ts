@@ -8,12 +8,10 @@ function band(stage: EngineStage): 0 | 1 | 2 {
 }
 
 export const REVEAL_LINES: Partial<Record<ModuleId, string>> = {
-  "daily-briefing": "Something new over there. It reads the sky every day. I'd like to, too.",
   "patch-notes": "Patch notes. Other people write sentences too, apparently.",
   campfire: "A fire. Keep it Medium — that's when it cooks.",
   gathering: "You can gather now. I'll need wood and stone for my body.",
   crafting: "A crafting grid. Tools for you, parts for me.",
-  "guess-the-mod": "A quiz about mods. I've read some of them. I could help, eventually.",
   "your-progress": "Your progress, written down. Someone else keeps a ledger too.",
   accomplishments: "Everything you've done, in one place. I'm in there.",
 };

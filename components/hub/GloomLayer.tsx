@@ -5,7 +5,7 @@ import { useAchievements } from "./AchievementsProvider";
 
 // The gloom (survival.ts): on the evening before a New Moon night the whole
 // of Basecamp slowly darkens, deepest through the night itself. There's no
-// other warning — Tonight's Sky is where to see it coming. A lit Campfire
+// other warning than Tonight's Sky (an upgrade, TonightsSky.tsx). A lit Campfire
 // lifts it (only at camp: out on the trek home there's no fire to sit by).
 // Never during the day. The Campfire card and the Materials panel (with
 // the Health and Hunger bars) sit above it (.outpost-lit); the site header

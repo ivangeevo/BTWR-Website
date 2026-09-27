@@ -10,6 +10,7 @@
 import {
   ACHIEVEMENTS,
   CATEGORY_ORDER,
+  HIDDEN_ACHIEVEMENTS,
   type AchievementCategory,
   type AchievementDef,
   type AchievementId,
@@ -39,12 +40,11 @@ export const ACHIEVEMENT_STATS: AchievementStat[] = [
   { id: "skins-tried", group: "Progress", label: "Skins tried", read: (c) => c.state.tier2.skinsTried.length },
   { id: "skill-points", group: "Progress", label: "Skill Points on hand", read: (c) => c.state.upgrades.skillPoints },
   { id: "upgrades", group: "Progress", label: "Upgrades bought", read: (c) => c.state.upgrades.purchased.length },
-  // Guess the Mod
-  { id: "quiz-answered", group: "Guess the Mod", label: "Questions answered", read: (c) => c.state.quiz.totalAnswered },
-  { id: "quiz-correct", group: "Guess the Mod", label: "Correct answers", read: (c) => c.state.quiz.totalCorrect },
-  { id: "quiz-streak", group: "Guess the Mod", label: "Best answer streak", read: (c) => c.state.quiz.bestStreak },
-  { id: "quiz-perfect", group: "Guess the Mod", label: "Perfect rounds", read: (c) => c.state.quiz.perfectRounds },
-  { id: "mods-guessed", group: "Guess the Mod", label: "Different mods guessed right", read: (c) => c.state.tier2.modsGuessedCorrect.length },
+  // Relics & the Field Guide (relics.ts, field-guide.ts)
+  { id: "quiz-answered", group: "Relics & Field Guide", label: "Relics examined", read: (c) => c.state.quiz.totalAnswered },
+  { id: "quiz-correct", group: "Relics & Field Guide", label: "Relics named right", read: (c) => c.state.quiz.totalCorrect },
+  { id: "quiz-streak", group: "Relics & Field Guide", label: "Best naming streak", read: (c) => c.state.quiz.bestStreak },
+  { id: "mods-guessed", group: "Relics & Field Guide", label: "Mods catalogued", read: (c) => c.state.tier2.modsGuessedCorrect.length },
   // Camp
   { id: "meals", group: "Camp", label: "Meals cooked", read: (c) => c.state.engine.counters.mealsCooked ?? 0 },
   { id: "wood", group: "Camp", label: "Wood on hand", read: (c) => c.state.resources.wood },
@@ -133,7 +133,7 @@ export type ActiveCatalog = {
 };
 
 export function activeCatalog(custom: readonly CustomAchievement[], removed: readonly AchievementId[]): ActiveCatalog {
-  const gone = new Set(removed);
+  const gone = new Set<AchievementId>([...HIDDEN_ACHIEVEMENTS, ...removed]);
   const list: AchievementDef[] = [
     ...ACHIEVEMENTS.filter((a) => !gone.has(a.id)),
     ...custom.map(({ id, title, description, icon, category, xp, secret }) => ({ id, title, description, icon, category, xp, secret })),

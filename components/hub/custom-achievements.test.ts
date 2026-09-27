@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACHIEVEMENTS, type AchievementId } from "./achievements-catalog";
+import { ACHIEVEMENTS, HIDDEN_ACHIEVEMENTS, type AchievementId } from "./achievements-catalog";
 import { DEFAULT_ACHIEVEMENT_TREE, resolveTree, visibleNodes } from "./achievement-tree";
 import {
   activeCatalog,
@@ -27,7 +27,13 @@ describe("active catalog", () => {
     const cat = activeCatalog([custom()], ["pd-fluent"]);
     expect(cat.byId["pd-fluent"]).toBeUndefined();
     expect(cat.byId["custom-regular"]?.title).toBe("Regular");
-    expect(cat.list.length).toBe(ACHIEVEMENTS.length);
+    expect(cat.list.length).toBe(ACHIEVEMENTS.length - HIDDEN_ACHIEVEMENTS.length);
+  });
+
+  it("leaves shelved and retired built-ins out, even with nothing removed", () => {
+    const cat = activeCatalog([], []);
+    for (const id of HIDDEN_ACHIEVEMENTS) expect(cat.byId[id]).toBeUndefined();
+    expect(cat.byId["fg-complete"]).toBeDefined();
   });
 
   it("makes unique readable ids", () => {

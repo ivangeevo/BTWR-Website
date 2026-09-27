@@ -113,8 +113,8 @@ export default function OutpostControlPanel() {
               </span>
               <p className="mt-2 max-w-xs text-sm text-slate-400">
                 A small idle game on its own page, reached from the menu once
-                it&apos;s on: an Engine to grow, a quiz, patch notes, and
-                achievements. Saved locally in your browser only.
+                it&apos;s on: an Engine to grow, a camp to keep, a Field Guide
+                to fill, and achievements. Saved locally in your browser only.
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1.5">

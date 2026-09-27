@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import OutpostGate from "@/components/hub/OutpostGate";
 import modsData from "@/data/mods.json";
-import type { Mod, PackRelease } from "@/lib/mods";
+import type { Mod } from "@/lib/mods";
 
 export const metadata: Metadata = {
   title: "The Outpost",
@@ -11,9 +11,6 @@ export const metadata: Metadata = {
 
 export default function OutpostPage() {
   return (
-    <OutpostGate
-      mods={modsData.mods as Mod[]}
-      packReleases={modsData.packReleases as PackRelease[]}
-    />
+    <OutpostGate mods={modsData.mods as Mod[]} />
   );
 }

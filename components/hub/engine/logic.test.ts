@@ -39,14 +39,24 @@ describe("stage gates", () => {
 
   it("each requirement toggles independently (The Stump)", () => {
     const e: EngineState = { ...defaultEngineState(), stage: 2, choicesMade: 6, askAnswers: { a: "x", b: "y", c: "z" }, modsRead: ["1", "2", "3", "4", "5"] };
-    const ok = site({ achieved: (id) => id === "mod-of-day-viewed" || id === "patch-notes-opened" });
+    const ok = site({ achieved: (id) => id === "patch-notes-opened" });
     expect(evaluateGate(3, e, cfg.gates, ok).met).toBe(true);
     expect(evaluateGate(3, { ...e, choicesMade: 5 }, cfg.gates, ok).met).toBe(false);
     expect(evaluateGate(3, { ...e, askAnswers: { a: "x" } }, cfg.gates, ok).met).toBe(false);
     expect(evaluateGate(3, { ...e, modsRead: ["1"] }, cfg.gates, ok).met).toBe(false);
     expect(evaluateGate(3, e, cfg.gates, site()).met).toBe(false);
-    expect(evaluateGate(3, e, cfg.gates, { ...ok, achieved: (id) => id === "mod-of-day-viewed" }).met).toBe(false);
-    expect(evaluateGate(3, e, cfg.gates, ok).reqs.filter((r) => r.site)).toHaveLength(3);
+    expect(evaluateGate(3, e, cfg.gates, ok).reqs.filter((r) => r.site)).toHaveLength(2);
+    // Patch Notes is shelved in the Outpost: its requirement drops out.
+    const shelved = site({ cardEnabled: (id) => id !== "patch-notes" });
+    expect(evaluateGate(3, e, cfg.gates, shelved).met).toBe(true);
+    expect(evaluateGate(3, e, cfg.gates, shelved).reqs.some((r) => r.id === "patch")).toBe(false);
+  });
+
+  it("relics named count as Gathering's", () => {
+    const e: EngineState = { ...defaultEngineState(), stage: 5 };
+    const req = (s: GateSite) => evaluateGate(6, e, cfg.gates, s).reqs.find((r) => r.id === "quiz-correct");
+    expect(req(site({ quizCorrect: 3 }))?.progress).toBe(3);
+    expect(req(site({ cardEnabled: (id) => id !== "gathering" }))).toBeUndefined();
   });
 
   it("First Iron needs the crank and millstone blueprints, mod facts, hoppers, a cooked meal and a stone tool", () => {

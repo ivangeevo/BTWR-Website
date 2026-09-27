@@ -12,12 +12,10 @@
 // other mechanic, without a second, parallel key type just for these two.
 export type ModuleId =
   | "ponder"
-  | "daily-briefing"
   | "campfire"
   | "gathering"
   | "patch-notes"
   | "crafting"
-  | "guess-the-mod"
   | "stage-tip"
   | "resource-tool-strip"
   | "your-progress"
@@ -35,22 +33,15 @@ export const MODULES: ModuleDef[] = [
     description:
       "The very first thing a visitor finds — a small self-assembling-sentence puzzle with its own Day One/Day Two/mid-game/endgame arc, drawn from the BTW Beginner's Guide.",
   },
-  {
-    id: "daily-briefing",
-    label: "Today at the Outpost",
-    description:
-      "Three small date-seeded flavor reads combined into one card — the daily mod spotlight, tonight's moon phase, and a beginner field note.",
-  },
   { id: "campfire", label: "The Campfire", description: "Tend-the-fire idle widget." },
   {
     id: "gathering",
     label: "Gathering",
     description:
-      "Wood Gathering / Hunting / Mining (plus Fishing and Farming from the Upgrades shop) combined into one card with tab toggles — Wood Gathering is always available, Hunting opens at The Stump and Mining with Stone Tools.",
+      "Wood Gathering / Hunting / Mining (plus Fishing and Farming from the Upgrades shop) combined into one card with tab toggles — Wood Gathering is always available, Hunting opens at The Stump and Mining with Stone Tools. From First Iron its trips turn up relics to name for the Field Guide.",
   },
   { id: "patch-notes", label: "Patch Notes", description: "Modpack/mod changelog feed." },
   { id: "crafting", label: "Crafting", description: "Spend resources on better tools." },
-  { id: "guess-the-mod", label: "Guess the Mod", description: "Quiz card." },
   {
     id: "stage-tip",
     label: "Tip",
@@ -68,22 +59,21 @@ export const MODULES: ModuleDef[] = [
 ];
 
 // Which Engine stage reveals each card (admin-overridable, Stages tab). The
-// Engine is the Outpost's spine: Day One is Ponder alone, Day Two brings the
-// day's reading, The Stump opens the camp (fire, gathering, crafting), and
-// First Iron adds the quiz. The Progress and Achievements tabs are there
-// from the start. prestige/upgrades are here only because this is a total
-// Record over ModuleId; Prestige opens at Stage 8 and the Upgrades section
-// uses FeaturesConfig.upgradesStage.
+// Engine is the Outpost's spine: Day One is Ponder alone, The Stump opens
+// the camp (fire, gathering, crafting), and from First Iron its trips start
+// turning up relics (relics.ts). The Progress and Achievements tabs are
+// there from the start. prestige/upgrades are here only because this is a
+// total Record over ModuleId; Prestige opens at Stage 8 and the Upgrades
+// section uses FeaturesConfig.upgradesStage. Patch Notes is shelved (below),
+// so its stage only matters once it's back.
 export const DEFAULT_MODULE_STAGE: Record<ModuleId, number> = {
   ponder: 1,
   "stage-tip": 1,
-  "daily-briefing": 2,
   "patch-notes": 2,
   campfire: 3,
   gathering: 3,
   crafting: 3,
   "resource-tool-strip": 3,
-  "guess-the-mod": 4,
   "your-progress": 1,
   accomplishments: 1,
   prestige: 8,
@@ -94,41 +84,14 @@ export const DEFAULT_MODULE_STAGE: Record<ModuleId, number> = {
   survival: 3,
 };
 
-// Where each card lives in Basecamp (HubSection.tsx): the Camp rail (the
-// survival work, always on screen, as an accordion — CampRail.tsx) or the
-// Notice Board (the daily reads and the quiz, a card grid in the main view
-// next to the Engine). The Engine ("ponder"), Stats & Materials and the
-// Upgrades shop have fixed places of their own.
-export type ModuleGroup = "camp" | "board";
+// Cards taken out of the Outpost for now, whatever the admin config says:
+// always disabled (admin-config.ts's isModuleDisabled), left out of the
+// admin panel's card list, their site requirements dropped from the Engine's
+// gates (stages.ts's REQ_CARD) and their achievements hidden
+// (achievements-catalog.ts's HIDDEN_ACHIEVEMENTS). The code stays: Patch
+// Notes' design is kept for use elsewhere on the site.
+export const SHELVED_MODULES: readonly ModuleId[] = ["patch-notes"];
 
-export const MODULE_GROUP: Partial<Record<ModuleId, ModuleGroup>> = {
-  campfire: "camp",
-  gathering: "camp",
-  crafting: "camp",
-  "daily-briefing": "board",
-  "patch-notes": "board",
-  "guess-the-mod": "board",
-};
-
-// Default order for the Notice Board's grid (see HubSection.tsx; only its
-// "board" cards are drawn there, so the other ids' places are ignored) — a single flat
-// list now that the grid is one modular 2-column layout instead of two
-// independently-stacked columns, laid out row-major (index 0 and 1 share a
-// row, 2 and 3 share the next, etc). This interleaving of the old left/right
-// lists (ponder, patch-notes, daily-briefing, campfire, ...) exactly
-// reproduces the row pairings the old two-column layout already had, since
-// every card is the same height — so a visitor who hasn't dragged anything
-// yet sees no change.
-// Drag order is stored flat in HubState.upgrades.cardOrder, falling back to
-// this. The tier-1-only Achievement Gallery preview isn't included — it
-// stays pinned at the end of the grid regardless of reordering, same
-// special-case as ModuleGate's own file comment describes.
-export const DEFAULT_CARD_ORDER: ModuleId[] = [
-  "ponder",
-  "patch-notes",
-  "daily-briefing",
-  "campfire",
-  "gathering",
-  "crafting",
-  "guess-the-mod",
-];
+export function isModuleShelved(id: ModuleId): boolean {
+  return SHELVED_MODULES.includes(id);
+}

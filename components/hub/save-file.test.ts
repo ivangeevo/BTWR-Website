@@ -51,7 +51,8 @@ describe("normalizeState (shared by page load and import)", () => {
       version: 1,
       unlocked: { "first-visit": "x", "long-gone-achievement": "y", "custom-mine": "z" },
       tier2: { skin: "frost" },
-      upgrades: { cardOrder: { left: ["ponder"], right: [] } },
+      upgrades: { skillPoints: 3, cardOrder: { left: ["ponder"], right: [] } },
+      modOfDay: { lastSeenDate: "2026-01-01" },
       survival: { health: 0 },
       settings: { toastsEnabled: false },
       priorities: { old: true },
@@ -59,7 +60,8 @@ describe("normalizeState (shared by page load and import)", () => {
     const s = normalizeState(raw)!;
     expect(Object.keys(s.unlocked).sort()).toEqual(["custom-mine", "first-visit"]);
     expect(s.tier2.skin).toBe("campfire");
-    expect(s.upgrades.cardOrder?.[0]).toBe("ponder");
+    expect(s.upgrades).toEqual({ skillPoints: 3, purchased: [] });
+    expect("modOfDay" in s).toBe(false);
     expect(s.survival.health).toBe(1);
     expect(s.settings).toEqual({ ...defaultState().settings, toastsEnabled: false });
     expect(s.activity).toEqual(defaultState().activity);
@@ -71,7 +73,7 @@ describe("normalizeState (shared by page load and import)", () => {
     const raw = {
       version: 1,
       experience: { mode: "casual", chosenAt: "2026-09-01T00:00:00.000Z" },
-      upgrades: { skillPoints: 2, purchased: ["hunting", "stars", "day-night-cycle", "wolf"], cardOrder: null },
+      upgrades: { skillPoints: 2, purchased: ["hunting", "stars", "day-night-cycle", "wolf"] },
     };
     const s = normalizeState(raw)!;
     expect(s.upgrades.purchased).toEqual(["wolf"]);
@@ -87,7 +89,7 @@ describe("normalizeState (shared by page load and import)", () => {
     const s = normalizeState({
       version: 1,
       experience: { mode: "survival", chosenAt: "2026-09-01T00:00:00.000Z" },
-      upgrades: { skillPoints: 0, purchased: ["day-night-cycle", "mining"], cardOrder: null },
+      upgrades: { skillPoints: 0, purchased: ["day-night-cycle", "mining"] },
     })!;
     expect(s.upgrades.purchased).toEqual([]);
     expect(s.upgrades.skillPoints).toBe(5);

@@ -81,7 +81,7 @@ export const ENGINE_ACHIEVEMENT_DEFS: AchievementDef[] = [
   def("en-sawmill", "Sawmill", "Chopped 25 trees with the Engine's Saw running.", "\u{1FA9A}", { xp: 100 }),
   def("en-thrive", "Beginning to Thrive", "The Engine learned to think while you're away.", "\u{1F331}", { xp: 150 }),
   def("en-water-wheel", "Running Water", "Ran the Engine on a water wheel.", "\u{1F30A}", { xp: 100 }),
-  def("en-detector-10", "Sixth Sense", "Used the Detector Block 10 times in Guess the Mod.", "\u{1F4E1}", { xp: 100 }),
+  def("en-detector-10", "Sixth Sense", "Used the Detector Block on relics 10 times.", "\u{1F4E1}", { xp: 100 }),
   def("en-full-drum", "A Full Drum", "Came back to a Ledger Drum filled to capacity.", "\u{1F941}", { xp: 75 }),
   def("en-crucible", "The Crucible", "The Engine reached the forge.", "\u{1F525}", { xp: 200 }),
   def("en-soulforged", "Soulforged", "Forged the Engine's first soulforged part.", "\u{1F5E1}\u{FE0F}", { xp: 150 }),

@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAchievements } from "./AchievementsProvider";
 
 // The Outpost's top-level tabs, in the middle of its top bar: Basecamp (the
-// card grid), Progress (level/XP, skins, logbook) and Achievements (the full
-// gallery). Progress and Achievements appear once the Engine stage set for
+// Engine and the camp), Progress (level/XP, skins, logbook, the Field Guide)
+// and Achievements (the full gallery). Progress and Achievements appear once the Engine stage set for
 // them is reached (module-registry's "your-progress" / "accomplishments",
 // Stage 1 by default), and the bar stays hidden while Basecamp is the only
 // tab. A tab carries an accent dot until it's first opened. The picked tab is remembered per

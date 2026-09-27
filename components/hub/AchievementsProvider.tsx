@@ -127,7 +127,25 @@ import type {
   SurvivalMechanic,
   UpgradesMechanic,
 } from "./mechanics";
-import { DEFAULT_CARD_ORDER, type ModuleId } from "./module-registry";
+import type { ModuleId } from "./module-registry";
+import type { Mod } from "@/lib/mods";
+import {
+  newRelic,
+  relicCache,
+  relicPool,
+  rollRelic,
+  strikeable,
+  type RelicResult,
+  type RelicSource,
+  type RelicState,
+} from "./relics";
+import {
+  completedGroups,
+  fieldGuideBonuses,
+  fieldGuideProgress,
+  NO_FIELD_GUIDE_BONUSES,
+  type FieldGuideBonuses,
+} from "./field-guide";
 import type { AchievementTree } from "./achievement-tree";
 import {
   BUILTIN_CATALOG,
@@ -150,6 +168,7 @@ import {
   xpProgress,
   PRESTIGE_LEVEL,
   TIER2_TAB_IDS,
+  XP_PER_CORRECT_ANSWER,
   XP_PER_DAILY_VISIT,
   type SkinId,
   type Tier2TabId,
@@ -173,7 +192,6 @@ type AchievementsContextValue = {
   dismissToast: (instanceId: string) => void;
   dismissAllToasts: () => void;
   quiz: QuizStats;
-  updateQuiz: (updater: (prev: QuizStats) => QuizStats) => void;
   visits: HubState["visits"];
   tier2: Tier2State;
   xpInfo: ReturnType<typeof xpProgress>;
@@ -182,13 +200,11 @@ type AchievementsContextValue = {
   setSkin: (skin: SkinId) => void;
   prestige: () => void;
   bumpPatchNotesSwitch: () => void;
-  markQuizPlayedToday: () => void;
   markAchievementsSeen: () => void;
   setLastTab: (tab: Tier2TabId | null) => void;
   setLeftTab: (tab: Tier2TabId | null) => void;
   setPinnedTab: (tab: Tier2TabId | null) => void;
   recordTabVisit: (tab: Tier2TabId) => void;
-  recordModGuessCorrect: (projectId: string) => void;
   recordPatchNotesOpen: () => void;
   recordExport: () => void;
   /** The whole Outpost as a save file's JSON text (see save-file.ts). */
@@ -229,6 +245,16 @@ type AchievementsContextValue = {
   completeMining: () => Partial<ResourceState>;
   /** Fishing (an Upgrades-shop capability): returns the Food caught, 0 if it couldn't run. */
   completeFishing: () => number;
+  /** The unidentified relic waiting in Gathering, if a trip's turned one up — see relics.ts. */
+  relic: RelicState | null;
+  /** Names the waiting relic: pays its cache (or a little Stone) and clears it. Null if there's none to name. */
+  identifyRelic: (choiceId: string) => RelicResult | null;
+  /** Strikes one wrong name off the waiting relic. The caller spends the Detector charge first. */
+  strikeRelic: () => boolean;
+  /** The Field Guide's finished-group perks in effect right now — see field-guide.ts. */
+  fieldGuideBonuses: FieldGuideBonuses;
+  /** The pack's mods, as the Outpost page was built with them. */
+  mods: Mod[];
   craftTool: (tier: string) => boolean;
   /** The Upgrades shop's capabilities out at camp — the wolf, torches, the farm (camp.ts). */
   camp: CampState;
@@ -287,15 +313,11 @@ type AchievementsContextValue = {
   canPrestige: boolean;
   prestigeOutpost: () => boolean;
   buyLegacyPerk: (id: PerkId) => boolean;
-  /** Skill Points balance + owned upgrade ids + any custom card order — see upgrade-catalog.ts. */
+  /** Skill Points balance + owned upgrade ids — see upgrade-catalog.ts. */
   upgrades: HubState["upgrades"];
   /** Resolved (catalog defaults + admin cost/stage/build overrides) Upgrades-shop entries — Upgrades tab in /outpost-admin. */
   upgradeCatalog: UpgradeDef[];
   buyUpgrade: (id: UpgradeId) => boolean;
-  /** Moves a card to a new position in the single main-grid order, persisted. */
-  reorderCard: (from: number, to: number) => void;
-  /** Resolved (custom order, else the default) card id order for the main grid. */
-  cardOrder: ModuleId[];
 };
 
 const AchievementsContext = createContext<AchievementsContextValue | null>(null);
@@ -330,13 +352,15 @@ type ExpansionCtx = {
   level: number;
   ledger: LedgerProgress;
   sessionUnlocks: number;
-  sessionPerfectRounds: number;
   sessionLifetimeXpGained: number;
   sessionSkinChanges: number;
-  sessionAnswered: number;
   sessionTabsVisited: Set<Tier2TabId>;
   sessionExported: boolean;
   sessionImported: boolean;
+  /** Field Guide groups finished (field-guide.ts). */
+  fieldGuideGroupsDone: number;
+  /** Every mod a relic can be is catalogued. */
+  fieldGuideComplete: boolean;
 };
 
 const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) => number }[] = [
@@ -352,9 +376,17 @@ const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) 
   { id: "hb-activity-100", at: 100, read: (c) => c.state.tier2.totalEventsLogged },
   { id: "hb-export-first", at: 1, read: (c) => c.state.tier2.exportCount },
   { id: "hb-import-first", at: 1, read: (c) => c.state.tier2.importCount },
+  // Relics & the Field Guide (relics.ts, field-guide.ts). "quiz" is the
+  // stats' name from when this was Guess the Mod's card.
+  { id: "quiz-attempted", at: 1, read: (c) => c.state.quiz.totalAnswered },
+  { id: "quiz-first-correct", at: 1, read: (c) => c.state.quiz.totalCorrect },
+  { id: "quiz-streak-5", at: 5, read: (c) => c.state.quiz.bestStreak },
+  { id: "no-compass-needed", at: 10, read: (c) => c.state.quiz.bestStreak },
+  { id: "millstone-grind", at: 25, read: (c) => c.state.quiz.totalAnswered },
+  { id: "fg-first-section", at: 1, read: (c) => c.fieldGuideGroupsDone },
   // Manual Labor
-  { id: "ml-millstone-ii", at: 100, read: (c) => c.state.quiz.totalAnswered },
-  { id: "ml-millstone-iii", at: 250, read: (c) => c.state.quiz.totalAnswered },
+  { id: "ml-millstone-ii", at: 60, read: (c) => c.state.quiz.totalAnswered },
+  { id: "ml-millstone-iii", at: 120, read: (c) => c.state.quiz.totalAnswered },
   { id: "ml-bellows-ii", at: 20, read: (c) => c.state.tier2.patchNotesModeSwitchCount },
   { id: "ml-bellows-iii", at: 50, read: (c) => c.state.tier2.patchNotesModeSwitchCount },
   { id: "ml-turntable-ii", at: 25, read: (c) => c.state.tier2.windowResizeCount },
@@ -372,8 +404,6 @@ const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) 
   { id: "sf-legend", at: 30, read: (c) => c.level },
   { id: "sf-prestige-ii", at: 2, read: (c) => c.state.tier2.prestigeCount },
   { id: "sf-prestige-iii", at: 3, read: (c) => c.state.tier2.prestigeCount },
-  { id: "sf-perfect-ii", at: 10, read: (c) => c.state.quiz.perfectRounds },
-  { id: "sf-perfect-iii", at: 25, read: (c) => c.state.quiz.perfectRounds },
   { id: "sf-streak-50", at: 50, read: (c) => c.state.quiz.bestStreak },
   { id: "sf-lifetime-xp", at: 5000, read: (c) => c.state.tier2.lifetimeXp },
   // Husbandry & Harvest
@@ -411,7 +441,7 @@ const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) 
   { id: "rw-open-30", at: 30, read: (c) => c.state.tier2.patchNotesOpenCount },
   { id: "rw-lore-15", at: 15, read: (c) => c.state.tier2.loreRevealedLevel },
   { id: "rw-lore-20", at: 20, read: (c) => c.state.tier2.loreRevealedLevel },
-  { id: "rw-quiz-300", at: 300, read: (c) => c.state.quiz.totalAnswered },
+  { id: "rw-quiz-300", at: 200, read: (c) => c.state.quiz.totalAnswered },
   { id: "rw-activity-200", at: 200, read: (c) => c.state.tier2.totalEventsLogged },
   { id: "rw-mode-switch-100", at: 100, read: (c) => c.state.tier2.patchNotesModeSwitchCount },
   { id: "rw-pin-5", at: 5, read: (c) => c.state.tier2.pinChanges },
@@ -424,7 +454,6 @@ const NUMERIC_RULES: { id: AchievementId; at: number; read: (ctx: ExpansionCtx) 
   { id: "bp-resize-100", at: 100, read: (c) => c.state.tier2.windowResizeCount },
   { id: "bp-toggle-150", at: 150, read: (c) => c.state.tier2.themeToggleClicks },
   { id: "bp-streak-75", at: 75, read: (c) => c.state.quiz.bestStreak },
-  { id: "bp-perfect-40", at: 40, read: (c) => c.state.quiz.perfectRounds },
   { id: "bp-activity-500", at: 500, read: (c) => c.state.tier2.totalEventsLogged },
   { id: "bp-prestige-5", at: 5, read: (c) => c.state.tier2.prestigeCount },
   // Hopper Economy (session chains — reuses the same session-unlock counter
@@ -452,6 +481,13 @@ const COMMUNITY_EDITION_AT = 10;
 // Achievements without their own XP value (the easy, early ones) still pay a little.
 const DEFAULT_ACHIEVEMENT_XP = 25;
 
+// The ids of a list that exist right now: shelved, retired (see
+// achievements-catalog.ts's HIDDEN_ACHIEVEMENTS) and admin-removed ones
+// can't be earned, so the "all of them" capstones don't wait on them.
+function live(c: ExpansionCtx, ids: readonly AchievementId[]): AchievementId[] {
+  return ids.filter((id) => c.catalog.byId[id]);
+}
+
 const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }[] = [
   // A flavor milestone: your first ten achievements.
   {
@@ -465,7 +501,7 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
   { id: "mm-round-the-clock", check: (c) => c.state.tier2.nightVisits >= 1 && c.state.tier2.dawnVisits >= 1 },
   {
     id: "nr-milestone-all",
-    check: (c) => c.unlockedCount >= ALL_HAND_AUTHORED_IDS.length - 1,
+    check: (c) => c.unlockedCount >= live(c, ALL_HAND_AUTHORED_IDS).length - 1,
   },
   {
     id: "nr-secrets-half",
@@ -489,11 +525,11 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
   },
   {
     id: "nr-category-manual",
-    check: (c) => EXPANSION_MANUAL_LABOR_IDS.every((id) => c.unlockedSet.has(id)),
+    check: (c) => live(c, EXPANSION_MANUAL_LABOR_IDS).every((id) => c.unlockedSet.has(id)),
   },
   {
     id: "nr-category-forge",
-    check: (c) => EXPANSION_SOUL_FORGE_IDS.every((id) => c.unlockedSet.has(id)),
+    check: (c) => live(c, EXPANSION_SOUL_FORGE_IDS).every((id) => c.unlockedSet.has(id)),
   },
   {
     id: "bp-paper-trail",
@@ -505,7 +541,6 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
     check: (c) => ["patch-notes", "quiz"].every((t) => c.sessionTabsVisited.has(t as Tier2TabId)),
   },
   { id: "he-full-session", check: (c) => c.sessionTabsVisited.size >= TIER2_TAB_IDS.length },
-  { id: "he-redstone-clock", check: (c) => c.sessionPerfectRounds >= 2 },
   { id: "he-overclocked", check: (c) => c.sessionLifetimeXpGained >= 500 },
   {
     id: "he-every-day",
@@ -513,7 +548,6 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
   },
   { id: "he-skin-session-swap", check: (c) => c.sessionSkinChanges >= 2 },
   { id: "he-round-trip", check: (c) => c.sessionExported && c.sessionImported },
-  { id: "he-quiz-marathon", check: (c) => c.sessionAnswered >= 25 },
   {
     id: "fr-wardrobe-certified",
     check: (c) => c.state.tier2.skinsTried.length >= 4 && c.state.tier2.skinChangeCount >= 20,
@@ -530,8 +564,8 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
   {
     id: "fr-master-every-trade",
     check: (c) =>
-      EXPANSION_MANUAL_LABOR_IDS.every((id) => c.unlockedSet.has(id)) &&
-      EXPANSION_SOUL_FORGE_IDS.every((id) => c.unlockedSet.has(id)),
+      live(c, EXPANSION_MANUAL_LABOR_IDS).every((id) => c.unlockedSet.has(id)) &&
+      live(c, EXPANSION_SOUL_FORGE_IDS).every((id) => c.unlockedSet.has(id)),
   },
   {
     id: "fr-nothing-hidden",
@@ -540,14 +574,15 @@ const CUSTOM_RULES: { id: AchievementId; check: (ctx: ExpansionCtx) => boolean }
   },
   {
     id: "fr-complete-111",
-    check: (c) => EXPANSION_IDS.filter((id) => id !== "fr-complete-111").every((id) => c.unlockedSet.has(id)),
+    check: (c) => live(c, EXPANSION_IDS).filter((id) => id !== "fr-complete-111").every((id) => c.unlockedSet.has(id)),
   },
   {
     id: "fr-founding-settler",
     check: (c) =>
-      ALL_HAND_AUTHORED_IDS.filter((id) => id !== "fr-founding-settler").every((id) => c.unlockedSet.has(id)),
+      live(c, ALL_HAND_AUTHORED_IDS).filter((id) => id !== "fr-founding-settler").every((id) => c.unlockedSet.has(id)),
   },
   { id: "fr-ledger-100", check: (c) => c.ledger.unlockedCount >= 100 },
+  { id: "fg-complete", check: (c) => c.fieldGuideComplete },
   ...ENGINE_CUSTOM_RULES,
 ];
 
@@ -563,7 +598,9 @@ function saveState(next: HubState) {
   saveStateRaw({ ...next, engine: liveEngine.current });
 }
 
-export function AchievementsProvider({ children }: { children: React.ReactNode }) {
+const NO_MODS: Mod[] = [];
+
+export function AchievementsProvider({ children, mods = NO_MODS }: { children: React.ReactNode; mods?: Mod[] }) {
   const [state, setState] = useState<HubState>(defaultState());
   const [mounted, setMounted] = useState(false);
   const [importEpoch, setImportEpoch] = useState(0);
@@ -585,7 +622,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   const sessionTabsVisitedRef = useRef<Set<Tier2TabId>>(new Set());
   const sessionExportedRef = useRef(false);
   const sessionImportedRef = useRef(false);
-  const mountSnapshotRef = useRef({ perfectRounds: 0, lifetimeXp: 0, skinChangeCount: 0, totalAnswered: 0 });
+  const mountSnapshotRef = useRef({ lifetimeXp: 0, skinChangeCount: 0 });
   // Diffed on every state change to log a Chronicle line only when a Ledger
   // Entry rank actually advances, not on every render.
   const ledgerRanksRef = useRef<Record<LedgerMetricKey, number> | null>(null);
@@ -606,9 +643,17 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // with the state they push.
   const legacyRef = useRef<LegacyState>(defaultLegacyState());
   // Read synchronously inside unlock() (Skill Point balance bump) and
-  // buyUpgrade/reorderCard (affordability + current card order) — same
-  // reasoning as the other refs.
-  const upgradesRef = useRef<HubState["upgrades"]>({ skillPoints: 0, purchased: [], cardOrder: null });
+  // buyUpgrade (affordability) — same reasoning as the other refs.
+  const upgradesRef = useRef<HubState["upgrades"]>({ skillPoints: 0, purchased: [] });
+  // The waiting relic (relics.ts), read and written synchronously by the
+  // gathering trips that turn one up and by identifyRelic/strikeRelic.
+  const relicRef = useRef<RelicState | null>(null);
+  // The pack's mods (a relic is one of them) and the Field Guide built from
+  // them — which mods are catalogued, and the perks its finished groups give
+  // (field-guide.ts). Kept in sync by an effect below; read by the gathering trips.
+  const modsRef = useRef<Mod[]>(mods);
+  const cataloguedRef = useRef<string[]>([]);
+  const fieldGuideRef = useRef<FieldGuideBonuses>(NO_FIELD_GUIDE_BONUSES);
   // Read synchronously inside unlock() (a [addXp]-only useCallback) to
   // decide whether to push a toast — same reasoning as the other refs.
   const settingsRef = useRef<HubState["settings"]>(defaultState().settings);
@@ -786,7 +831,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       }
       if (
         id !== "master-smith" &&
-        TIER2_NEW_IDS.filter((tid) => tid !== "master-smith").every((tid) =>
+        TIER2_NEW_IDS.filter((tid) => tid !== "master-smith" && catalogRef.current.byId[tid]).every((tid) =>
           unlockedRef.current.has(tid)
         )
       ) {
@@ -802,14 +847,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
   const dismissAllToasts = useCallback(() => {
     setToasts([]);
-  }, []);
-
-  const updateQuiz = useCallback((updater: (prev: QuizStats) => QuizStats) => {
-    setState((prev) => {
-      const next = { ...prev, quiz: updater(prev.quiz) };
-      saveState(next);
-      return next;
-    });
   }, []);
 
   const setSkin = useCallback((skin: SkinId) => {
@@ -856,16 +893,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   }, [unlock]);
 
   // Dashboard QoL — unread indicators, "remembers your last tab", pinning.
-  const markQuizPlayedToday = useCallback(() => {
-    setState((prev) => {
-      const today = todayUTC();
-      if (prev.tier2.lastQuizPlayedDate === today) return prev;
-      const next = { ...prev, tier2: { ...prev.tier2, lastQuizPlayedDate: today } };
-      saveState(next);
-      return next;
-    });
-  }, []);
-
   const markAchievementsSeen = useCallback(() => {
     setState((prev) => {
       if (prev.tier2.lastSeenAchievementCount === unlockedRef.current.size) return prev;
@@ -913,26 +940,13 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
   // Ledger-entries-adjacent, real-interaction trackers for the 111
   // expansion. Each is a small, focused setter so the components that call
-  // them (Tier2LeftMenu, Tier2RightMenu, GuessTheMod, PatchNotes,
-  // Tier2Progression) stay decoupled from how the underlying achievements
+  // them (Tier2LeftMenu, Tier2RightMenu, PatchNotes, Tier2Progression) stay decoupled from how the underlying achievements
   // are computed.
   const recordTabVisit = useCallback((tab: Tier2TabId) => {
     sessionTabsVisitedRef.current.add(tab);
     setState((prev) => {
       if (prev.tier2.tabsVisited.includes(tab)) return prev;
       const next = { ...prev, tier2: { ...prev.tier2, tabsVisited: [...prev.tier2.tabsVisited, tab] } };
-      saveState(next);
-      return next;
-    });
-  }, []);
-
-  const recordModGuessCorrect = useCallback((projectId: string) => {
-    setState((prev) => {
-      if (prev.tier2.modsGuessedCorrect.includes(projectId)) return prev;
-      const next = {
-        ...prev,
-        tier2: { ...prev.tier2, modsGuessedCorrect: [...prev.tier2.modsGuessedCorrect, projectId] },
-      };
       saveState(next);
       return next;
     });
@@ -993,6 +1007,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     settingsRef.current = imported.settings;
     survivalRef.current = imported.survival;
     campRef.current = imported.camp;
+    relicRef.current = imported.relic;
     experienceRef.current = imported.experience.mode;
     liveEngine.current = imported.engine;
     patchSwitchCountRef.current = imported.tier2.patchNotesModeSwitchCount;
@@ -1001,10 +1016,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     // Session achievements measure from here, and Ledger ranks the file
     // already had aren't newly crossed.
     mountSnapshotRef.current = {
-      perfectRounds: imported.quiz.perfectRounds,
       lifetimeXp: imported.tier2.lifetimeXp,
       skinChangeCount: imported.tier2.skinChangeCount,
-      totalAnswered: imported.quiz.totalAnswered,
     };
     ledgerRanksRef.current = null;
 
@@ -1309,7 +1322,9 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     }
     resourcesRef.current = resources;
     const gatheringMechanic = resolvedMechanic<GatheringMechanic>(adminConfigRef.current, "gathering");
-    const cooldownMs = effectiveCooldownMs(gatheringMechanic.activityCooldownMs, legacyRef.current.perks);
+    const cooldownMs = Math.round(
+      effectiveCooldownMs(gatheringMechanic.activityCooldownMs, legacyRef.current.perks) * fieldGuideRef.current.cooldownMult
+    );
     const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
     setState((prev) => {
       const activityLog = [
@@ -1328,18 +1343,50 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
+  // Now and then a trip turns up an unidentified relic (relics.ts): one
+  // waiting at a time, from the Gathering mechanic's stage on, and never out
+  // on a trek home. Checked after the trip's own hunger and hits, so a trip
+  // that ends in a death finds nothing.
+  const findRelic = useCallback(
+    (source: RelicSource) => {
+      if (relicRef.current || strandedNow()) return;
+      const mech = resolvedMechanic<GatheringMechanic>(adminConfigRef.current, "gathering");
+      if (liveEngine.current.stage < mech.relicStage) return;
+      const pct = source === "mining" ? mech.relicChanceMiningPct : mech.relicChancePct;
+      if (!rollRelic(pct / 100 + fieldGuideRef.current.relicChanceBonus)) return;
+      const relic = newRelic(relicPool(modsRef.current), cataloguedRef.current, source);
+      if (!relic) return;
+      relicRef.current = relic;
+      setState((prev) => {
+        const activityLog = [
+          { ts: new Date().toISOString(), text: "Turned up an unidentified relic" },
+          ...prev.tier2.activityLog,
+        ].slice(0, ACTIVITY_LOG_MAX);
+        const next: HubState = {
+          ...prev,
+          relic,
+          tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
+        };
+        saveState(next);
+        return next;
+      });
+    },
+    [strandedNow]
+  );
+
   // The Engine's Saw adds to Wood Gathering while powered (engine/buffs.ts).
   const completeWoodGathering = useCallback(() => {
     const { wood } = resolvedCollectAmounts(adminConfigRef.current);
     const buffs = currentEngineBuffs();
-    const amount = wood + collectBonus(legacyRef.current.perks) + buffs.sawWood;
+    const amount = wood + collectBonus(legacyRef.current.perks) + buffs.sawWood + fieldGuideRef.current.woodBonus;
     const meta = resolvedResourceMeta(adminConfigRef.current);
     applyResourceGain({ wood: amount }, `Wood Gathering: +${amount} ${meta.wood.name}${buffs.sawPowered ? " (Saw)" : ""}`);
     if (buffs.sawPowered) {
       updateEngine((e) => ({ ...e, counters: { ...e.counters, sawChops: e.counters.sawChops + 1 } }), "soon");
     }
     afterActivity("wood");
-  }, [afterActivity, applyResourceGain, currentEngineBuffs, updateEngine]);
+    findRelic("wood");
+  }, [afterActivity, applyResourceGain, currentEngineBuffs, findRelic, updateEngine]);
 
   // A fed wolf (camp.ts) brings a little extra home.
   const completeHunting = useCallback(() => {
@@ -1348,11 +1395,12 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       upgradesRef.current.purchased.includes("wolf") &&
       isWolfFed(campRef.current, cycleDayIndex(loadCycleStartedAt()));
     const wolfFood = wolf ? resolvedMechanic<UpgradesMechanic>(adminConfigRef.current, "upgrades").wolfHuntFood : 0;
-    const amount = food + collectBonus(legacyRef.current.perks) + wolfFood;
+    const amount = food + collectBonus(legacyRef.current.perks) + wolfFood + fieldGuideRef.current.foodBonus;
     const meta = resolvedResourceMeta(adminConfigRef.current);
     applyResourceGain({ food: amount }, `Hunting: +${amount} ${meta.food.name}${wolf ? " (Wolf)" : ""}`);
     afterActivity("hunting");
-  }, [afterActivity, applyResourceGain]);
+    findRelic("hunting");
+  }, [afterActivity, applyResourceGain, findRelic]);
 
   // Slow and safe: no hunger, no hits (afterActivity), and the fish bite
   // best at dawn and dusk on the cycle.
@@ -1482,6 +1530,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   const completeMining = useCallback((): Partial<ResourceState> => {
     const order = resolvedToolOrder(adminConfigRef.current);
     const gain = rollMiningYield(toolsRef.current.tier, order);
+    if (gain.stone !== undefined) gain.stone += fieldGuideRef.current.stoneBonus;
     const buffs = currentEngineBuffs();
     const helpers: string[] = [];
     if (gain.stone !== undefined && buffs.millStone > 0) {
@@ -1515,8 +1564,96 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       );
     }
     afterActivity("mining");
+    findRelic("mining");
     return gain;
-  }, [afterActivity, applyResourceGain, currentEngineBuffs, updateEngine]);
+  }, [afterActivity, applyResourceGain, currentEngineBuffs, findRelic, updateEngine]);
+
+  // Naming the waiting relic. Right pays a cache of what its trip gathers
+  // (a mining relic: a few more digs' worth at your tool) and catalogues
+  // the mod in the Field Guide; wrong leaves a little Stone, and the prompt
+  // shows what it really was. Doesn't touch the rest timer.
+  const identifyRelic = useCallback(
+    (choiceId: string): RelicResult | null => {
+      const relic = relicRef.current;
+      if (!relic || !relic.choices.includes(choiceId) || relic.struck.includes(choiceId)) return null;
+      const correct = choiceId === relic.modId;
+      const mech = resolvedMechanic<GatheringMechanic>(adminConfigRef.current, "gathering");
+      let gain: Partial<ResourceState> = { stone: 1 };
+      const source = relic.source;
+      if (correct && source === "mining") {
+        gain = {};
+        const order = resolvedToolOrder(adminConfigRef.current);
+        for (let i = 0; i < mech.relicCacheTrips; i++) {
+          for (const [id, n] of Object.entries(rollMiningYield(toolsRef.current.tier, order)) as [ResourceId, number][]) {
+            gain[id] = (gain[id] ?? 0) + n;
+          }
+        }
+        if (Object.keys(gain).length === 0) gain = { stone: mech.relicCacheTrips };
+      } else if (correct && source !== "mining") {
+        gain = relicCache(source, resolvedCollectAmounts(adminConfigRef.current), mech.relicCacheTrips);
+      }
+      const resources = { ...resourcesRef.current };
+      for (const [id, n] of Object.entries(gain) as [ResourceId, number][]) resources[id] = (resources[id] ?? 0) + n;
+      resourcesRef.current = resources;
+      relicRef.current = null;
+      if (correct && !cataloguedRef.current.includes(relic.modId)) {
+        cataloguedRef.current = [...cataloguedRef.current, relic.modId];
+      }
+      const name = modsRef.current.find((m) => m.projectId === relic.modId)?.name ?? "an unknown mod";
+      const logText = correct
+        ? `Relic: ${name} (+${formatYield(gain)})`
+        : `A relic crumbled: it was ${name} (+${formatYield(gain)})`;
+      setState((prev) => {
+        const streak = correct ? prev.quiz.currentStreak + 1 : 0;
+        const activityLog = [{ ts: new Date().toISOString(), text: logText }, ...prev.tier2.activityLog].slice(
+          0,
+          ACTIVITY_LOG_MAX
+        );
+        const next: HubState = {
+          ...prev,
+          relic: null,
+          resources,
+          quiz: {
+            ...prev.quiz,
+            currentStreak: streak,
+            bestStreak: Math.max(prev.quiz.bestStreak, streak),
+            totalAnswered: prev.quiz.totalAnswered + 1,
+            totalCorrect: prev.quiz.totalCorrect + (correct ? 1 : 0),
+          },
+          tier2: {
+            ...prev.tier2,
+            modsGuessedCorrect:
+              correct && !prev.tier2.modsGuessedCorrect.includes(relic.modId)
+                ? [...prev.tier2.modsGuessedCorrect, relic.modId]
+                : prev.tier2.modsGuessedCorrect,
+            activityLog,
+            totalEventsLogged: prev.tier2.totalEventsLogged + 1,
+          },
+        };
+        saveState(next);
+        return next;
+      });
+      if (correct) addXp(XP_PER_CORRECT_ANSWER);
+      return { correct, modId: relic.modId, gain };
+    },
+    [addXp]
+  );
+
+  const strikeRelic = useCallback((): boolean => {
+    const relic = relicRef.current;
+    if (!relic) return false;
+    const options = strikeable(relic);
+    if (options.length === 0) return false;
+    const pick = options[Math.floor(Math.random() * options.length)];
+    const next = { ...relic, struck: [...relic.struck, pick] };
+    relicRef.current = next;
+    setState((prev) => {
+      const saved = { ...prev, relic: next };
+      saveState(saved);
+      return saved;
+    });
+    return true;
+  }, []);
 
   // A one-off craft beside the tool ladder: halves every later trek home.
   const craftCompass = useCallback((): boolean => {
@@ -1709,38 +1846,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     return true;
   }, [strandedNow]);
 
-  // Single flat list now that the main grid is one modular grid (see module-registry.ts's
-  // DEFAULT_CARD_ORDER) — a plain splice-out/splice-in, same "move to
-  // position `to`, shifting everything between" semantics regardless of
-  // where in the grid `to` lands.
-  const reorderCard = useCallback((from: number, to: number) => {
-    const list = [...(upgradesRef.current.cardOrder ?? DEFAULT_CARD_ORDER)];
-    // to === list.length is a valid "move to the end" target (the grid's
-    // trailing drop cell) — splice appends there fine. from === to is a
-    // no-op (dropped on itself), and so is dropping the already-last card on
-    // the trailing end cell — every other from/to pair (including an
-    // adjacent forward drop, e.g. index i onto i+1) genuinely reorders the
-    // two, since `to` is the target's index in the array as it stood before
-    // removal, not after.
-    if (
-      from < 0 ||
-      from >= list.length ||
-      to < 0 ||
-      to > list.length ||
-      from === to ||
-      (to === list.length && from === list.length - 1)
-    )
-      return;
-    const [item] = list.splice(from, 1);
-    list.splice(to, 0, item);
-    upgradesRef.current = { ...upgradesRef.current, cardOrder: list };
-    setState((prev) => {
-      const next = { ...prev, upgrades: upgradesRef.current };
-      saveState(next);
-      return next;
-    });
-  }, []);
-
   // Load persisted state once on mount, apply the day-streak, fire the
   // visit-related achievements, and check the handful of conditions that
   // only make sense once at page-load (time of day, the lounge timer, the
@@ -1791,6 +1896,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     liveEngine.current = next.engine;
     survivalRef.current = next.survival;
     campRef.current = next.camp;
+    relicRef.current = next.relic;
     experienceRef.current = next.experience.mode;
     const loadedAdminConfig = loadAdminConfig();
     adminConfigRef.current = loadedAdminConfig;
@@ -1801,10 +1907,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     themeClicksRef.current = loaded.tier2.themeToggleClicks;
     resizeCountRef.current = loaded.tier2.windowResizeCount;
     mountSnapshotRef.current = {
-      perfectRounds: loaded.quiz.perfectRounds,
       lifetimeXp: loaded.tier2.lifetimeXp,
       skinChangeCount: loaded.tier2.skinChangeCount,
-      totalAnswered: loaded.quiz.totalAnswered,
     };
     saveState(next);
     setState(next);
@@ -1990,6 +2094,23 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     return () => window.clearInterval(id);
   }, [mounted, campfireDecayMinutes, commitCamp, commitSurvival, die, survivalMech, survivalOn]);
 
+  // The Field Guide (field-guide.ts): finished groups and their perks,
+  // mirrored into refs for the gathering trips.
+  const fieldGuideDone = useMemo(
+    () => completedGroups(mods, state.tier2.modsGuessedCorrect),
+    [mods, state.tier2.modsGuessedCorrect]
+  );
+  const guideProgress = useMemo(
+    () => fieldGuideProgress(mods, state.tier2.modsGuessedCorrect),
+    [mods, state.tier2.modsGuessedCorrect]
+  );
+  const fieldGuide = useMemo(() => fieldGuideBonuses(fieldGuideDone), [fieldGuideDone]);
+  useEffect(() => {
+    modsRef.current = mods;
+    cataloguedRef.current = state.tier2.modsGuessedCorrect;
+    fieldGuideRef.current = fieldGuide;
+  }, [mods, state.tier2.modsGuessedCorrect, fieldGuide]);
+
   // The expansion's check engine — re-evaluates every numeric/custom rule
   // (and the Ledger Entries rank table) after each state change. unlock()
   // is idempotent, so re-checking already-unlocked ids is harmless; this is
@@ -2002,18 +2123,18 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     const ctx: ExpansionCtx = {
       state,
       catalog: catalogRef.current,
-      unlockedCount: unlockedRef.current.size,
+      unlockedCount: [...unlockedRef.current].filter((id) => catalogRef.current.byId[id]).length,
       unlockedSet: unlockedRef.current,
       level,
       ledger,
       sessionUnlocks: sessionUnlockCountRef.current,
-      sessionPerfectRounds: state.quiz.perfectRounds - mountSnapshotRef.current.perfectRounds,
       sessionLifetimeXpGained: state.tier2.lifetimeXp - mountSnapshotRef.current.lifetimeXp,
       sessionSkinChanges: state.tier2.skinChangeCount - mountSnapshotRef.current.skinChangeCount,
-      sessionAnswered: state.quiz.totalAnswered - mountSnapshotRef.current.totalAnswered,
       sessionTabsVisited: sessionTabsVisitedRef.current,
       sessionExported: sessionExportedRef.current,
       sessionImported: sessionImportedRef.current,
+      fieldGuideGroupsDone: fieldGuideDone.length,
+      fieldGuideComplete: guideProgress.total > 0 && guideProgress.have >= guideProgress.total,
     };
 
     for (const rule of NUMERIC_RULES) {
@@ -2056,7 +2177,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       }
     }
     ledgerRanksRef.current = nextRanks;
-  }, [state, mounted, unlock]);
+  }, [state, mounted, unlock, fieldGuideDone, guideProgress]);
 
   const ledgerProgress = useMemo(() => computeLedgerProgress(state), [state]);
 
@@ -2070,12 +2191,11 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   const catalog = useMemo(() => resolvedAchievementCatalog(adminConfig), [adminConfig]);
   const achievementTree = useMemo(() => resolvedAchievementTree(adminConfig, catalog), [adminConfig, catalog]);
   // Rebuilt whenever the save's unlocks change (unlockedRef itself is mutated in place).
+  // Shelved, retired and admin-removed ones stay saved but aren't shown or counted.
   const shownUnlocked = useMemo(() => {
-    const all = unlockedRef.current;
-    if (adminConfig.removedAchievements.length === 0) return all;
-    return new Set([...all].filter((id) => catalog.byId[id]));
+    return new Set([...unlockedRef.current].filter((id) => catalog.byId[id]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog, adminConfig.removedAchievements, state.unlocked]);
+  }, [catalog, state.unlocked]);
   const toolTiersList = useMemo(() => resolvedToolTiers(adminConfig), [adminConfig]);
   const craftCostFor = useCallback(
     (tierId: string) => resolvedCraftCost(adminConfig, tierId),
@@ -2118,7 +2238,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     dismissToast,
     dismissAllToasts,
     quiz: state.quiz,
-    updateQuiz,
     visits: state.visits,
     tier2: state.tier2,
     xpInfo: xpProgress(state.tier2.xp),
@@ -2127,13 +2246,11 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     setSkin,
     prestige,
     bumpPatchNotesSwitch,
-    markQuizPlayedToday,
     markAchievementsSeen,
     setLastTab,
     setLeftTab,
     setPinnedTab,
     recordTabVisit,
-    recordModGuessCorrect,
     recordPatchNotesOpen,
     recordExport,
     exportSave,
@@ -2160,6 +2277,11 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     completeHunting,
     completeMining,
     completeFishing,
+    relic: state.relic,
+    identifyRelic,
+    strikeRelic,
+    fieldGuideBonuses: fieldGuide,
+    mods,
     craftTool,
     camp: state.camp,
     feedWolf,
@@ -2185,8 +2307,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     upgrades: state.upgrades,
     upgradeCatalog: upgradeCatalogResolved,
     buyUpgrade,
-    reorderCard,
-    cardOrder: state.upgrades.cardOrder ?? DEFAULT_CARD_ORDER,
     survival: state.survival,
     survivalActive,
     stranded: survivalActive && state.survival.stranded !== null,

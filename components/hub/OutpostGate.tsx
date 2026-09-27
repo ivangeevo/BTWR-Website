@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { Mod, PackRelease } from "@/lib/mods";
+import type { Mod } from "@/lib/mods";
 import HubSection from "./HubSection";
 import { isPhoneDevice } from "./device";
 import DesktopOnlyNotice from "./DesktopOnlyNotice";
@@ -15,20 +15,14 @@ type Gate = "checking" | "phone" | "off" | "on";
 // (and on a phone, that it's desktop-only). Starts as "checking" (matches
 // the server render) and decides after reading localStorage on mount, so
 // there's no hydration mismatch.
-export default function OutpostGate({
-  mods,
-  packReleases,
-}: {
-  mods: Mod[];
-  packReleases: PackRelease[];
-}) {
+export default function OutpostGate({ mods }: { mods: Mod[] }) {
   const [gate, setGate] = useState<Gate>("checking");
 
   useEffect(() => {
     setGate(isPhoneDevice() ? "phone" : isOutpostEnabled() ? "on" : "off");
   }, []);
 
-  if (gate === "on") return <HubSection mods={mods} packReleases={packReleases} />;
+  if (gate === "on") return <HubSection mods={mods} />;
   if (gate === "checking") return <div className="min-h-[60vh]" aria-busy="true" />;
 
   return (

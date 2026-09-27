@@ -5,7 +5,7 @@
 // additive on top of them. What reveals each card is the Engine's stage
 // (module-registry.ts's DEFAULT_MODULE_STAGE), not a tier ladder.
 import type { AchievementId } from "./achievements-catalog";
-import { DEFAULT_MODULE_STAGE, type ModuleId } from "./module-registry";
+import { DEFAULT_MODULE_STAGE, isModuleShelved, type ModuleId } from "./module-registry";
 import { MODULE_MECHANICS } from "./mechanics";
 import type { EngineAdminOverrides } from "./engine/config";
 import { resolveTree, type AchievementTree, type AdvFrame } from "./achievement-tree";
@@ -120,15 +120,18 @@ export function defaultAdminConfig(): AdminConfig {
     stageTips: {
       1: ["Solve a sentence with Ponder — it's the only thing here right now, and that's the point."],
       2: [
-        "Day Two: check today's Mod of the Day and crack open the Patch Notes — the Engine wants to read them too.",
+        "Day Two: the Engine wants to read about the pack — open a few mods on the Mods page and it will.",
         "Keep an eye on the rest of the site too... not everything announces itself.",
       ],
       3: [
         "The camp is open, down the right-hand side. Chop Wood in Gathering, craft a Campfire (4 Wood) in Crafting and keep it at Medium to cook, and go Hunting for Food. Upgrades, at the bottom of the camp, trades Skill Points and resources for new things to do.",
         "Cooked food will feed the Engine's hand crank, once it has a body. Mining needs a Stone Tool first.",
       ],
-      4: ["Guess the Mod is open, and the Engine has a body now — build its gear grid from the Body tab: a hand crank powers it, and grinds Stone from a Millstone next to it. Powered machines help the Outpost: a Saw for Wood, a Millstone for Stone, Bellows for ore."],
-      5: ["A powered Detector Block helps you in Guess the Mod."],
+      4: [
+        "Your trips out now and then turn up an unidentified relic: name the mod it came from, right in Gathering, for a cache and a new Field Guide entry (Progress tab).",
+        "The Engine has a body now — build its gear grid from the Body tab: a hand crank powers it, and grinds Stone from a Millstone next to it. Powered machines help the Outpost: a Saw for Wood, a Millstone for Stone, Bellows for ore.",
+      ],
+      5: ["A powered Detector Block strikes a wrong name off a relic."],
       6: ["Powered Bellows keep the campfire burning far longer."],
       7: ["Soulforged parts need a lit Hibachi. Choose what the Engine becomes."],
       8: ["The Engine is finished — and Prestige is open (top-left). A rebuild keeps its mind, not its body."],
@@ -372,8 +375,10 @@ export function resolvedModuleStage(config: AdminConfig, moduleId: ModuleId): nu
   return config.moduleStage[moduleId] ?? DEFAULT_MODULE_STAGE[moduleId];
 }
 
-// Ponder is the Engine itself (it holds every stage gate), so it can't be switched off.
+// Ponder is the Engine itself (it holds every stage gate), so it can't be
+// switched off. A shelved card (module-registry.ts) is off whatever the config says.
 export function isModuleDisabled(config: AdminConfig, moduleId: ModuleId): boolean {
+  if (isModuleShelved(moduleId)) return true;
   return moduleId !== "ponder" && config.moduleDisabled[moduleId] === true;
 }
 

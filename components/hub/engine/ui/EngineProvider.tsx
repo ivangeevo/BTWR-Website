@@ -1330,7 +1330,7 @@ export function useEngine(): EngineCtx {
   return ctx;
 }
 
-/** For cards that may render outside the Outpost (e.g. Guess the Mod's flat variant). */
+/** For components that may render outside the Engine's provider. */
 export function useEngineOptional(): EngineCtx | null {
   return useContext(EngineContext);
 }

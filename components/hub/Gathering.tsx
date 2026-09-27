@@ -5,6 +5,7 @@ import { CooldownNotice, LoadingBarButton, useCooldownRemaining } from "./activi
 import { useAchievements } from "./AchievementsProvider";
 import { farmGrowth } from "./camp";
 import { computeCyclePhase, daylightMsBetween, isTwilight, loadCycleStartedAt } from "./day-night-cycle";
+import RelicPrompt from "./RelicPrompt";
 import { findToolTier, HUNTING_STAGE, type ResourceId, type ResourceState } from "./resources";
 
 type ActionId = "wood-gathering" | "hunting" | "mining" | "fishing" | "farm";
@@ -41,9 +42,10 @@ function useFarmRipe(): boolean {
 }
 
 // Gathering's line in its folded Camp rail header (CampRail.tsx): what's
-// running, else the shared rest timer, plus a ripe crop.
+// running, else the shared rest timer, plus a ripe crop and a relic waiting
+// to be named.
 export function GatheringStatus({ busy }: { busy: string | null }) {
-  const { activityCooldownUntil } = useAchievements();
+  const { activityCooldownUntil, relic } = useAchievements();
   const remainingMs = useCooldownRemaining(activityCooldownUntil);
   const ripe = useFarmRipe();
   const text = busy ?? (remainingMs > 0 ? `Resting ${Math.ceil(remainingMs / 1000)}s` : "Ready");
@@ -51,6 +53,7 @@ export function GatheringStatus({ busy }: { busy: string | null }) {
     <span>
       {text}
       {ripe && <span className="text-[var(--outpost-accent)]"> · crop ripe</span>}
+      {relic && <span className="text-[var(--outpost-accent)]"> · {"\u{1F9FF}"} relic</span>}
     </span>
   );
 }
@@ -60,7 +63,8 @@ export function GatheringStatus({ busy }: { busy: string | null }) {
 // one coherent hub instead of cards that happen to fight over the same
 // timer. Planting and watching the farm don't touch the timer; harvesting
 // does. Lives in the Camp rail (CampRail.tsx), which supplies its panel and
-// title; onBusyChange tells its folded header what's running.
+// title; onBusyChange tells its folded header what's running. A relic a
+// trip turned up (relics.ts) waits at the top until it's named.
 export default function Gathering({ onBusyChange }: { onBusyChange?: (busy: string | null) => void }) {
   const {
     tools,
@@ -143,6 +147,7 @@ export default function Gathering({ onBusyChange }: { onBusyChange?: (busy: stri
   return (
     <div>
       <p className="text-xs leading-snug text-slate-400">Pick an activity — they share one rest timer.</p>
+      <RelicPrompt />
 
       <div className="mt-2.5 flex gap-1" role="tablist">
         {shownActions.map((a) => {

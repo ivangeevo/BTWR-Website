@@ -31,7 +31,7 @@ import {
   type FeaturesConfig,
 } from "./admin-config";
 import { mechanicConfigFields } from "./mechanics";
-import { MODULES, type ModuleId } from "./module-registry";
+import { isModuleShelved, MODULES, type ModuleId } from "./module-registry";
 import OutpostCorners from "./OutpostCorners";
 import { RESOURCE_IDS, TOOL_ORDER, type ResourceId, type ToolTier } from "./resources";
 import type { UpgradeId } from "./upgrade-catalog";
@@ -326,7 +326,8 @@ function ModulesTab({ config, update }: { config: AdminConfig; update: Update })
   }
 
   const byTier = new Map<string, typeof MODULES>();
-  for (const m of MODULES) {
+  // Shelved cards (module-registry.ts) aren't the admin's to place.
+  for (const m of MODULES.filter((mod) => !isModuleShelved(mod.id))) {
     const tierId = isModuleDisabled(config, m.id) ? DISABLED_GROUP.id : String(resolvedModuleStage(config, m.id));
     if (!byTier.has(tierId)) byTier.set(tierId, []);
     byTier.get(tierId)!.push(m);

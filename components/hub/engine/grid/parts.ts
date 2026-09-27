@@ -5,7 +5,7 @@ import type { EngineStage, GridPartType, Rot } from "../types";
 // conductors move it (axles in straight lines, gearboxes to turn corners and
 // reset an axle run), attachments do a job while powered (the Millstone,
 // Saw and Bellows boost the Outpost's Stone, Wood and ore; the Detector
-// helps Guess the Mod), consumers do a job for the Engine itself. Costs are real Outpost resources (see resources.ts).
+// helps name relics), consumers do a job for the Engine itself. Costs are real Outpost resources (see resources.ts).
 export type PartRole = "source" | "conductor" | "attachment" | "consumer";
 
 export type PartDef = {
@@ -119,7 +119,7 @@ export const PART_DEFS: Record<GridPartType, PartDef> = {
     name: "Detector Block",
     icon: "\u{1F4E1}",
     role: "attachment",
-    blurb: "While powered, charges up to strike a wrong answer from Guess the Mod.",
+    blurb: "While powered, charges up to strike a wrong name off a relic from Gathering.",
     cost: { stone: 4, copper: 3 },
     needsBlueprint: true,
     soulforged: false,

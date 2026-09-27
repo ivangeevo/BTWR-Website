@@ -21,7 +21,7 @@ const OPTIONS: Option[] = [
     tagline: "The Outpost the way Better Than Wolves plays it.",
     points: [
       "Health and Hunger: every trip out makes you hungry, and hunts and digs can hurt. Cook food and eat to keep going.",
-      "The gloom: on New Moon nights a dead fire means a darkness that hurts. Watch Tonight's Sky and keep your Campfire lit.",
+      "The gloom: on New Moon nights a dead fire means a darkness that hurts. Keep your Campfire lit, and buy Tonight's Sky from Upgrades to see it coming.",
       "Hardcore Spawn: die and you wake up far from camp, with a short trek home. You keep everything you gathered.",
       "The day/night cycle is always on.",
     ],

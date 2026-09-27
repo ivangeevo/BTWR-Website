@@ -12,7 +12,7 @@ import { buildSaveFile } from "./save-file";
 function richConfig(): AdminConfig {
   const c = defaultAdminConfig();
   c.moduleStage = { gathering: 4 };
-  c.moduleDisabled = { "guess-the-mod": true };
+  c.moduleDisabled = { crafting: true };
   c.achievementParent = { "first-visit": "root" };
   c.achievementFrame = { "first-visit": "goal" };
   c.removedAchievements = ["visit-streak-2"];

@@ -4,7 +4,6 @@ import { SURVIVAL_ACHIEVEMENT_DEFS, type SurvivalAchievementId } from "./surviva
 export type BuiltinAchievementId =
   // Tier 1 (12) — the original, simple hangout-spot achievements.
   | "first-visit"
-  | "mod-of-day-viewed"
   | "quiz-first-correct"
   | "quiz-perfect-round"
   | "quiz-streak-5"
@@ -69,6 +68,8 @@ export type BuiltinAchievementId =
   | "fr-wardrobe-certified" | "fr-all-flair" | "fr-all-categories" | "fr-master-every-trade"
   | "fr-nothing-hidden" | "fr-lifes-work" | "fr-half-year" | "fr-prestige-10"
   | "fr-complete-111" | "fr-founding-settler" | "fr-ledger-100"
+  // The Field Guide (field-guide.ts) — relics named, groups finished.
+  | "fg-first-section" | "fg-complete"
   // Ponder — the Engine's first ten (see engine/achievements.ts for their rules).
   | "pd-first-sentence" | "pd-fluent" | "pd-first-choice"
   | "pd-automated" | "pd-oracle" | "pd-old-friend"
@@ -111,7 +112,7 @@ export const CATEGORY_LABELS: Record<AchievementCategory, string> = {
   ponder: "Ponder",
   engine: "The Analytical Engine",
   onboarding: "Getting Started",
-  quiz: "Guess the Mod",
+  quiz: "Relics & Field Guide",
   "patch-notes": "Patch Notes",
   dedication: "Dedication",
   secrets: "Secrets",
@@ -148,6 +149,33 @@ export const CATEGORY_ORDER: AchievementCategory[] = [
   "bureaucracy",
   "hopper-economy",
   "frontier-record",
+];
+
+// Built-ins that can't be earned right now, so they're left out of the
+// live catalog (custom-achievements.ts's activeCatalog) — not shown, not
+// counted, not unlockable — but stay defined, and a save that earned one
+// keeps it.
+// - Shelved with the Patch Notes card (module-registry.ts's SHELVED_MODULES):
+//   back when it is.
+// - Retired with Guess the Mod's rounds: relics (relics.ts) are named one
+//   at a time, so there's no round to be perfect or session to marathon.
+export const HIDDEN_ACHIEVEMENTS: readonly AchievementId[] = [
+  "patch-notes-opened",
+  "patch-notes-mode-switched",
+  "bellows-crucible",
+  "ml-bellows-ii",
+  "ml-bellows-iii",
+  "rw-open-5",
+  "rw-open-15",
+  "rw-open-30",
+  "rw-mode-switch-100",
+  "quiz-perfect-round",
+  "perfect-alloy",
+  "sf-perfect-ii",
+  "sf-perfect-iii",
+  "bp-perfect-40",
+  "he-redstone-clock",
+  "he-quiz-marathon",
 ];
 
 export type AchievementDef = {
@@ -265,13 +293,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     category: "onboarding",
   },
   {
-    id: "mod-of-day-viewed",
-    title: "Spotlight's On",
-    description: "Checked out the mod of the day.",
-    icon: "✨",
-    category: "onboarding",
-  },
-  {
     id: "outpost-lounging",
     title: "Making Yourself at Home",
     description: "Spent 30 seconds looking around the Outpost.",
@@ -281,7 +302,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: "quiz-first-correct",
     title: "Good Eye",
-    description: "Correctly identified a mod.",
+    description: "Named a relic right.",
     icon: "\u{1F440}",
     category: "quiz",
   },
@@ -295,7 +316,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: "quiz-streak-5",
     title: "On a Roll",
-    description: "5 correct guesses in a row.",
+    description: "Named 5 relics right in a row.",
     icon: "\u{1F525}",
     category: "quiz",
   },
@@ -337,7 +358,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: "quiz-attempted",
     title: "Took a Swing",
-    description: "Made a guess in Guess the Mod.",
+    description: "Tried to name an unidentified relic.",
     icon: "\u{1F3AF}",
     category: "quiz",
   },
@@ -385,7 +406,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: "millstone-grind",
     title: "Millstone Grind",
-    description: "Answered 50 quiz questions total.",
+    description: "Examined 25 relics.",
     icon: "\u{2699}️",
     category: "quiz",
     xp: 100,
@@ -401,10 +422,26 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: "no-compass-needed",
     title: "No Compass Needed",
-    description: "Nailed a 10-guess streak in Guess the Mod.",
+    description: "Named 10 relics right in a row.",
     icon: "\u{1F9ED}",
     category: "quiz",
     xp: 100,
+  },
+  {
+    id: "fg-first-section",
+    title: "A Page Filled In",
+    description: "Finished a section of the Field Guide.",
+    icon: "📖",
+    category: "quiz",
+    xp: 150,
+  },
+  {
+    id: "fg-complete",
+    title: "Naturalist",
+    description: "Catalogued every mod in the pack in the Field Guide.",
+    icon: "🧭",
+    category: "quiz",
+    xp: 500,
   },
   {
     id: "bellows-crucible",
@@ -501,16 +538,16 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "hb-import-first", title: "Audit Complete", description: "Imported an Outpost save for the first time.", icon: "\u{1F4E5}", category: "homestead-basics", xp: 75 },
 
   // Manual Labor
-  { id: "ml-millstone-ii", title: "At the Millstone, Again", description: "Answered 100 quiz questions, lifetime.", icon: "\u{2699}\u{FE0F}", category: "manual-labor", xp: 150 },
-  { id: "ml-millstone-iii", title: "Grinding Never Stops", description: "Answered 250 quiz questions, lifetime.", icon: "\u{2699}\u{FE0F}", category: "manual-labor", xp: 300 },
+  { id: "ml-millstone-ii", title: "At the Millstone, Again", description: "Examined 60 relics, lifetime.", icon: "\u{2699}\u{FE0F}", category: "manual-labor", xp: 150 },
+  { id: "ml-millstone-iii", title: "Grinding Never Stops", description: "Examined 120 relics, lifetime.", icon: "\u{2699}\u{FE0F}", category: "manual-labor", xp: 300 },
   { id: "ml-bellows-ii", title: "Working the Bellows, Harder", description: "Switched Patch Notes mode 20 times, lifetime.", icon: "\u{1F525}", category: "manual-labor", xp: 150 },
   { id: "ml-bellows-iii", title: "The Bellows Never Rest", description: "Switched Patch Notes mode 50 times, lifetime.", icon: "\u{1F525}", category: "manual-labor", xp: 300 },
   { id: "ml-turntable-ii", title: "Turning the Turntable, Again", description: "Resized the window 25 times, lifetime.", icon: "\u{1F32C}\u{FE0F}", category: "manual-labor", xp: 150 },
   { id: "ml-turntable-iii", title: "The Turntable Never Stops", description: "Resized the window 60 times, lifetime.", icon: "\u{1F32C}\u{FE0F}", category: "manual-labor", xp: 300 },
   { id: "ml-crank-ii", title: "Hand-Cranked, Harder", description: "Flipped the theme switch 40 times, lifetime.", icon: "\u{1F527}", category: "manual-labor", xp: 150 },
   { id: "ml-crank-iii", title: "Arm Like Iron", description: "Flipped the theme switch 80 times, lifetime.", icon: "\u{1F527}", category: "manual-labor", xp: 300 },
-  { id: "ml-loom-streak", title: "Weaving a Pattern", description: "Hit a 15-guess streak in Guess the Mod.", icon: "\u{1F9F5}", category: "manual-labor", xp: 200 },
-  { id: "ml-loom-streak-ii", title: "Unbroken Thread", description: "Hit a 25-guess streak in Guess the Mod.", icon: "\u{1F9F5}", category: "manual-labor", xp: 350 },
+  { id: "ml-loom-streak", title: "Weaving a Pattern", description: "Named 15 relics right in a row.", icon: "\u{1F9F5}", category: "manual-labor", xp: 200 },
+  { id: "ml-loom-streak-ii", title: "Unbroken Thread", description: "Named 25 relics right in a row.", icon: "\u{1F9F5}", category: "manual-labor", xp: 350 },
   { id: "ml-reforge-i", title: "First Reforging", description: "Prestiged for the first time.", icon: "\u{1F528}", category: "manual-labor", xp: 250 },
 
   // Soul Forge & Hellfire Forge
@@ -523,14 +560,14 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "sf-prestige-iii", title: "Thrice Reforged", description: "Prestiged three times.", icon: "\u{2692}\u{FE0F}", category: "soul-forge", xp: 600 },
   { id: "sf-perfect-ii", title: "Ember Kept Alive", description: "10 perfect Guess the Mod rounds, lifetime.", icon: "\u{1F56F}\u{FE0F}", category: "soul-forge", xp: 250 },
   { id: "sf-perfect-iii", title: "Undying Flame", description: "25 perfect Guess the Mod rounds, lifetime.", icon: "\u{1F525}", category: "soul-forge", xp: 450 },
-  { id: "sf-streak-50", title: "Molten Focus", description: "Hit a 50-guess streak in Guess the Mod.", icon: "\u{1F321}\u{FE0F}", category: "soul-forge", xp: 500 },
+  { id: "sf-streak-50", title: "Molten Focus", description: "Named 50 relics right in a row.", icon: "\u{1F321}\u{FE0F}", category: "soul-forge", xp: 500 },
   { id: "sf-lifetime-xp", title: "Soul-Bound", description: "Earned 5,000 XP over your lifetime — prestige resets and all.", icon: "\u{1F52E}", secret: true, category: "soul-forge", xp: 500 },
 
   // Husbandry & Harvest
-  { id: "hh-first-catch", title: "First Cutting", description: "Correctly guessed 5 distinct mods.", icon: "\u{1F33E}", category: "husbandry-harvest", xp: 100 },
-  { id: "hh-apiary", title: "Tending the Apiary", description: "Correctly guessed 15 distinct mods.", icon: "\u{1F41D}", category: "husbandry-harvest", xp: 200 },
-  { id: "hh-broody", title: "Gone Broody", description: "Correctly guessed 30 distinct mods.", icon: "\u{1F414}", category: "husbandry-harvest", xp: 350 },
-  { id: "hh-full-harvest", title: "Full Harvest", description: "Correctly guessed 45 distinct mods.", icon: "\u{1F33B}", category: "husbandry-harvest", xp: 500 },
+  { id: "hh-first-catch", title: "First Cutting", description: "Catalogued 5 mods in the Field Guide.", icon: "\u{1F33E}", category: "husbandry-harvest", xp: 100 },
+  { id: "hh-apiary", title: "Tending the Apiary", description: "Catalogued 15 mods in the Field Guide.", icon: "\u{1F41D}", category: "husbandry-harvest", xp: 200 },
+  { id: "hh-broody", title: "Gone Broody", description: "Catalogued 30 mods in the Field Guide.", icon: "\u{1F414}", category: "husbandry-harvest", xp: 350 },
+  { id: "hh-full-harvest", title: "Full Harvest", description: "Catalogued 45 mods in the Field Guide.", icon: "\u{1F33B}", category: "husbandry-harvest", xp: 500 },
   { id: "hh-compost", title: "Well-Composted", description: "Visited the Outpost on 10 separate days.", icon: "\u{1FAB1}", category: "husbandry-harvest", xp: 150 },
   { id: "hh-compost-ii", title: "Deeply Composted", description: "Visited the Outpost on 30 separate days.", icon: "\u{1FAB1}", category: "husbandry-harvest", xp: 350 },
   { id: "hh-old-growth", title: "Old Growth", description: "Visited the Outpost on 60 separate days.", icon: "\u{1F333}", category: "husbandry-harvest", xp: 600 },
@@ -561,7 +598,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "nr-milestone-all", title: "Reforged in Fire", description: "Unlocked every other hand-authored achievement in the Outpost.", icon: "\u{1F451}", secret: true, category: "nether-reachievement", xp: 1000 },
   { id: "nr-secrets-half", title: "Half in Shadow", description: "Unlocked at least half of every secret achievement in the Outpost.", icon: "\u{1F573}\u{FE0F}", secret: true, category: "nether-reachievement", xp: 350 },
   { id: "nr-secrets-most", title: "Deep Cave Dweller", description: "Unlocked at least 80% of every secret achievement in the Outpost.", icon: "\u{1F987}", secret: true, category: "nether-reachievement", xp: 600 },
-  { id: "nr-category-quiz", title: "Quiz Historian", description: "Unlocked every achievement in the Guess the Mod category.", icon: "\u{1F4D3}", category: "nether-reachievement", xp: 400 },
+  { id: "nr-category-quiz", title: "Quiz Historian", description: "Unlocked every achievement in the Relics & Field Guide category.", icon: "\u{1F4D3}", category: "nether-reachievement", xp: 400 },
   { id: "nr-category-manual", title: "Master of Manual Labor", description: "Unlocked every achievement in the Manual Labor category.", icon: "\u{1F6E0}\u{FE0F}", category: "nether-reachievement", xp: 400 },
   { id: "nr-category-forge", title: "Keeper of the Forge", description: "Unlocked every achievement in the Soul Forge & Hellfire Forge category.", icon: "\u{1F525}", category: "nether-reachievement", xp: 400 },
   { id: "nr-hundred-days", title: "A Hundred Days In", description: "Visited the Outpost on 100 separate days.", icon: "\u{1F4C5}", category: "nether-reachievement", xp: 700 },
@@ -572,7 +609,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "rw-open-30", title: "Cover to Cover", description: "Opened Patch Notes 30 times, lifetime.", icon: "\u{1F4D8}", category: "rtfm-wiki", xp: 350 },
   { id: "rw-lore-15", title: "Footnote Hunter", description: "Revealed the Outpost Logbook up through level 15.", icon: "\u{1F50D}", category: "rtfm-wiki", xp: 200 },
   { id: "rw-lore-20", title: "Between the Lines", description: "Revealed the Outpost Logbook up through level 20.", icon: "\u{1F9D0}", category: "rtfm-wiki", xp: 300 },
-  { id: "rw-quiz-300", title: "Well Read", description: "Answered 300 quiz questions, lifetime.", icon: "\u{1F4D5}", category: "rtfm-wiki", xp: 400 },
+  { id: "rw-quiz-300", title: "Well Read", description: "Examined 200 relics, lifetime.", icon: "\u{1F4D5}", category: "rtfm-wiki", xp: 400 },
   { id: "rw-activity-200", title: "The Complete Ledger", description: "Logged 200 notable events in your activity log.", icon: "\u{1F5C2}\u{FE0F}", category: "rtfm-wiki", xp: 400 },
   { id: "rw-mode-switch-100", title: "Footnotes on Footnotes", description: "Switched Patch Notes mode 100 times, lifetime.", icon: "\u{1F4D1}", category: "rtfm-wiki", xp: 500 },
   { id: "rw-pin-5", title: "Dog-Eared Pages", description: "Changed your pinned tab 5 separate times.", icon: "\u{1F516}", category: "rtfm-wiki", xp: 200 },
@@ -587,7 +624,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "bp-tab-hopping", title: "Inter-Departmental Memo", description: "Visited 5 distinct dashboard tabs in a single session.", icon: "\u{2709}\u{FE0F}", secret: true, category: "bureaucracy", xp: 250 },
   { id: "bp-resize-100", title: "Facilities Request", description: "Resized the window 100 times, lifetime.", icon: "\u{1F3E2}", category: "bureaucracy", xp: 450 },
   { id: "bp-toggle-150", title: "Energy Audit", description: "Flipped the theme switch 150 times, lifetime.", icon: "\u{1F4A1}", category: "bureaucracy", xp: 450 },
-  { id: "bp-streak-75", title: "Performance Review", description: "Hit a 75-guess streak in Guess the Mod.", icon: "\u{1F4C8}", category: "bureaucracy", xp: 600 },
+  { id: "bp-streak-75", title: "Performance Review", description: "Named 75 relics right in a row.", icon: "\u{1F4C8}", category: "bureaucracy", xp: 600 },
   { id: "bp-perfect-40", title: "Exceeds Expectations", description: "40 perfect Guess the Mod rounds, lifetime.", icon: "\u{2B50}", category: "bureaucracy", xp: 600 },
   { id: "bp-activity-500", title: "Archive Overflow", description: "Logged 500 notable events in your activity log.", icon: "\u{1F5C3}\u{FE0F}", category: "bureaucracy", xp: 700 },
   { id: "bp-prestige-5", title: "Reorganization Complete", description: "Prestiged 5 times.", icon: "\u{1F3DB}\u{FE0F}", category: "bureaucracy", xp: 700 },

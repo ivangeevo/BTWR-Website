@@ -74,13 +74,12 @@ const ROWS: Row[] = [
   // Getting Started
   ["first-visit", null],
   ["outpost-lounging", "first-visit"],
-  ["mod-of-day-viewed", "first-visit"],
   ["theme-toggle-used", "first-visit"],
   ["window-resized-once", "first-visit"],
   ["campfire-medium", "first-visit"],
   ["community-edition", "first-visit", "goal"],
 
-  // Guess the Mod
+  // Relics & the Field Guide
   ["quiz-attempted", null],
   ["quiz-first-correct", "quiz-attempted"],
   ["quiz-streak-5", "quiz-first-correct"],
@@ -88,6 +87,8 @@ const ROWS: Row[] = [
   ["quiz-perfect-round", "quiz-first-correct"],
   ["perfect-alloy", "quiz-perfect-round", "goal"],
   ["millstone-grind", "quiz-attempted", "goal"],
+  ["fg-first-section", "quiz-first-correct", "goal"],
+  ["fg-complete", "fg-first-section", "challenge"],
 
   // Patch Notes
   ["patch-notes-opened", null],

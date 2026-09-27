@@ -1,4 +1,3 @@
-import type { Mod } from "@/lib/mods";
 import { ACHIEVEMENTS_BY_ID, type AchievementId } from "./achievements-catalog";
 import { defaultCampState, normalizeCamp, type CampState } from "./camp";
 import { isPhoneDevice } from "./device";
@@ -6,7 +5,7 @@ import { hashString } from "./engine/rng";
 import { defaultEngineState, normalizeEngineState } from "./engine/state";
 import type { EngineState } from "./engine/types";
 import { defaultLegacyState, type LegacyState } from "./legacy";
-import { DEFAULT_CARD_ORDER, type ModuleId } from "./module-registry";
+import { normalizeRelic, type RelicState } from "./relics";
 import type { ResourceState } from "./resources";
 import { defaultSurvivalState, type SurvivalState } from "./survival";
 import { SKINS_BY_ID, type SkinId, type Tier2TabId } from "./tier2";
@@ -101,18 +100,12 @@ export function normalizeCampfire(raw: Partial<CampfireState> | undefined): Camp
   return merged;
 }
 
-// The Outpost's meta-progression shop state (see upgrade-catalog.ts). cardOrder
-// (card dragging, always available) lives here too for history's sake: it
-// was an upgrade once. It's null until the visitor actually drags something
-// — consumers fall back to DEFAULT_CARD_ORDER, so this never needs a
-// migration default beyond null.
-// A single flat list — the main card grid is one modular grid now, not two
-// independently-ordered columns (see loadState's migration off the old
-// `{ left, right }` shape for visitors with a pre-existing save).
+// The Outpost's meta-progression shop state (see upgrade-catalog.ts). Older
+// saves also carry a cardOrder here, from when Basecamp had a card grid to
+// drag around; normalizeState drops it.
 export type UpgradesState = {
   skillPoints: number;
   purchased: string[];
-  cardOrder: ModuleId[] | null;
 };
 
 export type ToolState = {
@@ -154,8 +147,10 @@ export type HubState = {
   // read this to decide whether to open at all.
   enabled: boolean;
   unlocked: Partial<Record<AchievementId, string>>;
+  /** Relic identification stats (relics.ts) — named "quiz" from when it was Guess the Mod's card. */
   quiz: QuizStats;
-  modOfDay: { lastSeenDate: string | null };
+  /** The unidentified relic waiting in Gathering, if one's turned up — see relics.ts. */
+  relic: RelicState | null;
   visits: { firstVisitAt: string | null; lastVisitDate: string | null; streakDays: number };
   campfire: CampfireState;
   resources: ResourceState;
@@ -188,7 +183,7 @@ export function defaultState(): HubState {
       totalCorrect: 0,
       perfectRounds: 0,
     },
-    modOfDay: { lastSeenDate: null },
+    relic: null,
     visits: { firstVisitAt: null, lastVisitDate: null, streakDays: 0 },
     campfire: { built: false, stage: 0, lastTendedAt: null },
     resources: { wood: 0, food: 0, stone: 0, coal: 0, copper: 0, iron: 0, cookedFood: 0 },
@@ -201,7 +196,7 @@ export function defaultState(): HubState {
       themeOverrideAllowed: false,
     },
     legacy: defaultLegacyState(),
-    upgrades: { skillPoints: 0, purchased: [], cardOrder: null },
+    upgrades: { skillPoints: 0, purchased: [] },
     engine: defaultEngineState(),
     survival: defaultSurvivalState(),
     camp: defaultCampState(),
@@ -279,9 +274,10 @@ export function retireUpgrades(upgrades: UpgradesState, mode: ExperienceMode | n
 export function normalizeState(raw: unknown): HubState | null {
   if (typeof raw !== "object" || raw === null || (raw as { version?: unknown }).version !== 1) return null;
   try {
-    // Old saves may still carry the retired First Iron Tool / Priorities slices.
+    // Old saves may still carry the retired First Iron Tool / Priorities /
+    // Mod of the Day slices.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
-    const { firstIronTool, priorities, ...parsed } = raw as Record<string, any>;
+    const { firstIronTool, priorities, modOfDay, ...parsed } = raw as Record<string, any>;
     // Shallow-merge over defaults so a partially-shaped stored value (e.g.
     // from a future field addition) doesn't crash consumers expecting it.
     const base = defaultState();
@@ -291,29 +287,7 @@ export function normalizeState(raw: unknown): HubState | null {
     // an old id saved would otherwise crash every consumer that looks it up
     // in SKINS_BY_ID.
     if (!SKINS_BY_ID[tier2.skin]) tier2.skin = base.tier2.skin;
-    // cardOrder used to be stored as separate { left, right } column lists
-    // (pre the modular single-grid rework) — a visitor with that old shape
-    // still saved gets it interleaved into the new flat list (same pairing
-    // the grid used to render) rather than silently falling back to defaults
-    // and losing their customization.
-    const rawCardOrder = parsed.upgrades?.cardOrder;
-    let cardOrder: ModuleId[] | null = base.upgrades.cardOrder;
-    if (Array.isArray(rawCardOrder)) {
-      cardOrder = rawCardOrder;
-    } else if (rawCardOrder && Array.isArray(rawCardOrder.left) && Array.isArray(rawCardOrder.right)) {
-      const { left, right } = rawCardOrder as { left: ModuleId[]; right: ModuleId[] };
-      cardOrder = [];
-      for (let i = 0; i < Math.max(left.length, right.length); i++) {
-        if (left[i]) cardOrder.push(left[i]);
-        if (right[i]) cardOrder.push(right[i]);
-      }
-    }
-    // Cards and achievements get retired over time — drop ids that no longer
-    // exist, and slot any new card in at the end of a customized order.
-    if (cardOrder) {
-      const known = cardOrder.filter((id, i) => DEFAULT_CARD_ORDER.includes(id) && cardOrder!.indexOf(id) === i);
-      cardOrder = [...known, ...DEFAULT_CARD_ORDER.filter((id) => !known.includes(id))];
-    }
+    // Achievements get retired over time — drop ids that no longer exist.
     const unlocked = Object.fromEntries(
       Object.entries(parsed.unlocked ?? {}).filter(([id]) => id in ACHIEVEMENTS_BY_ID || id.startsWith("custom-"))
     ) as HubState["unlocked"];
@@ -325,12 +299,10 @@ export function normalizeState(raw: unknown): HubState | null {
     const experience = normalizeExperience(parsed.experience);
     const upgrades = retireUpgrades(
       {
-        ...base.upgrades,
-        ...parsed.upgrades,
+        skillPoints: typeof parsed.upgrades?.skillPoints === "number" ? parsed.upgrades.skillPoints : base.upgrades.skillPoints,
         purchased: Array.isArray(parsed.upgrades?.purchased)
           ? parsed.upgrades.purchased.filter((id: unknown): id is string => typeof id === "string")
           : base.upgrades.purchased,
-        cardOrder,
       },
       experience.mode
     );
@@ -342,7 +314,7 @@ export function normalizeState(raw: unknown): HubState | null {
       ...parsed,
       version: 1,
       quiz: { ...base.quiz, ...parsed.quiz },
-      modOfDay: { ...base.modOfDay, ...parsed.modOfDay },
+      relic: normalizeRelic(parsed.relic),
       visits: { ...base.visits, ...parsed.visits },
       experience,
       campfire: normalizeCampfire(parsed.campfire),
@@ -403,24 +375,6 @@ export function applyVisit(visits: HubState["visits"]): HubState["visits"] {
     lastVisitDate: today,
     streakDays: isConsecutive ? visits.streakDays + 1 : 1,
   };
-}
-
-// FNV-1a (engine/rng.ts) — deterministic, tiny, no dependency. Same date
-// string always hashes the same way, so every visitor sees the same
-// mod-of-the-day.
-
-export function pickModOfDay(mods: Mod[], dateStr: string = todayUTC()): Mod | null {
-  const pool = mods.filter((m) => !m.disabled && m.iconUrl);
-  if (pool.length === 0) return null;
-  const index = hashString(dateStr) % pool.length;
-  return pool[index];
-}
-
-// Same date-seeded trick as pickModOfDay, generalized for any pool — used
-// by BtwFieldNotes so every visitor sees the same tip on a given day.
-export function pickByDate<T>(pool: readonly T[], dateStr: string = todayUTC()): T | null {
-  if (pool.length === 0) return null;
-  return pool[hashString(dateStr) % pool.length];
 }
 
 // Desktop-only: a phone never counts as enabled (see device.ts).

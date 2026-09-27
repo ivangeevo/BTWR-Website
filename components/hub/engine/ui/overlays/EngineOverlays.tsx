@@ -94,7 +94,7 @@ export function EurekaLayer() {
         const top = r && col ? Math.max(r.top, col.top) : r?.top ?? 0;
         const bottom = r && col ? Math.min(r.bottom, col.bottom) : r?.bottom ?? 0;
         const cover = coverRef.current;
-        // The target is the card's cell (HubSection's CardCell); the lit panel is the card inside it.
+        // The target is a Camp rail section (CampRail.tsx) or the Engine's view, lit itself or holding a lit panel.
         const lit = !!(el?.closest(".outpost-lit") || el?.querySelector(":scope > * > .outpost-lit"));
         const covered = cover.picker || (cover.gloom && !lit);
         if (el && r && r.width > 0 && bottom - top > 24 && !covered) {

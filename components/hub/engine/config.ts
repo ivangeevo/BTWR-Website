@@ -233,14 +233,14 @@ export class EngineGateMechanic {
     field("s5Iron", "→5 iron", "Iron on hand.", 0, 500, 1),
     field("s5Cost", "→5 insight cost", "Insight spent to advance.", 0, 1e12, 1),
     field("s6Caesar", "→6 dial ciphers", "Caesar-dial ciphers solved.", 0, 10, 1),
-    field("s6QuizCorrect", "→6 quiz answers", "Correct Guess the Mod answers.", 0, 500, 1),
+    field("s6QuizCorrect", "→6 relics named", "Relics named right in Gathering.", 0, 500, 1),
     field("s6Cost", "→6 insight cost", "Insight spent to advance.", 0, 1e13, 1),
     field("s7DetectorUses", "→7 detector uses", "Detector Block uses.", 0, 100, 1),
     field("s7Components", "→7 components", "Components owned in total.", 0, 1000, 1),
     field("s7Meals", "→7 meals", "Meals cooked at the Campfire, lifetime.", 0, 1000, 1),
     field("s7Cost", "→7 insight cost", "Insight spent to advance.", 0, 1e15, 1),
     field("s8CorePU", "→8 steady power", "Steady power reaching the Engine's core (crank not counted).", 0, 100, 1, "PU"),
-    field("s8QuizCorrect", "→8 quiz answers", "Correct Guess the Mod answers, lifetime.", 0, 2000, 1),
+    field("s8QuizCorrect", "→8 relics named", "Relics named right in Gathering, lifetime.", 0, 2000, 1),
     field("s8Cost", "→8 insight cost", "Insight spent to advance.", 0, 1e18, 1),
   ];
 }

@@ -6,11 +6,13 @@ import Campfire, { CampfireStatus } from "./Campfire";
 import CraftingCard, { CraftingStatus } from "./CraftingCard";
 import Gathering, { GatheringStatus } from "./Gathering";
 import ResourceToolStrip from "./ResourceToolStrip";
+import TonightsSky, { useTonightsSkyShown } from "./TonightsSky";
 import UpgradesPanel, { UpgradesStatus, useUpgradesShown } from "./UpgradesPanel";
 
 // The Camp rail: Basecamp's always-on-screen column for survival work
-// (HubSection.tsx). Stats & Materials sit at the top, always open; under
-// them the Campfire, Gathering, Crafting and the Upgrades shop fold like an
+// (HubSection.tsx). Stats & Materials sit at the top, always open, with
+// Tonight's Sky fixed under them once it's bought (TonightsSky.tsx). Below,
+// the Campfire, Gathering, Crafting and the Upgrades shop fold like an
 // accordion — one open at a time, filling what height is left (and
 // scrolling inside itself), so the rail itself never scrolls. A folded
 // section's header still says what's going on in it (each card's *Status).
@@ -18,7 +20,7 @@ import UpgradesPanel, { UpgradesStatus, useUpgradesShown } from "./UpgradesPanel
 // running carries on while another section is open.
 //
 // No stacking context on the rail itself (no transform, filter or z-index):
-// the Campfire section and Stats are lit above the gloom (.outpost-lit),
+// the Campfire section, Stats and Tonight's Sky are lit above the gloom (.outpost-lit),
 // which only works while nothing around them traps their z-index.
 
 type SectionId = "campfire" | "gathering" | "crafting" | "upgrades";
@@ -119,6 +121,7 @@ export function useCampRailShown(): boolean {
 export default function CampRail() {
   const { isModuleRevealed, gloomLevel } = useAchievements();
   const upgradesShown = useUpgradesShown();
+  const skyShown = useTonightsSkyShown();
   const [open, setOpenState] = useState<SectionId | null>("campfire");
   // What's running inside, for the folded headers.
   const [cooking, setCooking] = useState(false);
@@ -148,6 +151,7 @@ export default function CampRail() {
   return (
     <aside aria-label="Camp" className="outpost-camp-rail">
       {isModuleRevealed("resource-tool-strip") && <ResourceToolStrip />}
+      {skyShown && <TonightsSky />}
       {shown.campfire && (
         <Section
           id="campfire"

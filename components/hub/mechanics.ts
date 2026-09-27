@@ -102,6 +102,14 @@ export class CampfireMechanic {
 export class GatheringMechanic {
   /** Shared rest timer after any Wood Gathering/Hunting/Mining completion, in ms. */
   activityCooldownMs = 10_000;
+  /** Chance a Wood Chopping or Hunting trip turns up a relic (relics.ts), in percent. */
+  relicChancePct = 12;
+  /** The same for Mining — digs find more of them. */
+  relicChanceMiningPct = 18;
+  /** Engine stage relics start turning up at (4 = First Iron). */
+  relicStage = 4;
+  /** A named relic pays about this many trips' worth of what the trip gathers. */
+  relicCacheTrips = 3;
 
   static readonly configFields: MechanicConfigField[] = [
     {
@@ -112,6 +120,41 @@ export class GatheringMechanic {
       max: 120_000,
       step: 1000,
       suffix: "ms",
+    },
+    {
+      key: "relicChancePct",
+      label: "Relic chance",
+      description: "Chance a Wood Chopping or Hunting trip turns up an unidentified relic.",
+      min: 0,
+      max: 100,
+      step: 1,
+      suffix: "%",
+    },
+    {
+      key: "relicChanceMiningPct",
+      label: "Relic chance (Mining)",
+      description: "Chance a Mining trip turns up an unidentified relic.",
+      min: 0,
+      max: 100,
+      step: 1,
+      suffix: "%",
+    },
+    {
+      key: "relicStage",
+      label: "Relics from stage",
+      description: "Engine stage relics start turning up at.",
+      min: 1,
+      max: 8,
+      step: 1,
+    },
+    {
+      key: "relicCacheTrips",
+      label: "Relic cache size",
+      description: "A named relic pays about this many trips' worth of what that trip gathers.",
+      min: 1,
+      max: 20,
+      step: 1,
+      suffix: "trips",
     },
   ];
 }

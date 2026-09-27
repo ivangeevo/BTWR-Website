@@ -719,7 +719,7 @@ html.daynight-fighting .outpost-zone::after {
 .outpost-frame {
   position: relative;
   /* Defaults for the whole card — header, corners, progress bar, and every
-     shared component (ModOfTheDay, PatchNotes, GuessTheMod,
+     shared component (the Camp rail's sections, the Engine,
      AchievementGallery) read these. Once tier 2 unlocks and a skin is
      picked, HubSection overrides these three right here via inline style,
      so the WHOLE outpost card retints, not just the tier-2 module nested
@@ -2372,31 +2372,6 @@ html.daynight-fighting .outpost-zone::after {
   animation: engine-reveal-glow 2.6s ease-out;
 }
 
-/* Card reordering (use-card-reorder.ts): the lifted card's cell stays behind
-   as a dashed "it'll land here" slot, and nothing on the page selects text
-   or shows another cursor while a card is held. */
-.outpost-card-placeholder::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border: 2px dashed var(--outpost-accent, #d98a4a);
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
-  opacity: 0.55;
-  pointer-events: none;
-}
-/* The card panels are translucent over the grid; a held card gets a solid
-   backing so the cards it passes over don't show through it. */
-.outpost-card-lifted {
-  background: #221a15;
-  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.65);
-}
-html.outpost-card-dragging,
-html.outpost-card-dragging * {
-  cursor: grabbing !important;
-  user-select: none !important;
-}
 
 /* ---------------------------------------------------------------------------
    Achievements tab — Minecraft-style advancement screen (AchievementGallery.tsx).
@@ -2701,18 +2676,6 @@ html.outpost-card-dragging * {
   }
 }
 
-/* Basecamp's Engine / Notice Board switch (HubSection.tsx). */
-.outpost-view-switch {
-  display: flex;
-  flex-shrink: 0;
-  align-self: flex-start;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  border-radius: 0.6rem;
-  border: 1px solid rgba(180, 140, 100, 0.18);
-  background: rgba(36, 26, 18, 0.55);
-}
-
 /* The Camp rail (CampRail.tsx): Stats & Materials, then an accordion of
    the survival work. On a wide screen it's a fixed-width column exactly as
    tall as Basecamp; the open section takes the height the folded ones
@@ -2793,13 +2756,6 @@ html.outpost-card-dragging * {
   .outpost-camp-rail {
     width: 23rem;
   }
-}
-
-/* An expanded card drops its fixed height and shows everything. */
-.outpost-card-expanded .outpost-card-md,
-.outpost-card-expanded .outpost-card-lg {
-  min-height: 0;
-  max-height: none;
 }
 
 /* Thin, themed scrollbars on the Outpost's scrolling columns. */
