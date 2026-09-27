@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeCyclePhase,
+  freshCycleStartedAt,
   gloomDarkness,
   isGloomNight,
   jumpCycle,
@@ -28,6 +29,19 @@ describe("gloom nights", () => {
     expect(gloomDarkness(computeCyclePhase(T0, T0 + PHASE_MS + 1000))).toBeCloseTo(0.4); // twilight gap
     expect(gloomDarkness(computeCyclePhase(T0, T0 + SEGMENT * 1.5))).toBe(1);
     expect(gloomDarkness(computeCyclePhase(T0, T0 + CYCLE + SEGMENT * 1.5))).toBe(0);
+  });
+});
+
+describe("a fresh cycle", () => {
+  it("opens on a Full Moon morning, with the first gloom night half a lunar month off", () => {
+    const start = freshCycleStartedAt(T0);
+    const now = computeCyclePhase(start, T0);
+    expect(now.isDay).toBe(true);
+    expect(now.bodyProgress).toBe(0);
+    expect(now.moonPhaseIndex).toBe(4);
+    expect(isGloomNight(computeCyclePhase(start, T0 + SEGMENT + 1000))).toBe(false);
+    expect(nightForecast(start, T0 + 3 * CYCLE + 1000).isGloom).toBe(false);
+    expect(nightForecast(start, T0 + 4 * CYCLE + 1000).isGloom).toBe(true);
   });
 });
 

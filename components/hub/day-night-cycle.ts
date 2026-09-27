@@ -45,13 +45,21 @@ export function loadCycleStartedAt(): number {
   } catch {
     // fall through to establishing a fresh anchor
   }
-  const now = Date.now();
+  const startedAt = freshCycleStartedAt();
   try {
-    window.localStorage.setItem(CYCLE_KEY, JSON.stringify({ startedAt: now }));
+    window.localStorage.setItem(CYCLE_KEY, JSON.stringify({ startedAt }));
   } catch {
     // localStorage unavailable — the cycle still works, it just restarts every load
   }
-  return now;
+  return startedAt;
+}
+
+// A brand-new cycle opens on the morning of a Full Moon, not a New Moon: the
+// first night is a bright one, and the first gloom night is half a lunar
+// month away — time to get a fire going before the dark actually bites.
+const FULL_MOON_INDEX = 4;
+export function freshCycleStartedAt(now: number = Date.now()): number {
+  return now - FULL_MOON_INDEX * FULL_CYCLE_MS;
 }
 
 export type CyclePhase = {
