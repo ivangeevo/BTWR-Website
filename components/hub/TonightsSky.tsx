@@ -12,8 +12,17 @@ import { isFullMoon, isNewMoon } from "./tier2";
 // only warning there is: without it the page just starts to darken at
 // sunset, GloomLayer.tsx). Otherwise it reads the real-world moon.
 // .outpost-lit, like Stats: a gloom warning has to stay readable in the gloom.
+// It forecasts the Engine's night too — the two keep one clock (engine/economy.ts's clockMult).
 
-type SkyReading = { label: string; caption: string; icon: string; warn?: boolean };
+type SkyReading = { label: string; caption: string; icon: string; warn?: boolean; fullMoon?: boolean; gloom?: boolean };
+
+// What tonight means for the Engine. Null before it has a night worth mentioning.
+function engineNote(stage: number, sky: SkyReading): string | null {
+  if (stage < 3) return null;
+  if (sky.gloom && stage >= 4) return "\u{2699}\u{FE0F} Keep the Engine's core turning: its light holds part of the gloom back.";
+  if (sky.fullMoon) return "\u{2699}\u{FE0F} Full moon: the Engine's Eureka sparks come far more often.";
+  return "\u{2699}\u{FE0F} Nights are for thinking: the Engine's sentences and ciphers pay more.";
+}
 
 function formatClock(ms: number): string {
   const total = Math.ceil(ms / 1000);
@@ -31,6 +40,8 @@ function readCycleSky(): SkyReading {
         : `Dawn in ${formatClock(f.msUntilDawn)}.`,
       icon: moon.icon,
       warn: f.isGloom,
+      fullMoon: f.moonPhaseIndex === 4,
+      gloom: f.isGloom,
     };
   }
   return {
@@ -40,6 +51,8 @@ function readCycleSky(): SkyReading {
       : `Dusk in ${formatClock(f.msUntilNight)}.`,
     icon: moon.icon,
     warn: f.isGloom,
+    fullMoon: f.moonPhaseIndex === 4,
+    gloom: f.isGloom,
   };
 }
 
@@ -71,7 +84,7 @@ export function useTonightsSkyShown(): boolean {
 }
 
 export default function TonightsSky() {
-  const { survivalActive } = useAchievements();
+  const { survivalActive, engine } = useAchievements();
   const [sky, setSky] = useState<SkyReading | null>(null);
 
   // The Outpost's own cycle once it's running (survival forces it on), else
@@ -101,6 +114,9 @@ export default function TonightsSky() {
             <p className={`text-xs leading-snug ${sky.warn ? "font-semibold text-rose-300" : "text-slate-400"}`}>
               {sky.caption}
             </p>
+            {engineNote(engine.stage, sky) && (
+              <p className="mt-0.5 text-[11px] leading-snug text-[var(--outpost-accent)]">{engineNote(engine.stage, sky)}</p>
+            )}
           </div>
         </div>
       ) : (

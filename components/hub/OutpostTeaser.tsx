@@ -43,6 +43,9 @@ export default function OutpostTeaser() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [view]);
 
+  // Stage 0 (engine/content/stirring.ts): it has no name yet, so neither does this.
+  const dark = pub?.stage === 0;
+
   if (view === "hidden") return null;
   if (view === "phone") {
     return (
@@ -59,13 +62,19 @@ export default function OutpostTeaser() {
           <OutpostCorners />
           <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
             <div className="min-w-0">
-              <span className="outpost-status-tag">
-                <span className="outpost-status-dot outpost-status-dot-online" aria-hidden="true" />
-                Outpost Online
-              </span>
-              <p className="mt-2 font-heading text-xl font-extrabold tracking-wide text-white">The Outpost</p>
+              {dark ? (
+                <span className="outpost-status-tag">…</span>
+              ) : (
+                <span className="outpost-status-tag">
+                  <span className="outpost-status-dot outpost-status-dot-online" aria-hidden="true" />
+                  Outpost Online
+                </span>
+              )}
+              <p className="mt-2 font-heading text-xl font-extrabold tracking-wide text-white">{dark ? "???" : "The Outpost"}</p>
               <p className="mt-0.5 text-sm text-slate-400">
-                {pub ? (
+                {dark ? (
+                  "something is here."
+                ) : pub ? (
                   <>
                     {pub.title} · {formatInsight(pub.insight)} insight
                     {pub.ips > 0 ? ` · ${formatInsight(pub.ips)}/s` : ""}
@@ -79,7 +88,7 @@ export default function OutpostTeaser() {
               href="/outpost"
               className="btn-glow shrink-0 rounded-lg border border-[var(--outpost-accent)] px-5 py-2.5 text-sm font-semibold text-[var(--outpost-accent)] hover:bg-[var(--outpost-accent-soft)]"
             >
-              Enter the Outpost {"→"}
+              {dark ? "Enter" : "Enter the Outpost"} {"→"}
             </Link>
           </div>
         </div>

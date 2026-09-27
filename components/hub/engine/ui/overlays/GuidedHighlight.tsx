@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { pendingTutorial } from "../../content/tutorials";
 import { useEngine } from "../EngineProvider";
 
@@ -39,10 +39,17 @@ function outlineOf(el: HTMLElement): Outline {
 // The Engine teaching a new mechanic in its own voice — a ring around the
 // thing it's talking about and a speech bubble below it. One tutorial at a
 // time, 1–3 steps each, skippable; the Logbook can replay any of them.
+// "Disable tutorials" switches them all off (after a confirm).
 export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLElement> }) {
-  const { e, ceremony, markTutorialSeen } = useEngine();
+  const { e, ceremony, markTutorialSeen, setTutorialsOff } = useEngine();
   const tut = ceremony ? null : pendingTutorial(e);
   const [step, setStep] = useState(0);
+  // "Disable tutorials" asks first; turning them back on lives in OutpostSettings.tsx.
+  const [confirmOff, setConfirmOff] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (confirmOff) cancelRef.current?.focus();
+  }, [confirmOff]);
   const [rect, setRect] = useState<Outline | null>(null);
   // Holds off while a just-decoded cipher page is playing out (CipherPanel),
   // so the next lesson doesn't land on top of the moment it unlocked.
@@ -132,9 +139,18 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
       >
         <p className="text-xs text-white">{s.line}</p>
         <div className="mt-1.5 flex items-center justify-between gap-2">
-          <button type="button" onClick={() => markTutorialSeen(tut.id)} className="text-[0.7rem] text-slate-400 hover:text-white">
-            Skip
-          </button>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => markTutorialSeen(tut.id)} className="text-[0.7rem] text-slate-400 hover:text-white">
+              Skip
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmOff(true)}
+              className="text-[0.7rem] text-rose-400 hover:text-rose-300 hover:underline"
+            >
+              Disable tutorials
+            </button>
+          </div>
           <span className="text-[0.6rem] text-white/30">
             {step + 1}/{tut.steps.length}
           </span>
@@ -147,6 +163,47 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
           </button>
         </div>
       </div>
+      {confirmOff && (
+        <div
+          className="absolute inset-0 z-[22] flex items-center justify-center bg-black/60 p-4"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="engine-tutorials-off-title"
+          aria-describedby="engine-tutorials-off-desc"
+          data-no-drag
+          onKeyDown={(ev) => ev.key === "Escape" && setConfirmOff(false)}
+        >
+          <div className="outpost-materialize w-full max-w-xs rounded-lg border border-rose-400/40 bg-[rgba(24,17,11,0.98)] p-3 shadow-xl">
+            <p id="engine-tutorials-off-title" className="text-sm font-semibold text-white">
+              Disable tutorials?
+            </p>
+            <p id="engine-tutorials-off-desc" className="mt-1 text-xs text-slate-300">
+              The Engine won&rsquo;t pop up to explain new things anymore. You can turn them back on any time in
+              the Outpost&rsquo;s settings menu ({"⚙️"}).
+            </p>
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                ref={cancelRef}
+                type="button"
+                onClick={() => setConfirmOff(false)}
+                className="rounded-md border border-white/15 px-2.5 py-1 text-xs text-slate-300 hover:border-white/40 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmOff(false);
+                  setTutorialsOff(true);
+                }}
+                className="rounded-md border border-rose-400/60 bg-rose-500/15 px-2.5 py-1 text-xs font-semibold text-rose-300 hover:bg-rose-500/25"
+              >
+                Disable
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

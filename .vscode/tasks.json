@@ -22,6 +22,34 @@
           "endsPattern": "Ready in"
         }
       }
+    },
+    {
+      "label": "dev (player view)",
+      "type": "shell",
+      "command": "npm.cmd run dev -- -p 3001",
+      "options": {
+        "env": {
+          "NEXT_PUBLIC_OUTPOST_ADMIN": "0",
+          "NEXT_DIST_DIR": ".next-player"
+        }
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated"
+      },
+      "problemMatcher": {
+        "owner": "custom",
+        "pattern": {
+          "regexp": "^NEVER_MATCH_ANYTHING_XKCD$",
+          "message": 0
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Starting",
+          "endsPattern": "Ready in"
+        }
+      }
     }
   ]
 }

@@ -2,6 +2,7 @@
 
 import { useCooldownRemaining } from "./activity-common";
 import { useAchievements } from "./AchievementsProvider";
+import { strandedLine } from "./engine/content/camp-voice";
 import { DEATH_CAUSE_TEXT, formatHalves } from "./survival";
 
 function formatClock(ms: number): string {
@@ -14,7 +15,7 @@ function formatClock(ms: number): string {
 // end time, so it keeps going with the tab closed — coming back later just
 // finds you home.
 export default function StrandedPanel({ className = "" }: { className?: string }) {
-  const { survival, stranded } = useAchievements();
+  const { survival, stranded, engine, engineBuffs } = useAchievements();
   const remainingMs = useCooldownRemaining(survival.stranded?.trekEndsAt ?? null);
   if (!stranded || !survival.stranded) return null;
 
@@ -52,6 +53,10 @@ export default function StrandedPanel({ className = "" }: { className?: string }
         </span>
       </div>
 
+      {/* The Engine, left alone at camp (engine/content/camp-voice.ts). */}
+      <p className="mt-1.5 text-[11px] italic leading-snug text-slate-300">
+        {strandedLine(engine.stage, engineBuffs.coreLit, !!survival.stranded.calledHome)}
+      </p>
       <p className="mt-1.5 text-[11px] leading-snug text-slate-400">
         Finding your way back to camp. Crafting is out of reach until you&apos;re home. Your Campfire comes with you,
         and Gathering still works.

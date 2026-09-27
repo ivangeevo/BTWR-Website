@@ -4,6 +4,7 @@ import { researchEffects } from "./catalog/research";
 import { DEFAULT_ENGINE_CONFIG as cfg, resolveEngineConfig } from "./config";
 import {
   bulkCost,
+  clockMult,
   componentCost,
   computeIps,
   formatInsight,
@@ -191,5 +192,16 @@ describe("formatInsight", () => {
     expect(formatInsight(1234)).toBe("1.23K");
     expect(formatInsight(56_700_000)).toBe("56.7M");
     expect(formatInsight(5.6e9)).toBe("5.60B");
+  });
+});
+
+describe("one clock with the camp", () => {
+  it("thinks better by night and builds better by day", () => {
+    const night = { night: true, fullMoon: false };
+    const day = { night: false, fullMoon: false };
+    expect(clockMult("think", night, cfg)).toBeCloseTo(1 + cfg.economy.nightThinkPct / 100);
+    expect(clockMult("think", day, cfg)).toBe(1);
+    expect(clockMult("build", day, cfg)).toBeCloseTo(1 + cfg.economy.dayBuildPct / 100);
+    expect(clockMult("build", night, cfg)).toBe(1);
   });
 });

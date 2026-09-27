@@ -28,6 +28,14 @@ function site(over: Partial<GateSite> = {}): GateSite {
 }
 
 describe("stage gates", () => {
+  it("Day One opens only once it has spelled its name", () => {
+    const e = defaultEngineState();
+    const g = evaluateGate(1, e, cfg.gates, site());
+    expect(g.met).toBe(false);
+    expect(g.cost).toBe(0);
+    expect(evaluateGate(1, { ...e, stirring: { found: ["P", "O", "N", "D", "E", "R"], woke: true } }, cfg.gates, site()).met).toBe(true);
+  });
+
   it("Day Two needs solves AND (a return visit or achievements)", () => {
     const e = { ...defaultEngineState(), solvedCount: 8 };
     expect(evaluateGate(2, e, cfg.gates, site()).met).toBe(false);

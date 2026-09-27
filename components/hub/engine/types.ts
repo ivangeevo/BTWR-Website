@@ -2,7 +2,10 @@
 // state.ts for defaults). Pure data shapes only — no React, no storage — so
 // every engine/*.ts module and its tests can import from here freely.
 
-export type EngineStage = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+// Stage 0 ("???", engine/content/stirring.ts) is where a new save starts:
+// before the Engine has words. It isn't in ENGINE_STAGES, which lists the
+// eight real chapters (replays, admin/debug stage pickers).
+export type EngineStage = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export const ENGINE_STAGES: EngineStage[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export type BeliefAxis = "hardcore" | "homesteader" | "soulforger";
@@ -175,12 +178,23 @@ export type EnginePublic = {
   fragments: string[];
 };
 
+export type CampLogEntry = { at: string; text: string };
+
 export type EngineState = {
   // ---------- MIND (survives prestige) ----------
   stage: EngineStage;
   stageEnteredAt: Partial<Record<EngineStage, string>>;
   ceremoniesSeen: number[];
   tutorialsSeen: string[];
+  /** Tutorial pop-ups switched off from a tutorial bubble; back on from the Logbook. */
+  tutorialsOff: boolean;
+  /**
+   * Stage 0's letters found in the dark, and whether it has woken (spelled
+   * its name). Null for a save that never had a Stage 0 (started before it existed).
+   */
+  stirring: { found: string[]; woke: boolean } | null;
+  /** The camp's log, newest first: deaths, treks home, gloom nights, firsts (content/camp-voice.ts). Shown in Soul. */
+  campLog: CampLogEntry[];
   solvedCount: number;
   choicesMade: number;
   solvesByKind: { tiles: number; fork: number; modFact: number; live: number; paragraph: number };
@@ -253,7 +267,7 @@ export type EngineState = {
 
 /** Environment facts the pure logic needs but can't read itself. */
 export type EngineEnv = {
-  /** Site sky cycle active and currently night (bonus flavour only). */
+  /** Night on the site's sky cycle, or on the real clock (19:00–06:00) while the cycle is off. */
   night: boolean;
   /** Site sky cycle active and at full moon (phase index 4). */
   fullMoon: boolean;

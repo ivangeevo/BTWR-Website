@@ -91,11 +91,13 @@ function DecodedPage({ page, onDone }: { page: Solved; onDone: () => void }) {
 // Decoding the Engine's lost blueprints. The board shows the scrambled page
 // word by word; what you've worked out so far fills in underneath.
 export default function CipherPanel() {
-  const { e, fx, store, ensureCipher, cipherGuess, cipherDial, cipherKeyword, cipherHint } = useEngine();
+  const { e, fx, store, ensureCipher, cipherGuess, cipherDial, cipherConfirm, cipherKeyword, cipherHint } = useEngine();
   const ips = useLive(store, (s) => s.ips);
   const [selected, setSelected] = useState<string | null>(null);
   const [keyword, setKeyword] = useState("");
   const [keywordWrong, setKeywordWrong] = useState(false);
+  // Decode pressed on dials that don't read yet; cleared by the next turn.
+  const [dialWrong, setDialWrong] = useState(false);
   const [decoded, setDecoded] = useState<Solved | null>(null);
   const shownRef = useRef<Omit<Solved, "plain" | "unlocked"> | null>(null);
 
@@ -240,8 +242,26 @@ export default function CipherPanel() {
       ) : (
         <div className="mt-2 flex flex-wrap items-center gap-4">
           {puzzle.shifts.map((_, i) => (
-            <Dial key={i} label={puzzle.shifts.length > 1 ? (i === 0 ? "Odd letters" : "Even letters") : "Shift"} value={cur.dials[i] ?? 0} onChange={(v) => cipherDial(i, v)} />
+            <Dial
+              key={i}
+              label={puzzle.shifts.length > 1 ? (i === 0 ? "Odd letters" : "Even letters") : "Shift"}
+              value={cur.dials[i] ?? 0}
+              onChange={(v) => {
+                cipherDial(i, v);
+                setDialWrong(false);
+              }}
+            />
           ))}
+          <div className="flex flex-col items-start gap-1">
+            <button
+              type="button"
+              onClick={() => setDialWrong(!cipherConfirm())}
+              className="rounded-md border border-[var(--outpost-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--outpost-accent)] hover:bg-[var(--outpost-accent-soft)]"
+            >
+              Decode
+            </button>
+            {dialWrong && <span className="text-[0.65rem] text-red-400">It doesn&rsquo;t read yet. Keep turning.</span>}
+          </div>
         </div>
       )}
 

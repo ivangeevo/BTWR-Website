@@ -6,7 +6,7 @@
 import type { ComponentDef } from "./catalog/components";
 import type { ResearchEffects } from "./catalog/research";
 import type { EngineConfig } from "./config";
-import type { ComponentId, EngineStage, EngineState } from "./types";
+import type { ComponentId, EngineEnv, EngineStage, EngineState } from "./types";
 
 /** Flat reward floor per stage (index = stage), so early solves matter before insight/sec exists. */
 export const STAGE_FLAT = [0, 2, 3, 5, 20, 100, 1_000, 10_000, 100_000];
@@ -233,6 +233,16 @@ export function cipherBurst(e: EngineState, ips: number, cfg: EngineConfig, fx: 
 
 export function crankRevValue(ips: number, fx: ResearchEffects): number {
   return 1 + fx.clickFrac * ips;
+}
+
+/**
+ * One clock with the camp: by day the Engine builds (the crank yields
+ * more), by night it thinks (sentences and ciphers pay more). `env.night`
+ * follows the site's day/night cycle, or the real clock without it.
+ */
+export function clockMult(kind: "think" | "build", env: EngineEnv, cfg: EngineConfig): number {
+  if (kind === "think") return env.night ? 1 + cfg.economy.nightThinkPct / 100 : 1;
+  return env.night ? 1 : 1 + cfg.economy.dayBuildPct / 100;
 }
 
 export function crankRevMs(e: EngineState, cfg: EngineConfig, fx: ResearchEffects, at: number): number {

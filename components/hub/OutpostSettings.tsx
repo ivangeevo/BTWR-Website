@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { enableOutpostAdmin } from "@/lib/site-config";
 import { useAchievements } from "./AchievementsProvider";
 import { DAY_NIGHT_STAGE } from "./day-night-cycle";
+import { useEngineOptional } from "./engine/ui/EngineProvider";
 import type { OutpostSettings as OutpostSettingsState } from "./hub-storage";
 
 function ToggleRow({
@@ -55,6 +57,11 @@ export default function OutpostSettings() {
   const { settings, updateSettings, survivalActive, engine } = useAchievements();
   // The cycle arrives with The Stump — before that there's nothing to switch.
   const cycleReached = engine.stage >= DAY_NIGHT_STAGE;
+  // Ponder's tutorial pop-ups can be switched off from a tutorial bubble
+  // (GuidedHighlight.tsx), which points here for turning them back on. Shown
+  // once there's been a tutorial to switch off.
+  const engineCtx = useEngineOptional();
+  const showTutorialToggle = !!engineCtx && (engine.tutorialsOff || engine.tutorialsSeen.length > 0);
   const [open, setOpen] = useState(false);
   const [bouncing, setBouncing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -110,14 +117,17 @@ export default function OutpostSettings() {
 
       {open && (
         <div className="outpost-settings-dropdown" role="menu">
-          <p className="text-xs font-bold uppercase tracking-wider text-white/40">Outpost Settings</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-white/40">{engine.stage > 0 ? "Outpost Settings" : "Settings"}</p>
           <div className="mt-1.5 divide-y divide-white/10">
-            <ToggleRow
-              label="Achievement notifications"
-              description="Show a toast when you unlock something."
-              checked={settings.toastsEnabled}
-              onChange={(v) => set({ toastsEnabled: v })}
-            />
+            {/* Not at Stage 0 ("???"): nothing there admits to having achievements yet. */}
+            {engine.stage > 0 && (
+              <ToggleRow
+                label="Achievement notifications"
+                description="Show a toast when you unlock something."
+                checked={settings.toastsEnabled}
+                onChange={(v) => set({ toastsEnabled: v })}
+              />
+            )}
             <ToggleRow
               label="Reduced motion"
               description="Turn off animations inside the Outpost."
@@ -145,14 +155,24 @@ export default function OutpostSettings() {
                 />
               </>
             )}
+            {showTutorialToggle && (
+              <ToggleRow
+                label="Ponder tutorials"
+                description="Pop-ups where the Engine walks you through something new."
+                checked={!engine.tutorialsOff}
+                onChange={(v) => engineCtx?.setTutorialsOff(!v)}
+              />
+            )}
           </div>
-          <Link
-            href="/outpost-admin"
-            className="mt-3 flex items-center justify-center gap-1.5 rounded-md border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/70 transition-colors hover:border-[var(--outpost-accent)] hover:text-[var(--outpost-accent)]"
-          >
-            <span aria-hidden="true">{"\u{1F6E0}\u{FE0F}"}</span>
-            Open Admin Panel
-          </Link>
+          {enableOutpostAdmin && (
+            <Link
+              href="/outpost-admin"
+              className="mt-3 flex items-center justify-center gap-1.5 rounded-md border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/70 transition-colors hover:border-[var(--outpost-accent)] hover:text-[var(--outpost-accent)]"
+            >
+              <span aria-hidden="true">{"\u{1F6E0}\u{FE0F}"}</span>
+              Open Admin Panel
+            </Link>
+          )}
         </div>
       )}
     </div>

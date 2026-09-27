@@ -69,6 +69,18 @@ describe("normalizeState (shared by page load and import)", () => {
     expect("priorities" in raw).toBe(true);
   });
 
+  it("starts only a brand-new save at Stage 0", () => {
+    expect(defaultState().engine.stage).toBe(0);
+    // Saved before the Engine existed: already playing, so Stage 1.
+    const old = normalizeState({ version: 1, unlocked: { "first-visit": "x" } })!;
+    expect(old.engine.stage).toBe(1);
+    expect(old.engine.stirring).toBeNull();
+    // A new save written by the Community switch keeps its Stage 0.
+    const fresh = normalizeState(JSON.parse(JSON.stringify(defaultState())))!;
+    expect(fresh.engine.stage).toBe(0);
+    expect(fresh.engine.stirring).toEqual({ found: [], woke: false });
+  });
+
   it("refunds upgrades the shop no longer sells, once", () => {
     const raw = {
       version: 1,

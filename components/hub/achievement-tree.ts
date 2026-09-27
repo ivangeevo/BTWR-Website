@@ -35,6 +35,7 @@ const ROWS: Row[] = [
 
   // The Analytical Engine — follows its stages
   ["en-day-two", null],
+  ["en-before-words", "en-day-two"],
   ["en-first-ask", "en-day-two"],
   ["en-believer", "en-first-ask", "goal"],
   ["en-true-believer", "en-believer"],

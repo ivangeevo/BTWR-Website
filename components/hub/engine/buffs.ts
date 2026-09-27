@@ -3,6 +3,12 @@
 // the STEADY (idle) solve, never the crank — so a per-run bonus can't flicker
 // on and off mid-hold. Each powered copy stacks. What the crank turns by
 // hand yields directly instead (see crankRev in EngineProvider).
+//
+// The core itself is a light at camp: with steady power reaching it, it
+// holds back part of the gloom and calls you home faster after a death
+// (survival.ts; the survival tick in AchievementsProvider applies both).
+// A powered Hibachi is a fire in its own right, so it shelters like the
+// Campfire.
 import type { ResearchEffects } from "./catalog/research";
 import type { EngineConfig } from "./config";
 import type { EngineState, GridPartType } from "./types";
@@ -22,6 +28,12 @@ export type EngineBuffs = {
   /** Extra of each ore found per Mining run (all powered Bellows). */
   bellowsOre: number;
   detectorMaxCharges: number;
+  /** Steady power reaches the core (Stage 4+, clutch engaged). */
+  coreLit: boolean;
+  /** 0..1 of the gloom the lit core holds back. */
+  gloomShield: number;
+  /** Multiplier on the Hardcore Spawn trek home (< 1 = shorter). */
+  trekMult: number;
 };
 
 export const NO_BUFFS: EngineBuffs = {
@@ -35,6 +47,9 @@ export const NO_BUFFS: EngineBuffs = {
   millStone: 0,
   bellowsOre: 0,
   detectorMaxCharges: 0,
+  coreLit: false,
+  gloomShield: 0,
+  trekMult: 1,
 };
 
 /** How many unbroken parts of each type the steady (idle) solve powers. */
@@ -54,10 +69,23 @@ export function poweredPartTypes(e: EngineState): Set<GridPartType> {
   return new Set(poweredPartCounts(e).keys());
 }
 
+/** Whether steady (idle) power reaches the core right now. */
+export function coreIsLit(e: EngineState): boolean {
+  return e.stage >= 4 && e.grid.clutch && !!e.solved && e.solved.idle.corePU > 0;
+}
+
 export function computeBuffs(e: EngineState, cfg: EngineConfig, fx: ResearchEffects): EngineBuffs {
-  const counts = poweredPartCounts(e);
-  if (counts.size === 0) return NO_BUFFS;
   const b = cfg.buffs;
+  const lit = coreIsLit(e);
+  const core = lit
+    ? {
+        coreLit: true,
+        gloomShield: Math.min(1, Math.max(0, b.coreLightPct / 100)),
+        trekMult: Math.max(0.1, 1 - b.coreTrekPct / 100),
+      }
+    : { coreLit: false, gloomShield: 0, trekMult: 1 };
+  const counts = poweredPartCounts(e);
+  if (counts.size === 0) return { ...NO_BUFFS, ...core };
   const home = e.specialization === "homesteader" ? 1 + b.homesteaderAttachPct / 100 : 1;
   const saws = counts.get("saw") ?? 0;
   const mills = counts.get("millstone") ?? 0;
@@ -73,6 +101,7 @@ export function computeBuffs(e: EngineState, cfg: EngineConfig, fx: ResearchEffe
     millStone: Math.round(mills * b.millstoneStone * fx.millMult * home),
     bellowsOre: Math.round(bellows * b.bellowsOre * fx.bellowsMult * home),
     detectorMaxCharges: counts.has("detector") ? b.detectorMaxCharges + fx.detectorChargeBonus : 0,
+    ...core,
   };
 }
 

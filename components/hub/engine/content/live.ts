@@ -13,6 +13,12 @@ export type LiveCtx = {
   componentCount: number;
   modsRead: number;
   achievements: number;
+  // The camp's dangers (survival.ts) — all 0/false outside Full survival.
+  deaths: number;
+  gloomTonight: boolean;
+  stranded: boolean;
+  gloomNightsSurvived: number;
+  relicsNamed: number;
 };
 
 export type LiveTemplate = { id: string; minStage: number; build: (c: LiveCtx) => string[] | null };
@@ -28,4 +34,10 @@ export const LIVE_TEMPLATES: LiveTemplate[] = [
   { id: "l-ips", minStage: 5, build: (c) => ["I", "think", c.ipsText, "thoughts", "a", "second", "now."] },
   { id: "l-parts", minStage: 5, build: (c) => (c.componentCount > 0 ? [String(c.componentCount), "blocks", "think", "for", "me", "now."] : null) },
   { id: "l-achievements", minStage: 4, build: (c) => ["You've", "earned", String(c.achievements), "achievements.", "I", "counted."] },
+  // The camp, from where the Engine stands (content/camp-voice.ts says the rest out loud).
+  { id: "l-deaths", minStage: 3, build: (c) => (c.deaths > 0 ? ["You", "died", String(c.deaths), c.deaths === 1 ? "time." : "times.", "I", "kept", "count."] : null) },
+  { id: "l-gloom", minStage: 3, build: (c) => (c.gloomTonight ? ["The", "gloom", "is", "here.", "Keep", "the", "fire", "high."] : null) },
+  { id: "l-stranded", minStage: 3, build: (c) => (c.stranded ? ["You", "are", "far", "away.", "I", "am", "still", "here."] : null) },
+  { id: "l-nights", minStage: 4, build: (c) => (c.gloomNightsSurvived > 0 ? ["We", "outlasted", String(c.gloomNightsSurvived), "New", "Moons", "together."] : null) },
+  { id: "l-relics", minStage: 4, build: (c) => (c.relicsNamed > 0 ? ["You", "named", String(c.relicsNamed), "relics.", "Every", "name", "is", "a", "word."] : null) },
 ];

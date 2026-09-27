@@ -101,7 +101,7 @@ const SPECIALS: ResearchDef[] = [
   { id: "r-global-2", name: "Store Drum", description: "+15% insight/sec.", cost: 1e8, stage: 6, effect: { kind: "globalPct", pct: 15 } },
   { id: "r-global-3", name: "Mill Column", description: "+20% insight/sec.", cost: 1e10, stage: 7, effect: { kind: "globalPct", pct: 20 } },
   { id: "r-global-4", name: "Printing Apparatus", description: "+25% insight/sec.", cost: 1e12, stage: 8, effect: { kind: "globalPct", pct: 25 } },
-  { id: "r-lore", name: "Reading Its Own Logbook", description: "+1% insight/sec per Logbook entry revealed.", cost: 5e6, stage: 6, effect: { kind: "lorePct", pct: 1 } },
+  { id: "r-lore", name: "Reading Its Own Soul", description: "+1% insight/sec per lore entry revealed in its Soul.", cost: 5e6, stage: 6, effect: { kind: "lorePct", pct: 1 } },
   { id: "r-governor", name: "Celestial Governor", description: "The Engine may hold the sky still when you ask it to.", cost: 1e12, stage: 8, effect: { kind: "governSky" } },
 ];
 

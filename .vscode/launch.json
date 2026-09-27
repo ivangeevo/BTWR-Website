@@ -15,7 +15,19 @@
       "name": "Dev server in Firefox (updates on save)",
       "url": "http://localhost:3000/",
       "webRoot": "${workspaceFolder}",
-      "preLaunchTask": "dev"
+      "preLaunchTask": "dev",
+      "profileDir": "${workspaceFolder}/.vscode/firefox-profile",
+      "keepProfileChanges": true
+    },
+    {
+      "type": "firefox",
+      "request": "launch",
+      "name": "Player view in Firefox (no admin panel)",
+      "url": "http://localhost:3001/",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "dev (player view)",
+      "profileDir": "${workspaceFolder}/.vscode/firefox-profile-player",
+      "keepProfileChanges": true
     },
     {
       "type": "msedge",
@@ -29,7 +41,9 @@
       "request": "launch",
       "name": "Launch Firefox (Live Server)",
       "url": "http://127.0.0.1:5500/",
-      "webRoot": "${workspaceFolder}"
+      "webRoot": "${workspaceFolder}",
+      "profileDir": "${workspaceFolder}/.vscode/firefox-profile",
+      "keepProfileChanges": true
     }
   ]
 }

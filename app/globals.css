@@ -505,13 +505,15 @@ html.daynight-fighting .outpost-zone::after {
   filter: blur(6px) saturate(1.4);
 }
 
+/* Opens to the right: the toggle sits at the header's left edge, so a
+   centred toast would be cut off by the page's edge. */
 .theme-toggle-blocked-toast {
   position: absolute;
-  left: 50%;
+  left: 0;
   top: calc(100% + 0.6rem);
   z-index: 30;
   width: 15rem;
-  transform: translateX(-50%);
+  max-width: calc(100vw - 2rem);
   border-radius: 0.65rem;
   border: 1px solid rgba(217, 138, 74, 0.4);
   background-color: rgba(20, 16, 12, 0.95);
@@ -526,11 +528,11 @@ html.daynight-fighting .outpost-zone::after {
 @keyframes theme-toast-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -4px);
+    transform: translateY(-4px);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translateY(0);
   }
 }
 
@@ -714,6 +716,19 @@ html.daynight-fighting .outpost-zone::after {
 .outpost-zone > * {
   position: relative;
   z-index: 1;
+}
+
+/* The Outpost game (HubSection.tsx) is all clicking — no stray text
+   highlights while tapping around. Typing fields stay selectable. */
+.outpost-no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.outpost-no-select input,
+.outpost-no-select textarea,
+.outpost-no-select [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .outpost-frame {
@@ -1461,6 +1476,13 @@ html.daynight-fighting .outpost-zone::after {
   padding: 0.5rem 0.85rem;
 }
 
+/* The chapter bar (ChapterBar.tsx) while the Engine's "this is what I need
+   to grow" lesson points at it. */
+.outpost-chapter-taught {
+  animation: engine-reveal-glow 2.2s ease-in-out infinite;
+  border-color: var(--outpost-accent, #d98a4a);
+}
+
 .outpost-tip-text {
   min-width: 0;
   flex: 1;
@@ -1657,6 +1679,224 @@ html.daynight-fighting .outpost-zone::after {
 /* ------------------------------------------------------------------ */
 /* Ponder / The Analytical Engine (components/hub/engine/ui)          */
 /* ------------------------------------------------------------------ */
+
+/* Stage 0 ("???", engine/ui/mind/Stirring.tsx): the card is night-dark,
+   and fades up into the normal panel when it wakes into Day One. */
+.engine-card {
+  transition:
+    background-color 2.4s ease,
+    border-color 2.4s ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+.engine-card[data-stage="0"] {
+  background-color: rgba(5, 4, 3, 0.94);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+.engine-stir-field {
+  position: relative;
+  min-height: 18rem;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  cursor: none;
+  touch-action: none;
+}
+.engine-stir-field * {
+  cursor: none;
+}
+/* The dark itself, lifting at dawn to show the card underneath. */
+.engine-stir-field::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 60%, #0b0906 0%, #020101 100%);
+  transition: opacity 2.4s ease;
+}
+.engine-stir-field.is-dawn::before {
+  opacity: 0;
+}
+.engine-stir-lantern {
+  position: absolute;
+  left: var(--lx);
+  top: var(--ly);
+  width: 180px;
+  height: 180px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255, 214, 150, 0.16) 0%, rgba(255, 190, 120, 0.05) 45%, transparent 70%);
+}
+.engine-stir-lantern::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  background: rgba(255, 220, 170, 0.7);
+}
+/* Unfound letters: only what the lantern falls on shows. */
+.engine-stir-dark {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image: radial-gradient(circle 85px at var(--lx) var(--ly), #000 30%, transparent 100%);
+  mask-image: radial-gradient(circle 85px at var(--lx) var(--ly), #000 30%, transparent 100%);
+}
+.engine-stir-letter {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 0.3rem 0.5rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.7rem;
+  line-height: 1;
+  color: rgba(255, 228, 190, 0.92);
+  background: none;
+  border: 0;
+  animation: engine-stir-drift var(--drift, 15s) ease-in-out var(--drift-delay, 0s) infinite alternate;
+}
+.engine-stir-letter:focus-visible {
+  outline: 1px dashed rgba(255, 214, 150, 0.5);
+  outline-offset: 2px;
+}
+.engine-stir-letter.is-lit {
+  color: rgba(255, 196, 130, 0.55);
+  text-shadow: 0 0 10px rgba(255, 170, 90, 0.45);
+  animation:
+    engine-stir-drift var(--drift, 15s) ease-in-out var(--drift-delay, 0s) infinite alternate,
+    engine-stir-appear 1.2s ease;
+}
+.engine-stir-letter.is-hung {
+  animation: none;
+  transition:
+    left 1s ease,
+    top 1s ease,
+    color 300ms ease,
+    transform 200ms ease,
+    text-shadow 300ms ease;
+}
+.engine-stir-letter.is-hung:hover {
+  color: rgba(255, 214, 160, 0.9);
+  transform: translate(-50%, -50%) scale(1.15);
+}
+.engine-stir-letter.is-linked {
+  color: #fff4e2;
+  text-shadow:
+    0 0 8px rgba(255, 200, 130, 0.9),
+    0 0 22px rgba(255, 170, 90, 0.55);
+}
+.engine-stir-letter.is-humming::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2.6rem;
+  height: 2.6rem;
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 200, 130, 0.6);
+  animation: engine-stir-hum 900ms ease-out forwards;
+}
+/* A broken chain: every letter gutters like a candle, then steadies. */
+.engine-stir-field.is-snap .engine-stir-letter {
+  animation: engine-stir-snap 650ms ease;
+}
+.engine-stir-thread {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.engine-stir-thread line {
+  stroke: rgba(255, 200, 130, 0.75);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 3px rgba(255, 170, 90, 0.8));
+  animation: engine-stir-appear 400ms ease;
+}
+.engine-stir-whisper {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 9%;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-size: 0.85rem;
+  color: rgba(255, 220, 180, 0.6);
+  pointer-events: none;
+  animation: engine-stir-whisper 5.6s ease forwards;
+}
+.engine-stir-field.is-reduced .engine-stir-letter,
+.engine-stir-field.is-reduced .engine-stir-whisper,
+.engine-stir-field.is-reduced .engine-stir-thread line {
+  animation: none;
+}
+.engine-stir-field.is-reduced.is-snap .engine-stir-letter {
+  opacity: 0.2;
+}
+@keyframes engine-stir-drift {
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0);
+  }
+  33% {
+    transform: translate(-50%, -50%) translate(16px, -12px);
+  }
+  66% {
+    transform: translate(-50%, -50%) translate(-12px, 14px);
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(10px, 8px);
+  }
+}
+@keyframes engine-stir-snap {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  15% {
+    opacity: 0.1;
+  }
+  30% {
+    opacity: 0.7;
+  }
+  45% {
+    opacity: 0.05;
+  }
+  70% {
+    opacity: 0.4;
+  }
+}
+@keyframes engine-stir-appear {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes engine-stir-hum {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.8);
+  }
+}
+@keyframes engine-stir-whisper {
+  0% {
+    opacity: 0;
+    letter-spacing: 0.3em;
+  }
+  20%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    letter-spacing: 0.05em;
+  }
+}
 
 .engine-card[data-dust="1"] {
   filter: saturate(0.85);
@@ -2297,12 +2537,15 @@ html.daynight-fighting .outpost-zone::after {
 .engine-companion-hold {
   box-shadow: 0 0 0 3px rgba(217, 138, 74, 0.35);
 }
+/* Opens to the right, like the theme toggle's toast: the gear sits near the
+   header's left edge. Wraps rather than running off a narrow window. */
 .engine-companion-tip {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  left: 0;
   z-index: 70;
-  white-space: nowrap;
+  width: max-content;
+  max-width: min(20rem, calc(100vw - 2rem));
   border-radius: 0.5rem;
   border: 1px solid rgba(217, 138, 74, 0.45);
   background: rgba(24, 17, 11, 0.97);

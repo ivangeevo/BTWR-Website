@@ -5,7 +5,6 @@ import { useAchievements } from "./AchievementsProvider";
 import { useEngine } from "./engine/ui/EngineProvider";
 import {
   FLAIR_BADGES,
-  loreSnippetForLevel,
   PRESTIGE_LEVEL,
   SKINS,
 } from "./tier2";
@@ -200,11 +199,6 @@ export default function Tier2Progression() {
   const earnedBadges = FLAIR_BADGES.filter((b) => b.unlockLevel <= xpInfo.level);
   const canPrestige = xpInfo.level >= PRESTIGE_LEVEL;
 
-  const loreEntries: { level: number; text: string }[] = [];
-  for (let lvl = 2; lvl <= tier2.loreRevealedLevel; lvl++) {
-    loreEntries.push({ level: lvl, text: loreSnippetForLevel(lvl) });
-  }
-
   return (
     <div>
       {earnedBadges.length > 0 && (
@@ -281,21 +275,7 @@ export default function Tier2Progression() {
         </CollapsibleSubsection>
       )}
 
-      {loreEntries.length > 0 && (
-        <CollapsibleSubsection title="Outpost Logbook" badge={`${loreEntries.length}`}>
-          <ul className="space-y-2">
-            {loreEntries
-              .slice()
-              .reverse()
-              .map((entry) => (
-                <li key={entry.level} className="text-xs text-white/60">
-                  <span className="mr-1.5 font-semibold text-white/40">Lv.{entry.level}</span>
-                  {entry.text}
-                </li>
-              ))}
-          </ul>
-        </CollapsibleSubsection>
-      )}
+      {/* The level-up lore lives in the Engine's Soul tab now (LogbookTab.tsx), with the rest of what it remembers. */}
 
       {canPrestige && <PrestigeButton onPrestige={prestige} />}
 

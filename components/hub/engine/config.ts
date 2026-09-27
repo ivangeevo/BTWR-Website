@@ -48,6 +48,10 @@ export class EngineEconomyMechanic {
   goldBonusPct = 5;
   /** Cost of changing specialization, in seconds of insight/sec. */
   respecCostSec = 1800;
+  /** By night it thinks: percent more from sentences and ciphers. */
+  nightThinkPct = 10;
+  /** By day it builds: percent more from each crank revolution. */
+  dayBuildPct = 10;
 
   static readonly configFields: MechanicConfigField[] = [
     field("powerFloor", "Power floor", "Share of component output kept with no spare power.", 0, 1, 0.05),
@@ -64,6 +68,8 @@ export class EngineEconomyMechanic {
     field("hardcoreIpsMult", "Hardcore insight/sec", "Hardcore specialization multiplier.", 1, 5, 0.05),
     field("goldBonusPct", "Gold medal bonus", "Permanent insight/sec per Difference Engine gold.", 0, 100, 1, "%"),
     field("respecCostSec", "Respec cost", "Seconds of insight/sec to change specialization.", 0, 86400, 60, "s"),
+    field("nightThinkPct", "Night: thinking", "Percent more insight from sentences and ciphers at night.", 0, 200, 5, "%"),
+    field("dayBuildPct", "Day: building", "Percent more insight per crank revolution by day.", 0, 200, 5, "%"),
   ];
 }
 
@@ -105,6 +111,10 @@ export class EngineBuffMechanic {
   detectorRechargeMin = 60;
   /** Specialization bonus to the Saw, Millstone & Bellows (Homesteader), percent. */
   homesteaderAttachPct = 100;
+  /** A lit core (steady power reaching it): percent less gloom — darkness and harm. */
+  coreLightPct = 40;
+  /** A lit core calls you home: percent shorter Hardcore Spawn trek. */
+  coreTrekPct = 25;
 
   static readonly configFields: MechanicConfigField[] = [
     field("sawWood", "Saw: extra wood", "Extra wood per Wood Gathering, per powered Saw.", 0, 50, 1),
@@ -115,6 +125,8 @@ export class EngineBuffMechanic {
     field("detectorMaxCharges", "Detector charges", "Charges held at once.", 1, 20, 1),
     field("detectorRechargeMin", "Detector recharge", "Minutes per charge.", 1, 1440, 5, "min"),
     field("homesteaderAttachPct", "Homesteader attachments", "Extra Saw, Millstone & Bellows strength.", 0, 500, 10, "%"),
+    field("coreLightPct", "Core light vs gloom", "Percent less gloom (darkness and harm) while steady power reaches the core.", 0, 100, 5, "%"),
+    field("coreTrekPct", "Core calls you home", "Percent shorter trek home while the core is lit.", 0, 90, 5, "%"),
   ];
 }
 

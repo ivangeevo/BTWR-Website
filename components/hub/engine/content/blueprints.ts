@@ -32,7 +32,7 @@ export const ENGINE_KEYWORD = "SOULFORGE";
 export const KEY_FRAGMENTS: { id: string; text: string; hint: string }[] = [
   { id: "frag-star", text: "SOU", hint: "Something in the night sky was never just a star. (Or: read every Core mod.)" },
   { id: "frag-page", text: "LFO", hint: "A faint mark waits on the Mods page, or at the bottom of the Get BTWR page. (Or: hold the Engine's gear.)" },
-  { id: "frag-ledger", text: "RGE", hint: "The Logbook keeps it, eventually. (Or: a full-moon spark, or a finished commission.)" },
+  { id: "frag-ledger", text: "RGE", hint: "Its Soul keeps it, eventually. (Or: a full-moon spark, or a finished commission.)" },
 ];
 
 // Beyond the last blueprint, the Engine keeps writing ciphers for the

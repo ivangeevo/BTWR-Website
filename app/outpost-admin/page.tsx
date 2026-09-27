@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import AdminPanel from "@/components/hub/AdminPanel";
+import { enableOutpostAdmin } from "@/lib/site-config";
 
 export const metadata: Metadata = {
   title: "Outpost Admin",
@@ -8,6 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default function OutpostAdminPage() {
+  if (!enableOutpostAdmin) notFound();
   return (
     <div className="mx-auto max-w-5xl px-3 py-12 sm:px-4">
       <AdminPanel />

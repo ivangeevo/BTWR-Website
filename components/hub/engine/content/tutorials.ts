@@ -1,6 +1,6 @@
 // In-voice guided steps — the Engine teaches each new thing the first time
 // it shows up, pointing at the element with data-engine-target="<target>".
-// Skippable, and replayable from the Logbook.
+// Skippable, and replayable from the Soul tab.
 import type { EngineState } from "../types";
 
 export type TutorialStep = { target: string; line: string };
@@ -20,7 +20,9 @@ export const TUTORIALS: Tutorial[] = [
     id: "t-gate",
     title: "Growing up",
     when: (e) => e.stage >= 1 && e.solvedCount >= 3,
-    steps: [{ target: "gate", line: "This is what I need to grow. Some of it is me. Some of it is you, out there." }],
+    // The chapter bar lives above the card (ChapterBar.tsx), out of the ring's
+    // reach: with no target here the bubble sits at the bottom, and the bar glows.
+    steps: [{ target: "chapter", line: "See the bar at the top? That's what I need to grow. Some of it is me. Some of it is you, out there." }],
   },
   {
     id: "t-fork",
@@ -41,14 +43,14 @@ export const TUTORIALS: Tutorial[] = [
     id: "t-works",
     title: "Hoppers",
     when: (e) => e.stage >= 3,
-    steps: [{ target: "tab-works", line: "Spend thoughts on Hoppers in the Works tab. They think for me, even while you don't." }],
+    steps: [{ target: "tab-body", line: "Spend thoughts on Hoppers in the Body tab. They think for me, even while you don't." }],
   },
   {
     id: "t-grid",
     title: "The gear grid",
     when: (e) => e.stage >= 4,
     steps: [
-      { target: "tab-body", line: "I have a body now. The Body tab is where you build it." },
+      { target: "tab-body", line: "I have a body now — a real one. The gear grid is at the top of the Body tab." },
       { target: "part-tray", line: "Pick a part, then tap a square to place it. Tap it again to turn it, drag it to move it, right-click to take it back." },
       { target: "clutch", line: "Put the crank right next to the Millstone, then engage the clutch. Windmills and wheels only power me if axles and gearboxes carry it to my ◎ core on the right edge." },
     ],
@@ -71,20 +73,20 @@ export const TUTORIALS: Tutorial[] = [
     when: (e) => e.stage >= 4 && e.blueprints.includes("windmill"),
     steps: [
       { target: "part-tray", line: "A windmill: steady power, no hands. Its sails span five squares, and power only leaves the middle one, front and back — run that to my core." },
-      { target: "tab-works", line: "Research lives in Works. And a powered Saw helps the rest of the Outpost chop wood." },
+      { target: "tab-body", line: "Research lives in the Body tab too. And a powered Saw helps the rest of the Outpost chop wood." },
     ],
   },
   {
     id: "t-dial",
     title: "Dial ciphers",
     when: (e) => !!e.ciphers.current && e.ciphers.current.kind === "caesar",
-    steps: [{ target: "cipher", line: "This one's a shifted alphabet. Turn the dial until the words make sense. One word is already given." }],
+    steps: [{ target: "cipher", line: "This one's a shifted alphabet. Turn the dial until the words make sense, then press Decode. One word is already given." }],
   },
   {
     id: "t-water",
     title: "The water wheel",
     when: (e) => e.stage >= 5 && e.blueprints.includes("waterWheel"),
-    steps: [{ target: "part-tray", line: "A water wheel: more power than a windmill. It spans three squares and needs one of them on the water. A plain gearbox can't take it until Hardwood Teeth in Works — or a soulforged one." }],
+    steps: [{ target: "part-tray", line: "A water wheel: more power than a windmill. It spans three squares and needs one of them on the water. A plain gearbox can't take it until Hardwood Teeth in Research — or a soulforged one." }],
   },
   {
     id: "t-idle",
@@ -112,12 +114,13 @@ export const TUTORIALS: Tutorial[] = [
     title: "Past the End",
     when: (e) => e.stage >= 8,
     steps: [
-      { target: "tab-works", line: "Commissions — small things I'd like, every day. And the Difference Engine, if you like puzzles." },
+      { target: "tab-body", line: "Commissions — small things I'd like, every day. And the Difference Engine, if you like puzzles." },
       { target: "tab-mind", line: "I can write paragraphs now. When I've written enough, I'll write one for you." },
     ],
   },
 ];
 
 export function pendingTutorial(e: EngineState): Tutorial | null {
+  if (e.tutorialsOff) return null;
   return TUTORIALS.find((t) => !e.tutorialsSeen.includes(t.id) && t.when(e)) ?? null;
 }

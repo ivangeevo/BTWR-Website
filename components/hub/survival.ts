@@ -17,6 +17,8 @@ export type StrandedState = {
   blocks: number;
   trekMs: number;
   trekEndsAt: string;
+  /** The Engine's lit core shortened this walk (engine/buffs.ts). */
+  calledHome?: boolean;
 };
 
 export type SurvivalState = {
@@ -34,6 +36,8 @@ export type SurvivalState = {
   deaths: number;
   gloomDeaths: number;
   treksCompleted: number;
+  /** New Moon nights that ended with the visitor still alive (the Engine remarks on it). */
+  gloomNightsSurvived: number;
   compass: boolean;
   lastCause: DeathCause | null;
 };
@@ -76,6 +80,7 @@ export function defaultSurvivalState(maxHealth = 20, maxHunger = 20): SurvivalSt
     deaths: 0,
     gloomDeaths: 0,
     treksCompleted: 0,
+    gloomNightsSurvived: 0,
     compass: false,
     lastCause: null,
   };
@@ -86,6 +91,8 @@ export type VitalsEnv = {
   gloomNight: boolean;
   /** Any lit Campfire stage — and the visitor is at camp to sit by it. */
   fireLit: boolean;
+  /** 0..1 of the gloom's harm held back without full shelter — the Engine's lit core (engine/buffs.ts). */
+  gloomShield?: number;
 };
 
 /** Whether gloom is hurting the visitor right now. */
@@ -120,8 +127,9 @@ export function tickVitals(
   hunger = Math.max(0, hunger - drained);
 
   let gloomHit = 0;
-  if (inGloom(env)) {
-    [gloomHit, acc.gloom] = accrue(acc.gloom, dtMs, t.gloomSec);
+  const shield = Math.min(1, Math.max(0, env.gloomShield ?? 0));
+  if (inGloom(env) && shield < 1) {
+    [gloomHit, acc.gloom] = accrue(acc.gloom, dtMs, t.gloomSec / (1 - shield));
   } else {
     acc.gloom = 0;
   }
@@ -186,8 +194,9 @@ export function applyDamage(s: SurvivalState, amount: number): SurvivalState {
   return { ...s, health: Math.max(0, s.health - amount) };
 }
 
-export function trekMsFor(compass: boolean, t: Pick<SurvivalTuning, "trekSec" | "compassTrekPct">): number {
-  return Math.round(t.trekSec * 1000 * (compass ? t.compassTrekPct / 100 : 1));
+/** `mult` is anything else shortening the walk — the Engine's lit core calling you home (engine/buffs.ts). */
+export function trekMsFor(compass: boolean, t: Pick<SurvivalTuning, "trekSec" | "compassTrekPct">, mult = 1): number {
+  return Math.round(t.trekSec * 1000 * (compass ? t.compassTrekPct / 100 : 1) * mult);
 }
 
 /**
@@ -201,7 +210,8 @@ export function respawn(
   cause: DeathCause,
   nowMs: number,
   t: SurvivalTuning,
-  rand: () => number = Math.random
+  rand: () => number = Math.random,
+  trekMult = 1
 ): SurvivalState {
   const windowMs = t.respawnWindowMin * 60_000;
   const windowStartMs = s.respawnWindowStart ? new Date(s.respawnWindowStart).getTime() : null;
@@ -214,14 +224,14 @@ export function respawn(
     ? Math.round(s.lastBlocks! * (0.9 + rand() * 0.2))
     : Math.round(lo + rand() * (hi - lo));
   const penalty = repeats * t.respawnPenalty;
-  const trekMs = trekMsFor(s.compass, t);
+  const trekMs = trekMsFor(s.compass, t, trekMult);
 
   return {
     ...s,
     health: Math.max(Math.min(t.respawnFloor, t.maxHealth), t.maxHealth - penalty),
     hunger: Math.max(Math.min(t.respawnFloor, t.maxHunger), t.maxHunger - penalty),
     acc: { ...EMPTY_ACC },
-    stranded: { blocks, trekMs, trekEndsAt: new Date(nowMs + trekMs).toISOString() },
+    stranded: { blocks, trekMs, trekEndsAt: new Date(nowMs + trekMs).toISOString(), ...(trekMult < 1 ? { calledHome: true } : {}) },
     respawnWindowStart: inWindow ? s.respawnWindowStart : new Date(nowMs).toISOString(),
     respawnsInWindow: repeats,
     lastBlocks: blocks,

@@ -311,7 +311,9 @@ function MechanicSettingsMenu({ moduleId, config, update }: { moduleId: ModuleId
 
 function ModulesTab({ config, update }: { config: AdminConfig; update: Update }) {
   // "Disabled" sits below every stage: a switched-off card never shows at all.
-  const tiers = [...STAGE_LIST, DISABLED_GROUP];
+  // Stage 0 ("???") holds Ponder alone, and Ponder stays there (resolvedModuleStage).
+  const STAGE_ZERO = { id: "0", name: `Stage 0 · ${STAGES[0].chapter}` };
+  const tiers = [STAGE_ZERO, ...STAGE_LIST, DISABLED_GROUP];
 
   function setModuleTier(id: ModuleId, stage: string) {
     update((prev) => {
@@ -338,7 +340,7 @@ function ModulesTab({ config, update }: { config: AdminConfig; update: Update })
       <p className="text-sm text-slate-400">
         Which Engine stage reveals each card/section, grouped by stage — use a module&apos;s dropdown to move it to a
         different one, or to <span className="font-semibold text-red-400">Disabled</span> to hide it altogether. An
-        Engine gate step that happens on a disabled card is skipped. Ponder can&apos;t be disabled — it is the Engine.
+        Engine gate step that happens on a disabled card is skipped. Ponder can&apos;t be moved or disabled — it is the Engine, and the only thing Stage 0 shows.
       </p>
       <div className="mt-3 space-y-2">
         {tiers.map((t) => {
@@ -364,13 +366,14 @@ function ModulesTab({ config, update }: { config: AdminConfig; update: Update })
                       <div className="relative shrink-0">
                         <select
                           value={t.id}
+                          disabled={m.id === "ponder"}
                           onChange={(e) => setModuleTier(m.id, e.target.value)}
                           className={`appearance-none rounded-md border border-white/15 bg-[#241a12] py-1.5 pl-2 pr-6 text-xs font-semibold ${
                             t.id === DISABLED_GROUP.id ? "text-red-400" : "text-white"
                           }`}
                         >
                           {tiers
-                            .filter((tt) => m.id !== "ponder" || tt.id !== DISABLED_GROUP.id)
+                            .filter((tt) => (m.id === "ponder" ? tt.id === STAGE_ZERO.id : tt.id !== STAGE_ZERO.id))
                             .map((tt) => (
                               <option
                                 key={tt.id}

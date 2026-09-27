@@ -15,6 +15,19 @@ const t = new SurvivalMechanic();
 const calm = { gloomNight: false, fireLit: true };
 const T0 = Date.UTC(2026, 0, 1);
 
+describe("trek home", () => {
+  it("is shortened by the Engine's lit core, stacking with the Compass", () => {
+    const plain = respawn(defaultSurvivalState(), "hunting", T0, t, () => 0.5);
+    const called = respawn(defaultSurvivalState(), "hunting", T0, t, () => 0.5, 0.75);
+    const both = respawn({ ...defaultSurvivalState(), compass: true }, "hunting", T0, t, () => 0.5, 0.75);
+    expect(plain.stranded!.trekMs).toBe(t.trekSec * 1000);
+    expect(plain.stranded!.calledHome).toBeUndefined();
+    expect(called.stranded!.trekMs).toBe(t.trekSec * 1000 * 0.75);
+    expect(called.stranded!.calledHome).toBe(true);
+    expect(both.stranded!.trekMs).toBe(t.trekSec * 1000 * (t.compassTrekPct / 100) * 0.75);
+  });
+});
+
 describe("tickVitals", () => {
   it("drains a point of hunger per hungerDrainSec, across many small ticks", () => {
     let s = defaultSurvivalState();
@@ -27,6 +40,17 @@ describe("tickVitals", () => {
     expect(tickVitals(s, 5000, { gloomNight: true, fireLit: true }, t).state.health).toBe(20);
     expect(tickVitals(s, 5000, { gloomNight: false, fireLit: false }, t).state.health).toBe(20);
     expect(tickVitals(s, 5000, { gloomNight: true, fireLit: false }, t).state.health).toBe(19);
+  });
+
+  it("lets the Engine's lit core hold part of the gloom back", () => {
+    const s = defaultSurvivalState();
+    const dark = { gloomNight: true, fireLit: false };
+    // Half the gloom held back: a point every 2 × gloomSec instead of every gloomSec.
+    expect(tickVitals(s, 5000, { ...dark, gloomShield: 0.5 }, t).state.health).toBe(20);
+    expect(tickVitals(s, 10000, { ...dark, gloomShield: 0.5 }, t).state.health).toBe(19);
+    // All of it held back: no harm at all.
+    expect(tickVitals(s, 60000, { ...dark, gloomShield: 1 }, t).state.health).toBe(20);
+    expect(defaultSurvivalState().gloomNightsSurvived).toBe(0);
   });
 
   it("kills by gloom in about 100s from full health", () => {

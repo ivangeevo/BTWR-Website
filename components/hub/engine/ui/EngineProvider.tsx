@@ -19,14 +19,17 @@ import { isSolved, keywordGuesses, revealOne } from "../ciphers";
 import { commissionProgress, refreshCommissions } from "../commissions";
 import { ASKS_BY_ID, dominantBelief } from "../content/asks";
 import { BLUEPRINTS_BY_ID, KEY_FRAGMENTS } from "../content/blueprints";
+import { campJournalLine, campLine, campLogLine, type CampEvent } from "../content/camp-voice";
 import type { LiveCtx } from "../content/live";
 import { LORE_FRAGMENT_RANK, loreRankForInsight } from "../content/lore";
 import { JOURNAL_ASK_PREFIX } from "../content/puzzles";
+import { allFound, STIR_WORD } from "../content/stirring";
 import { eurekaLine, POP_LINES, popReasonText, revealLine, welcomeBackLine } from "../content/voice";
 import { MODULES } from "../../module-registry";
 import {
   bulkCost,
   cipherBurst,
+  clockMult,
   computeIps,
   enginePUAt,
   crankRevValue,
@@ -46,6 +49,7 @@ import { betterResult, DIFF_BY_ID, scoreChallenge, type DiffPart, type DiffScore
 import { canPlaceAt, layoutFor, placementRot, remapGrid, turnTarget } from "../grid/layouts";
 import { PART_DEFS, STARTER_BLUEPRINTS } from "../grid/parts";
 import {
+  announceOutpostToggled,
   EVT_INBOX,
   EVT_MODS_READ,
   readEngineDebug,
@@ -58,7 +62,7 @@ import {
   writeEngineLock,
 } from "../bridge-storage";
 import { evaluateGate, stageTitle, type GateResult, type GateSite } from "../stages";
-import { JOURNAL_MAX, publicSnapshot } from "../state";
+import { CAMP_LOG_MAX, JOURNAL_MAX, publicSnapshot } from "../state";
 import type {
   BeliefAxis,
   ComponentId,
@@ -102,6 +106,7 @@ type EngineCtx = {
   ensureCipher: () => void;
   cipherGuess: (cipherLetter: string, plain: string | null) => void;
   cipherDial: (index: number, value: number) => void;
+  cipherConfirm: () => boolean;
   cipherKeyword: (word: string) => boolean;
   cipherHint: () => void;
   // Stage
@@ -133,6 +138,12 @@ type EngineCtx = {
   submitDifference: (id: string, placed: DiffPart[]) => DiffScore | null;
   markTutorialSeen: (id: string) => void;
   replayTutorial: (id: string) => void;
+  setTutorialsOff: (off: boolean) => void;
+  // Stage 0 (content/stirring.ts)
+  /** A letter found in the dark. */
+  stirFind: (letter: string) => void;
+  /** Its name spelled: wakes into Day One. False if it isn't ready. */
+  stirWake: () => boolean;
   dismissAway: () => void;
 };
 
@@ -148,6 +159,9 @@ function uid(): string {
 function iso(ms: number): string {
   return new Date(ms).toISOString();
 }
+
+// Meals, relics and new tools share this gap between remarks (content/camp-voice.ts).
+const CAMP_CHAT_COOLDOWN_MS = 20_000;
 
 function pushJournal(journal: string[], line: string): string[] {
   return [line, ...journal].slice(0, JOURNAL_MAX);
@@ -190,6 +204,10 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
       const phase = computeCyclePhase(loadCycleStartedAt());
       night = !phase.isDay;
       fullMoon = phase.moonPhaseIndex === 4;
+    } else {
+      // No sky cycle running: the Engine keeps the real clock's night.
+      const h = new Date().getHours();
+      night = h >= 19 || h < 6;
     }
     return { night: debug.forceNight ?? night, fullMoon: debug.forceFullMoon ?? fullMoon };
     // envTick re-reads the sky every checkpoint.
@@ -214,7 +232,8 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
         const now = Date.now();
         const c = cfgRef.current;
         let s = settle(prev, c, fxOf(prev), now);
-        if (s.welcomeBackPending) {
+        // Stage 0 has no words to greet anyone with; the flag waits for Day One.
+        if (s.welcomeBackPending && s.stage >= 1) {
           const ips = computeIps(s, c, fxOf(s), now).ips;
           const gift = Math.max(stageFlat(s.stage) * 5, ips * c.offline.welcomeBackSec) * (s.specialization === "hardcore" ? 2 : 1);
           s = {
@@ -362,6 +381,84 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
   const narrateRef = useRef(narrateReveals);
   narrateRef.current = narrateReveals;
 
+  // --- The Engine talks about the camp (content/camp-voice.ts) ---
+  // Watches the camp's counters and speaks when one moves. The first reading
+  // after a load or an import is only a baseline, so nothing carried over
+  // from last time counts as news. Deaths, getting home and the gloom always
+  // get a word; meals, relics and tools share a cooldown so it never nags.
+  const campPrevRef = useRef<{
+    deaths: number;
+    treks: number;
+    nights: number;
+    gloom: boolean;
+    meals: number;
+    relics: number;
+    tool: string;
+    calledHome: boolean;
+  } | null>(null);
+  const campChatAtRef = useRef(0);
+  useEffect(() => {
+    campPrevRef.current = null;
+  }, [importEpoch]);
+  useEffect(() => {
+    if (!mounted) return;
+    const now = {
+      deaths: a.survival.deaths,
+      treks: a.survival.treksCompleted,
+      nights: a.survival.gloomNightsSurvived,
+      gloom: a.gloomNight,
+      meals: e.counters.mealsCooked,
+      relics: a.quiz.totalCorrect,
+      tool: a.tools.tier,
+      calledHome: !!a.survival.stranded?.calledHome,
+    };
+    const prev = campPrevRef.current;
+    campPrevRef.current = now;
+    if (!prev || e.stage === 0) return;
+
+    const events: { ev: CampEvent; always: boolean }[] = [];
+    if (now.deaths > prev.deaths) events.push({
+        ev: { kind: "death", cause: a.survival.lastCause, first: now.deaths === 1, blocks: a.survival.stranded?.blocks ?? null },
+        always: true,
+      });
+    if (now.treks > prev.treks) events.push({ ev: { kind: "home", calledHome: prev.calledHome, first: now.treks === 1 }, always: true });
+    if (now.gloom && !prev.gloom) events.push({ ev: { kind: "gloomFalls" }, always: true });
+    if (now.nights > prev.nights) events.push({ ev: { kind: "gloomSurvived", first: now.nights === 1 }, always: true });
+    if (now.meals > prev.meals) events.push({ ev: { kind: "meal", count: now.meals }, always: false });
+    if (now.relics > prev.relics) events.push({ ev: { kind: "relic", count: now.relics }, always: false });
+    if (now.tool !== prev.tool) {
+      const name = a.toolTiersList.find((t) => t.id === now.tool)?.name;
+      if (name) events.push({ ev: { kind: "tool", name }, always: false });
+    }
+
+    for (const { ev, always } of events) {
+      const journalLine = campJournalLine(ev);
+      if (journalLine) updateEngine((s) => ({ ...s, journal: pushJournal(s.journal, journalLine) }));
+      const logLine = campLogLine(ev);
+      if (logLine) {
+        const entry = { at: new Date().toISOString(), text: logLine };
+        updateEngine((s) => ({ ...s, campLog: [entry, ...s.campLog].slice(0, CAMP_LOG_MAX) }));
+      }
+      const line = campLine(ev, e.stage);
+      if (!line) continue;
+      const t = Date.now();
+      if (!always && t - campChatAtRef.current < CAMP_CHAT_COOLDOWN_MS) continue;
+      campChatAtRef.current = t;
+      toast(line, ev.kind === "death" || ev.kind === "gloomFalls" ? "warn" : "info");
+    }
+    // Only the watched values matter; the rest are read at the moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    mounted,
+    a.survival.deaths,
+    a.survival.treksCompleted,
+    a.survival.gloomNightsSurvived,
+    a.gloomNight,
+    e.counters.mealsCooked,
+    a.quiz.totalCorrect,
+    a.tools.tier,
+  ]);
+
   // --- Drain events from outside the Outpost (Mods page, header gear, sky) ---
   const drainRef = useRef<() => void>(() => {});
   drainRef.current = () => {
@@ -443,8 +540,8 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
         at: now,
       });
 
-      // Eureka sparks (Stage 4+).
-      if (s.stage >= c.eureka.startStage) {
+      // Eureka sparks (Stage 4+; never at Stage 0, whatever the admin start).
+      if (s.stage >= Math.max(1, c.eureka.startStage)) {
         const active = s.eureka.active;
         if (active && new Date(active.expiresAt).getTime() <= now) {
           updateEngine((cur) => ({
@@ -572,7 +669,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     (kind: "tiles" | "fork" | "modFact" | "live" | "paragraph", text: string, wasChoice: boolean): number => {
       let reward = 0;
       act((s, now) => {
-        reward = puzzleBurst(s, ipsNow(s, now), cfgRef.current, fxOf(s));
+        reward = puzzleBurst(s, ipsNow(s, now), cfgRef.current, fxOf(s)) * clockMult("think", envRef.current, cfgRef.current);
         const out = grant(s, reward);
         return {
           ...out,
@@ -613,7 +710,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
   const finishLetter = useCallback(
     (lines: string[]) => {
       act((s) => (s.letter ? s : grant({ ...s, letter: lines }, stageFlat(s.stage) * 100)));
-      toast("It wrote you a letter. It's in the Logbook now.", "good");
+      toast("It wrote you a letter. It's in its Soul now.", "good");
     },
     [act, toast]
   );
@@ -624,13 +721,17 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     if (cur && cur !== s.ciphers.current) updateEngine((prev) => ({ ...prev, ciphers: { ...prev.ciphers, current: cur } }));
   }, [getEngine, updateEngine]);
 
-  const finishCipherIfSolved = (s: EngineState, now: number): EngineState => {
+  // Dial ciphers (caesar, caesar2) only finish when the player presses Decode
+  // (cipherConfirm): turning a dial, a hint, or a Eureka letter can set the
+  // right shift, but never reads the page out on its own.
+  const finishCipherIfSolved = (s: EngineState, now: number, confirmed = false): EngineState => {
     const cur = s.ciphers.current;
     if (!cur) return s;
+    if ((cur.kind === "caesar" || cur.kind === "caesar2") && !confirmed) return s;
     const p = puzzleFor(cur, s, fxOf(s));
     if (!isSolved(p, cur)) return s;
     const bp = BLUEPRINTS_BY_ID[cur.id];
-    const reward = cipherBurst(s, ipsNow(s, now), cfgRef.current, fxOf(s));
+    const reward = cipherBurst(s, ipsNow(s, now), cfgRef.current, fxOf(s)) * clockMult("think", envRef.current, cfgRef.current);
     let out = grant(s, reward);
     out = {
       ...out,
@@ -677,6 +778,19 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [act]
+  );
+
+  /** Decode on a dial cipher: false (nothing changes) if the dials aren't right yet. */
+  const cipherConfirm = useCallback(
+    (): boolean => {
+      const s = getEngine();
+      const cur = s.ciphers.current;
+      if (!cur || !isSolved(puzzleFor(cur, s, fxOf(s)), cur)) return false;
+      act((st, now) => finishCipherIfSolved(st, now, true));
+      return true;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [act, getEngine]
   );
 
   const cipherKeyword = useCallback(
@@ -798,7 +912,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     let value = 0;
     const hand = { millstone: 0, saw: 0, bellows: 0 };
     act((s, now) => {
-      value = crankRevValue(ipsNow(s, now), fxOf(s));
+      value = crankRevValue(ipsNow(s, now), fxOf(s)) * clockMult("build", envRef.current, cfgRef.current);
       const out = grant(s, value);
       const turned = out.grid.clutch ? out.solved?.cranked : undefined;
       const byUid = new Map(out.grid.cells.filter(Boolean).map((c) => [c!.uid, c!.type]));
@@ -1222,6 +1336,28 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     (id: string) => updateEngine((s) => (s.tutorialsSeen.includes(id) ? s : { ...s, tutorialsSeen: [...s.tutorialsSeen, id] })),
     [updateEngine]
   );
+  const setTutorialsOff = useCallback(
+    (off: boolean) => updateEngine((s) => (s.tutorialsOff === off ? s : { ...s, tutorialsOff: off })),
+    [updateEngine]
+  );
+  const stirFind = useCallback(
+    (letter: string) =>
+      act((s) =>
+        s.stage !== 0 || !s.stirring || s.stirring.found.includes(letter) || !(STIR_WORD as readonly string[]).includes(letter)
+          ? s
+          : { ...s, stirring: { ...s.stirring, found: [...s.stirring.found, letter] } }
+      ),
+    [act]
+  );
+  const stirWake = useCallback((): boolean => {
+    const s = getEngine();
+    if (s.stage !== 0 || !s.stirring || !allFound(s)) return false;
+    updateEngine((cur) => (cur.stirring ? { ...cur, stirring: { ...cur.stirring, woke: true } } : cur), "now");
+    const woke = advance();
+    // The header's ??? link reads the saved snapshot: let it catch up once saved.
+    if (woke) window.setTimeout(announceOutpostToggled, 500);
+    return woke;
+  }, [advance, getEngine, updateEngine]);
   const replayTutorial = useCallback(
     (id: string) => updateEngine((s) => ({ ...s, tutorialsSeen: s.tutorialsSeen.filter((t) => t !== id) })),
     [updateEngine]
@@ -1266,6 +1402,11 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
       componentCount: Object.values(s.components).reduce<number>((acc, n) => acc + (n ?? 0), 0),
       modsRead: s.modsRead.length,
       achievements: ach.unlocked.size,
+      deaths: ach.survivalActive ? ach.survival.deaths : 0,
+      gloomTonight: ach.gloomNight,
+      stranded: ach.stranded,
+      gloomNightsSurvived: ach.survivalActive ? ach.survival.gloomNightsSurvived : 0,
+      relicsNamed: ach.quiz.totalCorrect,
     };
   }, [getEngine]);
 
@@ -1293,6 +1434,7 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     ensureCipher,
     cipherGuess,
     cipherDial,
+    cipherConfirm,
     cipherKeyword,
     cipherHint,
     advance,
@@ -1318,6 +1460,9 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     submitDifference,
     markTutorialSeen,
     replayTutorial,
+    setTutorialsOff,
+    stirFind,
+    stirWake,
     dismissAway,
   };
 

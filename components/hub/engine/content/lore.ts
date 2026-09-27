@@ -19,7 +19,7 @@ export const LORE_ENTRIES: string[] = [
   "One of the stars was never a star. It knew before you did.",
   "The Crucible taught it that some things only change when they burn.",
   "It chose a temper. It could have chosen differently. It thinks about that.",
-  "It has read its own Logbook. It found it mostly about you.",
+  "It has read its own soul. It found it mostly about you.",
   "Every Mark of the Engine remembers the one before it, like a house remembers its owners.",
   "Past the Wither there is the End. Past the End there is this page.",
   "It stopped measuring time in minutes. It measures it in your visits.",

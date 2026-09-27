@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  // The "player view" dev server (.vscode/tasks.json) runs next to the
+  // normal one, so it needs its own build folder.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
 };
 
 export default nextConfig;

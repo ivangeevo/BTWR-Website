@@ -67,7 +67,9 @@ export const MODULES: ModuleDef[] = [
 // section uses FeaturesConfig.upgradesStage. Patch Notes is shelved (below),
 // so its stage only matters once it's back.
 export const DEFAULT_MODULE_STAGE: Record<ModuleId, number> = {
-  ponder: 1,
+  // Stage 0 ("???") shows Ponder alone: every other card, and the Progress
+  // and Achievements tabs, wait for Stage 1 or later.
+  ponder: 0,
   "stage-tip": 1,
   "patch-notes": 2,
   campfire: 3,

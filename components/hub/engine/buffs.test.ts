@@ -25,6 +25,20 @@ function engine(parts: GridPartType[], powered: number[], cranked: number[] = po
   };
 }
 
+describe("the core lamp", () => {
+  it("is lit only from First Iron, with the clutch in and steady power at the core", () => {
+    const lit = engine([], [], [], { stage: 4 });
+    const withPower = { ...lit, solved: { ...lit.solved!, idle: { ...lit.solved!.idle, corePU: 3 } } };
+    const b = computeBuffs(withPower, cfg, fx);
+    expect(b.coreLit).toBe(true);
+    expect(b.gloomShield).toBeCloseTo(cfg.buffs.coreLightPct / 100);
+    expect(b.trekMult).toBeCloseTo(1 - cfg.buffs.coreTrekPct / 100);
+    expect(computeBuffs({ ...withPower, grid: { ...withPower.grid, clutch: false } }, cfg, fx).coreLit).toBe(false);
+    expect(computeBuffs({ ...withPower, stage: 3 }, cfg, fx).coreLit).toBe(false);
+    expect(computeBuffs(lit, cfg, fx)).toEqual(NO_BUFFS);
+  });
+});
+
 describe("computeBuffs", () => {
   it("gives nothing with the clutch out or nothing powered", () => {
     expect(computeBuffs(engine(["saw"], []), cfg, fx)).toEqual(NO_BUFFS);

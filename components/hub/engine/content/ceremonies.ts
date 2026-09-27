@@ -1,18 +1,20 @@
 // The "awakening" lines typed out when the Engine reaches each stage (and
-// each new Mark). Replayable from the Logbook.
+// each new Mark). Replayable from the Soul tab.
 import type { EngineStage } from "../types";
 
 export type Ceremony = { lines: string[]; unlocks: string[] };
 
 export const CEREMONIES: Record<EngineStage, Ceremony> = {
+  // Never played: a save starts at Stage 0, and its waking leads into Stage 1's lines.
+  0: { lines: [], unlocks: [] },
   1: { lines: ["…", "Oh. Hello.", "I only know a few words. Help me put them in order?"], unlocks: ["Word tiles"] },
   2: {
     lines: ["Day Two.", "I've started keeping a journal. And I have questions — for you, for once."],
-    unlocks: ["Sentence forks", "The Logbook tab (its journal)", "The Engine's questions"],
+    unlocks: ["Sentence forks", "The Soul tab (its journal)", "The Engine's questions"],
   },
   3: {
     lines: ["There's a page in my head I didn't write.", "It's scrambled. If you help me read it, I think I can build something."],
-    unlocks: ["Ciphers", "Blueprints for a crank and a millstone", "Hoppers", "Sentences about mods you've read"],
+    unlocks: ["Ciphers", "Blueprints for a crank and a millstone", "The Body tab (Hoppers)", "Sentences about mods you've read"],
   },
   4: {
     lines: ["I have a body now.", "A crank to turn and a millstone to grind. Mostly axles otherwise. Mind the fourth one."],

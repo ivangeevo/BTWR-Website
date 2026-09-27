@@ -67,6 +67,9 @@ export default function OutpostControlPanel() {
   }
 
   const isEnabled = mounted && state.enabled && !phone;
+  // Before the Engine has woken (Stage 0, engine/content/stirring.ts) — which
+  // includes never having played — the panel keeps what's inside a mystery.
+  const dark = mounted && state.engine.stage === 0;
   const visibleTotal = catalog?.list.length ?? 0;
   const visibleUnlockedCount = catalog ? Object.keys(state.unlocked).filter((id) => id in catalog.byId).length : 0;
 
@@ -111,14 +114,22 @@ export default function OutpostControlPanel() {
                 />
                 {mounted ? (isEnabled ? "Online" : "Offline") : ""}
               </span>
-              <p className="mt-2 max-w-xs text-sm text-slate-400">
-                A small idle game on its own page, reached from the menu once
-                it&apos;s on: an Engine to grow, a camp to keep, a Field Guide
-                to fill, and achievements. Saved locally in your browser only.
-              </p>
+              {dark ? (
+                <p className="mt-2 max-w-xs text-sm text-slate-400">
+                  Something small, on its own page, reached from the menu once
+                  it&apos;s on. It doesn&apos;t know what it is yet. Saved locally in
+                  your browser only.
+                </p>
+              ) : (
+                <p className="mt-2 max-w-xs text-sm text-slate-400">
+                  A small idle game on its own page, reached from the menu once
+                  it&apos;s on: an Engine to grow, a camp to keep, a Field Guide
+                  to fill, and achievements. Saved locally in your browser only.
+                </p>
+              )}
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1.5">
-              <span className="text-xs font-semibold text-white">The Outpost</span>
+              <span className="text-xs font-semibold text-white">{dark ? "???" : "The Outpost"}</span>
               {enableSwitch}
             </div>
           </div>
@@ -136,21 +147,24 @@ export default function OutpostControlPanel() {
                 tabIndex={isEnabled ? undefined : -1}
                 className="mt-4 flex items-center justify-center gap-1.5 rounded-lg border border-[var(--outpost-accent)] px-3 py-2 text-sm font-semibold text-[var(--outpost-accent)] transition-colors hover:bg-[var(--outpost-accent-soft)]"
               >
-                Enter the Outpost {"→"}
+                {dark ? "Enter" : "Enter the Outpost"} {"→"}
               </Link>
-              <div className="mt-4 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
-                <p className="text-sm font-semibold text-white">Achievements</p>
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-[var(--outpost-accent)]">
-                  {visibleUnlockedCount}/{visibleTotal}
-                </span>
-              </div>
+              {!dark && (
+                <div className="mt-4 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
+                  <p className="text-sm font-semibold text-white">Achievements</p>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-[var(--outpost-accent)]">
+                    {visibleUnlockedCount}/{visibleTotal}
+                  </span>
+                </div>
+              )}
 
               <div className="mt-4 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white">Reset local Outpost data</p>
+                  <p className="text-sm font-semibold text-white">{dark ? "Reset local data" : "Reset local Outpost data"}</p>
                   <p className="mt-0.5 text-xs text-slate-400">
-                    Clears achievements, quiz stats, and visit streaks stored in
-                    this browser. Doesn&apos;t change the switch above.
+                    {dark
+                      ? "Clears everything it has kept in this browser. Doesn't change the switch above."
+                      : "Clears achievements, quiz stats, and visit streaks stored in this browser. Doesn't change the switch above."}
                   </p>
                 </div>
                 <button

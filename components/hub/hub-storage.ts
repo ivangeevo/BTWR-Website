@@ -329,7 +329,9 @@ export function normalizeState(raw: unknown): HubState | null {
       },
       upgrades,
       camp: normalizeCamp(parsed.camp),
-      engine: normalizeEngineState(parsed.engine),
+      // A save from before the Engine existed has no slice: it was already
+      // playing, so it resumes at Stage 1 rather than a new save's Stage 0.
+      engine: normalizeEngineState(parsed.engine ?? {}),
       survival,
       tier2,
       unlocked,

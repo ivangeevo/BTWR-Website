@@ -11,6 +11,7 @@ import { isDialCipher } from "./stages";
 import type { BeliefAxis } from "./types";
 
 export const ENGINE_ACHIEVEMENT_IDS = [
+  "en-before-words",
   "en-day-two",
   "en-first-ask",
   "en-believer",
@@ -62,6 +63,7 @@ function def(
 }
 
 export const ENGINE_ACHIEVEMENT_DEFS: AchievementDef[] = [
+  def("en-before-words", "Before Words", "Helped something in the dark find its name.", "\u{1F56F}\u{FE0F}", { secret: true, xp: 150 }),
   def("en-day-two", "Day Two", "Ponder made it through its first night.", "\u{1F305}"),
   def("en-first-ask", "It Asked You Something", "Answered one of the Engine's questions.", "\u{2753}"),
   def("en-believer", "Confidant", "Answered 10 of the Engine's questions.", "\u{1F5E3}\u{FE0F}", { xp: 75 }),
@@ -187,5 +189,7 @@ export const ENGINE_CUSTOM_RULES: { id: AchievementId; check: (c: Ctx) => boolea
       check: (c) => c.state.engine.ciphers.solved.some((id) => isDialCipher(id)),
     },
     { id: "en-letter", check: (c) => c.state.engine.letter !== null },
+    // Only a save that started at Stage 0 has a stirring to wake from.
+    { id: "en-before-words", check: (c) => !!c.state.engine.stirring?.woke },
     { id: "pd-old-friend", check: (c) => c.state.engine.mark >= 2 && c.state.engine.journal.length >= 20 },
 ];

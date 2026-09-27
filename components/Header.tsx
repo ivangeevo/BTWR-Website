@@ -8,6 +8,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import {
   EVT_OUTPOST_TOGGLED,
   queueSecret,
+  readEnginePublic,
   readOutpostEnabled,
 } from "@/components/hub/engine/bridge-storage";
 import HeaderCompanion from "@/components/hub/engine/ui/HeaderCompanion";
@@ -31,10 +32,11 @@ function isCurrent(pathname: string, href: string) {
 }
 
 // Off until the client has read the save, so the server render matches.
-function useOutpostLink(): boolean {
-  const [shown, setShown] = useState(false);
+// Named ??? while the Engine is still at Stage 0 (engine/content/stirring.ts).
+function useOutpostLink(): { shown: boolean; dark: boolean } {
+  const [link, setLink] = useState({ shown: false, dark: false });
   useEffect(() => {
-    const sync = () => setShown(readOutpostEnabled());
+    const sync = () => setLink({ shown: readOutpostEnabled(), dark: readEnginePublic()?.stage === 0 });
     sync();
     window.addEventListener("storage", sync);
     window.addEventListener(EVT_OUTPOST_TOGGLED, sync);
@@ -43,7 +45,7 @@ function useOutpostLink(): boolean {
       window.removeEventListener(EVT_OUTPOST_TOGGLED, sync);
     };
   }, []);
-  return shown;
+  return link;
 }
 
 const getBtwrLink = { href: "/get-btwr", label: "Get BTWR!" };
@@ -52,8 +54,8 @@ export default function Header() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const logoClicksRef = useRef<number[]>([]);
-  const showOutpost = useOutpostLink();
-  const navLinks = showOutpost ? [...baseLinks, outpostLink] : baseLinks;
+  const outpost = useOutpostLink();
+  const navLinks = outpost.shown ? [...baseLinks, outpost.dark ? { ...outpostLink, label: "???" } : outpostLink] : baseLinks;
   // The Outpost fills the screen under the header, so the header slims down there.
   const onOutpost = isCurrent(pathname, outpostLink.href);
 

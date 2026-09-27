@@ -131,8 +131,8 @@ export const FLAIR_BADGES: FlairBadge[] = [
   { icon: "\u{1F3C5}", name: "Veteran's Medal", unlockLevel: 20 },
 ];
 
-// Revealed one at a time, in order, on each level-up — accumulates into a
-// readable "logbook" inside the Outpost. Cycles once the pool runs out so
+// Revealed one at a time, in order, on each level-up — accumulates in the
+// Engine's Soul tab, under Lore (engine/ui/LogbookTab.tsx). Cycles once the pool runs out so
 // higher levels don't dead-end with nothing new.
 export const LORE_SNIPPETS: string[] = [
   "Early log: the millstone doesn't care how tired your arm is. Grind first, ask questions later.",

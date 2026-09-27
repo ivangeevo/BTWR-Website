@@ -88,7 +88,7 @@ export type AdminConfig = {
   /** Flat amount Wood Gathering/Hunting grant per completed chop/trip. */
   collectAmounts: { wood: number; food: number };
   /** Tip strings shown (rotating every 60s if more than one) while the
-   * Engine is at that stage — see StageTip.tsx. Empty/missing means no tip
+   * Engine is at that stage — see ChapterBar.tsx. Empty/missing means no tip
    * box at that stage. */
   stageTips: Partial<Record<number, string[]>>;
   features: FeaturesConfig;
@@ -371,7 +371,9 @@ export function importAdminConfig(raw: string): AdminConfig | null {
 
 // --- Resolved (default + admin-override) views, used by both the panel and the live site ---
 
+// Ponder is always there, from Stage 0 on: it's the only thing a new save shows.
 export function resolvedModuleStage(config: AdminConfig, moduleId: ModuleId): number {
+  if (moduleId === "ponder") return 0;
   return config.moduleStage[moduleId] ?? DEFAULT_MODULE_STAGE[moduleId];
 }
 

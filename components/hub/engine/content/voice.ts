@@ -60,7 +60,7 @@ export function popReasonText(p: PopInfo, maxChain: number): string {
 export function popFixText(p: PopInfo, type: GridPartType): string {
   if (p.reason === "overload") {
     return type === "gearbox"
-      ? " Research stronger gear teeth in Works, use a Soulforged Gearbox, or run straight axles into the core instead."
+      ? " Research stronger gear teeth, use a Soulforged Gearbox, or run straight axles into the core instead."
       : " Split the load, or run straight axles into the core instead.";
   }
   if (p.reason === "chain") return " Put a gearbox in the run to reset it.";

@@ -30,7 +30,7 @@ import {
   type Tier2State,
 } from "./hub-storage";
 import { currentCampfireStage, type CampfireStage } from "./campfire-stage";
-import { computeBuffs, type EngineBuffs } from "./engine/buffs";
+import { computeBuffs, NO_BUFFS, type EngineBuffs } from "./engine/buffs";
 import { researchEffects } from "./engine/catalog/research";
 import { resolveEngineConfig, type EngineConfig } from "./engine/config";
 import { settle } from "./engine/economy";
@@ -666,6 +666,13 @@ export function AchievementsProvider({ children, mods = NO_MODS }: { children: R
   // synchronously by the survival tick and the capability mutators, same
   // reasoning as the other refs.
   const campRef = useRef<CampState>(defaultCampState());
+  // What the Engine's lit core and powered Hibachi do for the camp (its light
+  // against the gloom, calling you home) — mirrored from engineBuffs below
+  // for the survival tick and die(), which read refs.
+  const engineBuffsRef = useRef<EngineBuffs>(NO_BUFFS);
+  // The gloom night underway, if any, and whether it has cost a life yet —
+  // to count the nights survived (SurvivalState.gloomNightsSurvived).
+  const gloomNightRef = useRef<{ on: boolean; died: boolean }>({ on: false, died: false });
   // The visitor's pick on The Stump's experience screen — survival only
   // ever runs for "survival". Read synchronously by survivalOn().
   const experienceRef = useRef<ExperienceMode | null>(null);
@@ -1126,7 +1133,8 @@ export function AchievementsProvider({ children, mods = NO_MODS }: { children: R
   const die = useCallback(
     (cause: DeathCause) => {
       const nowMs = Date.now();
-      survivalRef.current = respawn(survivalRef.current, cause, nowMs, survivalMech());
+      gloomNightRef.current.died = true;
+      survivalRef.current = respawn(survivalRef.current, cause, nowMs, survivalMech(), Math.random, engineBuffsRef.current.trekMult);
       saveCycleStartedAt(skipToMorning(loadCycleStartedAt(), nowMs));
       const blocks = survivalRef.current.stranded?.blocks ?? 0;
       commitSurvival(`Died to ${DEATH_CAUSE_TEXT[cause]} · woke up ~${blocks.toLocaleString()} blocks from spawn`);
@@ -2045,6 +2053,7 @@ export function AchievementsProvider({ children, mods = NO_MODS }: { children: R
         setGloomLevel(0);
         setGloomNight(false);
         setGloomForced(false);
+        gloomNightRef.current = { on: false, died: false };
         return;
       }
 
@@ -2059,12 +2068,27 @@ export function AchievementsProvider({ children, mods = NO_MODS }: { children: R
       const phase = debug.forceGloom ? { ...cyclePhase, moonPhaseIndex: 0 } : cyclePhase;
       const gloom = isGloomNight(phase);
       setGloomForced(debug.forceGloom === true);
+      // A gloom night that ends with the visitor alive is one survived.
+      const night = gloomNightRef.current;
+      if (gloom && !night.on) {
+        gloomNightRef.current = { on: true, died: false };
+      } else if (!gloom && night.on) {
+        gloomNightRef.current = { on: false, died: false };
+        if (!night.died) {
+          survivalRef.current = { ...survivalRef.current, gloomNightsSurvived: survivalRef.current.gloomNightsSurvived + 1 };
+          commitSurvival("Made it through a gloom night");
+        }
+      }
       // Only a lit fire keeps the gloom off — wherever you are, since the
       // Campfire goes with you. No fire crafted yet means no shelter at all,
-      // unless there's a torch to light for the night.
+      // unless there's a torch to light for the night. A powered Hibachi on
+      // the Engine is a fire too; its lit core alone only holds part of the
+      // gloom back (engine/buffs.ts).
+      const engineLight = engineBuffsRef.current;
       const fireLit =
-        campfireRef.current.built &&
-        currentCampfireStage(campfireRef.current, campfireDecayMinutes(), new Date(nowMs)) > 0;
+        engineLight.hibachiLit ||
+        (campfireRef.current.built &&
+          currentCampfireStage(campfireRef.current, campfireDecayMinutes(), new Date(nowMs)) > 0);
       const segment = cycleSegmentIndex(loadCycleStartedAt(), nowMs);
       let torchLit = isTorchLit(campRef.current, segment);
       if (gloom && !fireLit && !torchLit && upgradesRef.current.purchased.includes("torches")) {
@@ -2076,13 +2100,18 @@ export function AchievementsProvider({ children, mods = NO_MODS }: { children: R
         }
       }
       const sheltered = fireLit || torchLit;
-      const shown = sheltered ? 0 : Math.round(gloomDarkness(phase) * 100) / 100;
+      const shown = sheltered ? 0 : Math.round(gloomDarkness(phase) * (1 - engineLight.gloomShield) * 100) / 100;
       setGloomLevel(shown);
       setGloomNight(gloom);
 
       if (dtMs <= 0) return;
       const before = survivalRef.current;
-      const { state: after, died } = tickVitals(before, dtMs, { gloomNight: gloom, fireLit: sheltered }, survivalMech());
+      const { state: after, died } = tickVitals(
+        before,
+        dtMs,
+        { gloomNight: gloom, fireLit: sheltered, gloomShield: engineLight.gloomShield },
+        survivalMech()
+      );
       survivalRef.current = after;
       if (died) {
         die(died);
@@ -2209,6 +2238,9 @@ export function AchievementsProvider({ children, mods = NO_MODS }: { children: R
     () => computeBuffs(state.engine, engineConfig, researchEffects(state.engine.research)),
     [state.engine, engineConfig]
   );
+  useEffect(() => {
+    engineBuffsRef.current = engineBuffs;
+  }, [engineBuffs]);
   const mechanicsResolved = useMemo(() => {
     return {
       campfire: resolvedMechanic<CampfireMechanic>(adminConfig, "campfire"),

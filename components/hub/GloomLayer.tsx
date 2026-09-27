@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { enableOutpostAdmin } from "@/lib/site-config";
 import { useAchievements } from "./AchievementsProvider";
 
 // The gloom (survival.ts): on the evening before a New Moon night the whole
@@ -13,6 +14,7 @@ import { useAchievements } from "./AchievementsProvider";
 //
 // While the admin debug flag makes every night a gloom night, a notice says
 // so — otherwise a forgotten flag just looks like far too many New Moons.
+// Only where the admin panel exists (enableOutpostAdmin), since it links there.
 export default function GloomLayer() {
   const { gloomLevel, gloomForced } = useAchievements();
   return (
@@ -22,7 +24,7 @@ export default function GloomLayer() {
         className="outpost-gloom pointer-events-none absolute inset-0"
         style={{ opacity: gloomLevel * 0.85 }}
       />
-      {gloomForced && (
+      {gloomForced && enableOutpostAdmin && (
         <Link
           href="/outpost-admin"
           className="outpost-lit absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-rose-400/40 bg-black/80 px-3 py-1 text-[11px] font-semibold text-rose-200 hover:border-rose-300"

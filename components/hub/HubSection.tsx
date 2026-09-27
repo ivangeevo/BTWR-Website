@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
 import type { Mod } from "@/lib/mods";
 import { AchievementsProvider, useAchievements } from "./AchievementsProvider";
 import AccomplishmentsSection from "./AccomplishmentsSection";
 import AchievementToastStack from "./AchievementToastStack";
 import CampRail, { useCampRailShown } from "./CampRail";
+import ChapterBar from "./ChapterBar";
 import ExperiencePicker from "./ExperiencePicker";
 import OutpostCorners from "./OutpostCorners";
 import OutpostSettings from "./OutpostSettings";
@@ -12,18 +14,19 @@ import OutpostTabs, { OutpostTabPanel, useOutpostTabs } from "./OutpostTabs";
 import Ponder from "./Ponder";
 import PrestigeBadge from "./PrestigeBadge";
 import GloomLayer from "./GloomLayer";
-import StageTip from "./StageTip";
 import StrandedPanel from "./StrandedPanel";
 import YourProgressSection from "./YourProgressSection";
-import type { ModuleId } from "./module-registry";
 import { EngineProvider } from "./engine/ui/EngineProvider";
 import { EngineToasts, EurekaLayer } from "./engine/ui/overlays/EngineOverlays";
+import { STAGES } from "./engine/stages";
 import { OUTPOST_VERSION } from "./outpost-version";
 import { SKINS_BY_ID } from "./tier2";
 
 // The Outpost, on its own page (/outpost) and exactly one screen tall.
 // The page never scrolls, each part scrolls inside itself.
-// - A slim top bar: title, the Basecamp/Progress/Achievements tabs, rank, settings.
+// - A slim top bar: title and chapter, the Basecamp/Progress/Achievements
+//   tabs, rank, settings. Under it the chapter bar (ChapterBar.tsx): what
+//   the Outpost's next chapter needs, from the Engine and from you.
 // - Basecamp is two parts. The main view, under the stage tip, is the
 //   Engine (the Ponder card, the same size on every one of its tabs).
 //   Beside it, the Camp rail (CampRail.tsx): Stats & Materials, Tonight's
@@ -32,15 +35,6 @@ import { SKINS_BY_ID } from "./tier2";
 // - Progress and Achievements fill the space under the bar.
 // Below the lg breakpoint (a narrow desktop window) the columns stack and
 // the page scrolls normally instead; see .outpost-screen in globals.css.
-
-// Shows a module once the Engine reaches the stage that reveals it
-// (module-registry.ts's DEFAULT_MODULE_STAGE, admin-overridable) — the one
-// place this decision gets made.
-function ModuleGate({ id, children }: { id: ModuleId; children: React.ReactNode }) {
-  const { isModuleRevealed } = useAchievements();
-  if (!isModuleRevealed(id)) return null;
-  return <>{children}</>;
-}
 
 // Cosmetic-only "rank" derived from achievement completion — no separate
 // tracking, just a label over the same unlocked/total ratio already shown
@@ -57,11 +51,24 @@ function rankForProgress(unlockedCount: number, total: number): string {
 
 // The slim bar across the top: status and title (with the Prestige badge),
 // the tabs in the middle, the rank bar and settings gear on the right.
+// At Stage 0 ("???", engine/content/stirring.ts) nothing gives away that
+// this is more than one strange card: no name, no status, no rank, no
+// Prestige — and the tab's own title says ??? too.
 function TopBar({ tabs }: { tabs: ReturnType<typeof useOutpostTabs> }) {
-  const { unlocked, mounted, achievements } = useAchievements();
+  const { unlocked, mounted, achievements, engine } = useAchievements();
   const totalUnlocked = unlocked.size;
   const totalAchievements = achievements.length;
   const percent = mounted ? Math.round((totalUnlocked / totalAchievements) * 100) : 0;
+  const dark = mounted && engine.stage === 0;
+
+  useEffect(() => {
+    if (!dark) return;
+    const was = document.title;
+    document.title = "???";
+    return () => {
+      document.title = was;
+    };
+  }, [dark]);
 
   return (
     <div
@@ -71,17 +78,23 @@ function TopBar({ tabs }: { tabs: ReturnType<typeof useOutpostTabs> }) {
       className="relative z-40 grid shrink-0 items-center gap-3 border-b border-white/10 px-4 py-2.5 sm:grid-cols-[1fr_auto_1fr]"
     >
       <div className="flex min-w-0 items-center gap-3">
-        <span className="outpost-status-tag">
-          <span className="outpost-status-dot outpost-status-dot-online" aria-hidden="true" />
-          Online
-        </span>
-        <h1 className="truncate font-heading text-xl font-extrabold tracking-wide text-white">The Outpost</h1>
-        <PrestigeBadge />
+        {dark ? (
+          <span className="outpost-status-tag">…</span>
+        ) : (
+          <span className="outpost-status-tag">
+            <span className="outpost-status-dot outpost-status-dot-online" aria-hidden="true" />
+            Online
+          </span>
+        )}
+        <h1 className="truncate font-heading text-xl font-extrabold tracking-wide text-white">{dark ? "???" : "The Outpost"}</h1>
+        {/* The chapter the whole Outpost is in (the Engine's stage) — see ChapterBar. */}
+        {mounted && !dark && <span className="outpost-resource-chip shrink-0">{STAGES[engine.stage].chapter}</span>}
+        {!dark && <PrestigeBadge />}
       </div>
       {/* Keeps the three-part grid in shape while the tab bar is hidden. */}
       {tabs.available.length > 1 ? <OutpostTabs {...tabs} /> : <div />}
       <div className="flex items-center gap-3 sm:justify-end">
-        {mounted && (
+        {mounted && !dark && (
           <div className="w-44" title={`${totalUnlocked} of ${totalAchievements} achievements`}>
             <div className="flex items-center justify-between text-[0.65rem] font-semibold uppercase tracking-wider text-white/50">
               {/* Plain live count, not <CountUp> — this keeps changing all session. */}
@@ -110,9 +123,6 @@ function Basecamp() {
   return (
     <div className="flex flex-col gap-4 p-3 sm:p-4 lg:absolute lg:inset-0 lg:flex-row">
       <div className={`flex flex-col gap-3 lg:min-h-0 lg:min-w-0 lg:flex-1 ${centred}`}>
-        <ModuleGate id="stage-tip">
-          <StageTip />
-        </ModuleGate>
         {/* Hardcore Spawn: only there while a respawn's trek home is underway. */}
         <StrandedPanel />
         <div data-module-id="ponder" className="lg:min-h-0 lg:flex-1">
@@ -141,12 +151,13 @@ function OutpostFrame() {
 
   return (
     <div
-      className="outpost-frame relative mx-auto flex w-full max-w-[120rem] flex-col lg:min-h-0 lg:flex-1"
+      className="outpost-frame outpost-no-select relative mx-auto flex w-full max-w-[120rem] flex-col lg:min-h-0 lg:flex-1"
       style={style}
       data-reduced-motion={settings.reducedMotion || undefined}
     >
       <OutpostCorners />
       <TopBar tabs={tabs} />
+      <ChapterBar />
       {/* Basecamp stays mounted while another tab is open, so its cards keep
           their in-progress state; the other two mount when opened. */}
       <OutpostTabPanel

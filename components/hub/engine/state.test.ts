@@ -15,8 +15,37 @@ describe("normalizeEngineState", () => {
 
   it("clamps bad stages and survives garbage", () => {
     expect(normalizeEngineState({ stage: 42 }).stage).toBe(8);
-    expect(normalizeEngineState(null).stage).toBe(1);
+    expect(normalizeEngineState(null).stage).toBe(0);
     expect(normalizeEngineState("nope").insight).toBe(0);
+  });
+
+  it("starts a new save at Stage 0, still in the dark", () => {
+    const e = defaultEngineState();
+    expect(e.stage).toBe(0);
+    expect(e.stirring).toEqual({ found: [], woke: false });
+    expect(stageTitle(0, 1)).toBe("???");
+    expect(e.public.title).toBe("???");
+  });
+
+  it("leaves a save from before Stage 0 where it was", () => {
+    const e = normalizeEngineState({ stage: 1, stageEnteredAt: { 1: "2026-01-01T00:00:00.000Z" }, ceremoniesSeen: [1] });
+    expect(e.stage).toBe(1);
+    expect(e.stirring).toBeNull();
+    expect(e.stageEnteredAt).toEqual({ 1: "2026-01-01T00:00:00.000Z" });
+    expect(normalizeEngineState({ insight: 5 }).stage).toBe(1);
+  });
+
+  it("starts an old save's camp log empty and drops malformed entries", () => {
+    expect(normalizeEngineState({ stage: 5 }).campLog).toEqual([]);
+    const entry = { at: "2026-09-27T12:00:00.000Z", text: "Made it home." };
+    expect(normalizeEngineState({ stage: 5, campLog: [entry, { at: 3 }, "x"] }).campLog).toEqual([entry]);
+  });
+
+  it("keeps Stage 0's letters across a reload", () => {
+    const e = normalizeEngineState({ stage: 0, stirring: { found: ["P", "O", 3], woke: false } });
+    expect(e.stage).toBe(0);
+    expect(e.stirring).toEqual({ found: ["P", "O"], woke: false });
+    expect(normalizeEngineState({ stage: 0 }).stirring).toEqual({ found: [], woke: false });
   });
 
   it("repairs a grid whose cell count doesn't match its size", () => {

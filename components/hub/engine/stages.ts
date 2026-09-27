@@ -9,6 +9,9 @@ import type { EngineStage, EngineState, GridPartType, SolveSummary } from "./typ
 export type StageDef = { stage: EngineStage; chapter: string; caption: string };
 
 export const STAGES: Record<EngineStage, StageDef> = {
+  // Before it has words (content/stirring.ts). Its caption shifts as the
+  // letters turn up — see stirringCaption; this one is only a fallback.
+  0: { stage: 0, chapter: "…", caption: "something is here." },
   1: { stage: 1, chapter: "Day One", caption: "Punching trees for shafts, not logs. Same as you." },
   2: { stage: 2, chapter: "Day Two", caption: "Waiting for daylight before it decides anything." },
   3: { stage: 3, chapter: "The Stump", caption: "Found a blueprint in its own head. Can't read it yet." },
@@ -48,6 +51,7 @@ export function roman(n: number): string {
 }
 
 export function stageTitle(stage: EngineStage, mark: number): string {
+  if (stage === 0) return "???";
   if (stage <= 3) return "Ponder";
   if (stage === 4) return mark > 1 ? `The Contraption, Mark ${roman(mark)}` : "The Contraption";
   return mark > 1 ? `The Analytical Engine, Mark ${roman(mark)}` : "The Analytical Engine";
@@ -158,6 +162,10 @@ export function evaluateGate(next: EngineStage, e: EngineState, g: EngineGateMec
   let cost = 0;
   const engaged = e.grid.clutch && !!e.solved;
   switch (next) {
+    // Out of Stage 0: it has spelled its own name.
+    case 1:
+      reqs.push(flag("woke", "…", !!e.stirring?.woke));
+      break;
     case 2:
       reqs.push(count("solves", "Finish sentences", e.solvedCount, g.s2Solves));
       reqs.push(

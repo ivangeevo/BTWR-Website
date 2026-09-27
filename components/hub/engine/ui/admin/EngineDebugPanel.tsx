@@ -89,6 +89,21 @@ export default function EngineDebugPanel() {
     }, `Jumped to Stage ${stage} (${STAGES[stage].chapter}). Its ceremony plays on next load.`);
   }
 
+  // Back to Stage 0 ("???") with no letters found, to play the waking again.
+  // Everything else in the save stays as it is.
+  function jumpToDark() {
+    apply(
+      (cur) => ({
+        ...cur,
+        stage: 0,
+        stageEnteredAt: { ...cur.stageEnteredAt, 0: new Date().toISOString() },
+        ceremoniesSeen: [],
+        stirring: { found: [], woke: false },
+      }),
+      "Back in the dark (Stage 0). Reload the Outpost to see it."
+    );
+  }
+
   const Btn = ({ onClick, children }: { onClick: () => void; children: React.ReactNode }) => (
     <button
       type="button"
@@ -132,6 +147,7 @@ export default function EngineDebugPanel() {
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-white/50">Jump to stage</h3>
         <div className="mt-2 flex flex-wrap gap-1.5">
+          <Btn onClick={jumpToDark}>0. {STAGES[0].chapter} (???)</Btn>
           {ENGINE_STAGES.map((s) => (
             <Btn key={s} onClick={() => jumpTo(s)}>
               {s}. {STAGES[s].chapter}
@@ -289,7 +305,7 @@ export default function EngineDebugPanel() {
           <Btn onClick={() => apply(() => defaultEngineState(), "Engine reset to a fresh Day One (the rest of the Outpost untouched).")}>
             Reset the Engine only
           </Btn>
-          <Btn onClick={() => apply((cur) => ({ ...cur, tutorialsSeen: [] }), "Tutorials will play again.")}>Replay all tutorials</Btn>
+          <Btn onClick={() => apply((cur) => ({ ...cur, tutorialsSeen: [], tutorialsOff: false }), "Tutorials will play again.")}>Replay all tutorials</Btn>
         </div>
       </section>
 

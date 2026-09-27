@@ -3,6 +3,7 @@
 
 # next.js
 /.next/
+/.next-player/
 /out/
 
 # production
@@ -24,3 +25,6 @@ next-env.d.ts
 # Claude Code — settings.json (shared permissions/commands) is checked in,
 # settings.local.json is per-machine and shouldn't be.
 .claude/settings.local.json
+
+# Persistent Firefox debug profile (keeps localStorage between launches)
+.vscode/firefox-profile*/

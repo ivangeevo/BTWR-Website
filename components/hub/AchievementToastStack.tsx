@@ -81,9 +81,12 @@ function Toast({
 const MAX_SHOWN = 4;
 
 export default function AchievementToastStack() {
-  const { toasts, dismissToast, dismissAllToasts } = useAchievements();
+  const { toasts, dismissToast, dismissAllToasts, engine } = useAchievements();
 
-  if (toasts.length === 0) return null;
+  // Held back at Stage 0 ("???"): achievements would give away that there's
+  // more here. They pile up unseen (a toast's timer only starts once it's
+  // shown) and arrive together when the Engine wakes.
+  if (toasts.length === 0 || engine.stage === 0) return null;
 
   const newestOnTop = [...toasts].reverse().slice(0, MAX_SHOWN);
 

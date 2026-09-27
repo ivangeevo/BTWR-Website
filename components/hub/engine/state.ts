@@ -4,6 +4,7 @@ import { layoutFor, remapGrid } from "./grid/layouts";
 import { stageTitle } from "./stages";
 import type {
   BeliefAxis,
+  CampLogEntry,
   CommissionInstance,
   EngineCounterKey,
   EngineCounters,
@@ -58,13 +59,17 @@ export function emptySummary(): SolveSummary {
 }
 
 export const JOURNAL_MAX = 40;
+export const CAMP_LOG_MAX = 60;
 
 export function defaultEngineState(now: string = new Date(0).toISOString()): EngineState {
   return {
-    stage: 1,
-    stageEnteredAt: { 1: now },
-    ceremoniesSeen: [1],
+    stage: 0,
+    stageEnteredAt: { 0: now },
+    ceremoniesSeen: [],
     tutorialsSeen: [],
+    tutorialsOff: false,
+    stirring: { found: [], woke: false },
+    campLog: [],
     solvedCount: 0,
     choicesMade: 0,
     solvesByKind: { tiles: 0, fork: 0, modFact: 0, live: 0, paragraph: 0 },
@@ -105,8 +110,8 @@ export function defaultEngineState(now: string = new Date(0).toISOString()): Eng
     counters: defaultCounters(),
     firstPopRefunded: false,
     public: {
-      stage: 1,
-      title: "Ponder",
+      stage: 0,
+      title: "???",
       ips: 0,
       corePU: 0,
       insight: 0,
@@ -178,7 +183,8 @@ export function normalizeEngineState(raw: unknown): EngineState {
   const base = defaultEngineState();
   if (!isObj(raw)) return base;
   const r = raw as Partial<EngineState> & Record<string, unknown>;
-  const stage = Math.min(8, Math.max(1, Math.floor(num(r.stage, 1)))) as EngineStage;
+  // A save with no stage at all predates Stage 0, so it resumes at 1.
+  const stage = Math.min(8, Math.max(0, Math.floor(num(r.stage, 1)))) as EngineStage;
   const grid = isObj(r.grid)
     ? {
         w: num(r.grid.w, 0),
@@ -223,9 +229,20 @@ export function normalizeEngineState(raw: unknown): EngineState {
     ...base,
     ...r,
     stage,
-    stageEnteredAt: { ...base.stageEnteredAt, ...(isObj(r.stageEnteredAt) ? r.stageEnteredAt : {}) },
+    // Not merged over the defaults: those carry Stage 0's entry, which an
+    // older save never had.
+    stageEnteredAt: isObj(r.stageEnteredAt) ? (r.stageEnteredAt as EngineState["stageEnteredAt"]) : { [stage]: base.settledAt },
     ceremoniesSeen: arr(r.ceremoniesSeen, base.ceremoniesSeen),
     tutorialsSeen: arr(r.tutorialsSeen, []),
+    tutorialsOff: r.tutorialsOff === true,
+    stirring: isObj(r.stirring)
+      ? { found: arr<string>(r.stirring.found, []).filter((x) => typeof x === "string"), woke: r.stirring.woke === true }
+      : stage === 0
+        ? base.stirring
+        : null,
+    campLog: arr<unknown>(r.campLog, [])
+      .filter((x): x is CampLogEntry => isObj(x) && typeof x.at === "string" && typeof x.text === "string")
+      .slice(0, CAMP_LOG_MAX),
     solvedCount: num(r.solvedCount, 0),
     choicesMade: num(r.choicesMade, 0),
     solvesByKind: { ...base.solvesByKind, ...(isObj(r.solvesByKind) ? r.solvesByKind : {}) },
