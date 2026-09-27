@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Ticks down the shared activity cooldown (Wood Gathering / Hunting / Mining
-// all set the same `activity.cooldownUntil`) so each card can show its own
-// "resting" countdown without re-deriving the math three times.
+// Ticks down to a stored "until" timestamp — Gathering's shared rest timer,
+// a trek home — without each card re-deriving the math.
 export function useCooldownRemaining(cooldownUntil: string | null): number {
   const [remainingMs, setRemainingMs] = useState(0);
 
@@ -32,21 +31,28 @@ export function CooldownNotice({ remainingMs }: { remainingMs: number }) {
   );
 }
 
-// Click-and-wait mechanic for every Gathering activity (Wood Gathering,
-// Hunting, Mining) — no hold required, just runs the bar
-// to completion once started (leaving is fine, it keeps going).
+// Click-and-wait mechanic for every Gathering activity and the Campfire's
+// cooking — no hold required, just runs the bar to completion once started
+// (leaving is fine, it keeps going). To cancel a run partway, remount it
+// (change its `key`), as the Campfire does when the fire leaves Medium.
+// onRunningChange lets a folded Camp rail header show that a run is going.
 export function LoadingBarButton({
   durationMs,
   disabled,
   idleLabel,
   runningLabel,
   onComplete,
+  onRunningChange,
+  className = "",
 }: {
   durationMs: number;
   disabled: boolean;
   idleLabel: string;
-  runningLabel: string;
+  /** Static text, or built from the time left so the button can count down. */
+  runningLabel: string | ((remainingMs: number) => string);
   onComplete: () => void;
+  onRunningChange?: (running: boolean) => void;
+  className?: string;
 }) {
   const [progress, setProgress] = useState(0);
   const runningRef = useRef(false);
@@ -54,6 +60,8 @@ export function LoadingBarButton({
   const rafRef = useRef<number | null>(null);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+  const onRunningRef = useRef(onRunningChange);
+  onRunningRef.current = onRunningChange;
 
   function tick() {
     if (!runningRef.current) return;
@@ -63,6 +71,7 @@ export function LoadingBarButton({
     if (p >= 1) {
       runningRef.current = false;
       setProgress(0);
+      onRunningRef.current?.(false);
       onCompleteRef.current();
       return;
     }
@@ -73,12 +82,15 @@ export function LoadingBarButton({
     if (disabled || runningRef.current) return;
     runningRef.current = true;
     startedAtRef.current = performance.now();
+    onRunningRef.current?.(true);
     rafRef.current = requestAnimationFrame(tick);
   }
 
   useEffect(() => {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      // Unmounted mid-run (a cancelled cook, a switched Gathering tab).
+      if (runningRef.current) onRunningRef.current?.(false);
     };
   }, []);
 
@@ -89,10 +101,16 @@ export function LoadingBarButton({
       type="button"
       disabled={disabled || running}
       onClick={start}
-      className="outpost-hold-button"
+      className={`outpost-hold-button ${className}`}
     >
       <span className="outpost-hold-button-fill" style={{ width: `${progress * 100}%` }} aria-hidden="true" />
-      <span className="relative z-10">{running ? runningLabel : idleLabel}</span>
+      <span className="relative z-10">
+        {!running
+          ? idleLabel
+          : typeof runningLabel === "function"
+            ? runningLabel(durationMs * (1 - progress))
+            : runningLabel}
+      </span>
     </button>
   );
 }

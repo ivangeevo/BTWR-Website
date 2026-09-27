@@ -46,7 +46,7 @@ export const MODULES: ModuleDef[] = [
     id: "gathering",
     label: "Gathering",
     description:
-      "Wood Gathering / Hunting / Mining combined into one card with tab toggles — Wood Gathering is always available, Hunting and Mining reveal as later tiers unlock.",
+      "Wood Gathering / Hunting / Mining (plus Fishing and Farming from the Upgrades shop) combined into one card with tab toggles — Wood Gathering is always available, Hunting opens at The Stump and Mining with Stone Tools.",
   },
   { id: "patch-notes", label: "Patch Notes", description: "Modpack/mod changelog feed." },
   { id: "crafting", label: "Crafting", description: "Spend resources on better tools." },
@@ -72,7 +72,7 @@ export const MODULES: ModuleDef[] = [
 // day's reading, The Stump opens the camp (fire, gathering, crafting), and
 // First Iron adds the quiz. The Progress and Achievements tabs are there
 // from the start. prestige/upgrades are here only because this is a total
-// Record over ModuleId; Prestige opens at Stage 8 and the Upgrades badge
+// Record over ModuleId; Prestige opens at Stage 8 and the Upgrades section
 // uses FeaturesConfig.upgradesStage.
 export const DEFAULT_MODULE_STAGE: Record<ModuleId, number> = {
   ponder: 1,
@@ -87,22 +87,38 @@ export const DEFAULT_MODULE_STAGE: Record<ModuleId, number> = {
   "your-progress": 1,
   accomplishments: 1,
   prestige: 8,
-  upgrades: 2,
+  upgrades: 3,
   // Not a card either: Health/Hunger/Hardcore Spawn switch on at
   // FeaturesConfig.survivalStage (admin-config.ts). Here only so this stays
   // a total Record over ModuleId, same as prestige/upgrades above.
   survival: 3,
 };
 
-// Default order for the card grid (see HubSection.tsx; the Engine, "ponder",
-// has its own column there, so its place in this list is ignored) — a single flat
+// Where each card lives in Basecamp (HubSection.tsx): the Camp rail (the
+// survival work, always on screen, as an accordion — CampRail.tsx) or the
+// Notice Board (the daily reads and the quiz, a card grid in the main view
+// next to the Engine). The Engine ("ponder"), Stats & Materials and the
+// Upgrades shop have fixed places of their own.
+export type ModuleGroup = "camp" | "board";
+
+export const MODULE_GROUP: Partial<Record<ModuleId, ModuleGroup>> = {
+  campfire: "camp",
+  gathering: "camp",
+  crafting: "camp",
+  "daily-briefing": "board",
+  "patch-notes": "board",
+  "guess-the-mod": "board",
+};
+
+// Default order for the Notice Board's grid (see HubSection.tsx; only its
+// "board" cards are drawn there, so the other ids' places are ignored) — a single flat
 // list now that the grid is one modular 2-column layout instead of two
 // independently-stacked columns, laid out row-major (index 0 and 1 share a
 // row, 2 and 3 share the next, etc). This interleaving of the old left/right
 // lists (ponder, patch-notes, daily-briefing, campfire, ...) exactly
 // reproduces the row pairings the old two-column layout already had, since
-// every card is the same height — so a visitor who hasn't bought the
-// card-reorder upgrade (or hasn't dragged anything yet) sees no change.
+// every card is the same height — so a visitor who hasn't dragged anything
+// yet sees no change.
 // Drag order is stored flat in HubState.upgrades.cardOrder, falling back to
 // this. The tier-1-only Achievement Gallery preview isn't included — it
 // stays pinned at the end of the grid regardless of reordering, same

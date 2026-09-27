@@ -40,7 +40,7 @@ function outlineOf(el: HTMLElement): Outline {
 // thing it's talking about and a speech bubble below it. One tutorial at a
 // time, 1–3 steps each, skippable; the Logbook can replay any of them.
 export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLElement> }) {
-  const { e, ceremony, markTutorialSeen, workshopOpen } = useEngine();
+  const { e, ceremony, markTutorialSeen } = useEngine();
   const tut = ceremony ? null : pendingTutorial(e);
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState<Outline | null>(null);
@@ -109,7 +109,7 @@ export default function GuidedHighlight({ root }: { root: React.RefObject<HTMLEl
       window.removeEventListener("resize", measure);
       mo?.disconnect();
     };
-  }, [target, root, workshopOpen, e.stage]);
+  }, [target, root, e.stage]);
 
   const s = tut?.steps[step];
   if (!tut || !s || waiting) return null;

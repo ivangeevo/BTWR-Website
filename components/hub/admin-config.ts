@@ -16,7 +16,7 @@ import {
   type CustomAchievement,
 } from "./custom-achievements";
 import { OUTPOST_VERSION } from "./outpost-version";
-import { UPGRADES, type UpgradeDef, type UpgradeId } from "./upgrade-catalog";
+import { isUpgradeId, UPGRADES, type UpgradeDef, type UpgradeId } from "./upgrade-catalog";
 import {
   RESOURCE_IDS,
   RESOURCE_META,
@@ -30,22 +30,21 @@ import {
 
 const ADMIN_STORAGE_KEY = "btwr:hub:admin:v1";
 
+export type UpgradeEdit = { cost?: number; stage?: number; build?: Partial<ResourceState> };
+
 export type CustomToolTier = ToolTier & {
   craftCost: Partial<Record<ResourceId, number>>;
 };
 
 export type ResourceMetaEdit = { name?: string; icon?: string };
 
-// Whole-mechanic on/off switches. Day/Night Cycle, Stars, Hunting and Mining
-// used to live here as admin toggles/tier pickers, but have moved
-// to the Upgrades shop (upgrade-catalog.ts) as purchasable unlocks instead —
-// each keeps its own Engine stage there. What's left here is just the header
-// badges, which stay admin-controlled since they're not something a visitor
-// buys into.
+// Whole-mechanic on/off switches. The header badges stay admin-controlled
+// since they're not something a visitor buys into; each Upgrades-shop entry
+// keeps its own Engine stage in upgrade-catalog.ts on top of upgradesStage.
 export type FeaturesConfig = {
-  /** Master switch — off means the Upgrades badge/shop never shows in the Outpost header. */
+  /** Master switch — off means the Upgrades shop never shows in the Camp rail. */
   upgradesEnabled: boolean;
-  /** Engine stage before the Upgrades badge appears in the header. Each upgrade inside keeps its own stage (upgrade-catalog.ts) on top of this. */
+  /** Engine stage before the Upgrades shop appears in the Camp rail. Each upgrade inside keeps its own stage (upgrade-catalog.ts) on top of this. */
   upgradesStage: number;
   /** Master switch — off means the Prestige badge never shows in the header. Otherwise it appears once the Engine reaches Stage 8. */
   prestigeEnabled: boolean;
@@ -58,7 +57,7 @@ export type FeaturesConfig = {
 export function defaultFeatures(): FeaturesConfig {
   return {
     upgradesEnabled: true,
-    upgradesStage: 2,
+    upgradesStage: 3,
     prestigeEnabled: true,
     survivalEnabled: true,
     survivalStage: 3,
@@ -93,8 +92,8 @@ export type AdminConfig = {
    * box at that stage. */
   stageTips: Partial<Record<number, string[]>>;
   features: FeaturesConfig;
-  /** Overrides for an Upgrades-shop entry's cost/stage (see upgrade-catalog.ts) — keyed by upgrade id. Missing means that upgrade uses its catalog default. */
-  upgradeEdits: Partial<Record<UpgradeId, { cost?: number; stage?: number }>>;
+  /** Overrides for an Upgrades-shop entry's cost/stage/build cost (see upgrade-catalog.ts) — keyed by upgrade id. Missing means that upgrade uses its catalog default. */
+  upgradeEdits: Partial<Record<UpgradeId, UpgradeEdit>>;
   /** Overrides for a module's mechanic class fields (see mechanics.ts) — keyed by module id, then by field key. */
   mechanicOverrides: Partial<Record<string, Partial<Record<string, number>>>>;
   /** Ponder / The Analytical Engine's tunables (engine/config.ts) — the admin panel's Engine tab. */
@@ -125,7 +124,7 @@ export function defaultAdminConfig(): AdminConfig {
         "Keep an eye on the rest of the site too... not everything announces itself.",
       ],
       3: [
-        "The camp is open. Chop Wood in Gathering, craft a Campfire (4 Wood) in Crafting and keep it at Medium to cook, and spend Skill Points in the Upgrades shop (top-left badge) — Hunting and Mining are in there.",
+        "The camp is open, down the right-hand side. Chop Wood in Gathering, craft a Campfire (4 Wood) in Crafting and keep it at Medium to cook, and go Hunting for Food. Upgrades, at the bottom of the camp, trades Skill Points and resources for new things to do.",
         "Cooked food will feed the Engine's hand crank, once it has a body. Mining needs a Stone Tool first.",
       ],
       4: ["Guess the Mod is open, and the Engine has a body now — build its gear grid from the Body tab: a hand crank powers it, and grinds Stone from a Millstone next to it. Powered machines help the Outpost: a Saw for Wood, a Millstone for Stone, Bellows for ore."],
@@ -185,6 +184,19 @@ function pickNumbers<K extends string>(v: unknown, keys: readonly K[]): Partial<
     if (isNum(n)) out[k] = n;
   }
   return Object.keys(out).length > 0 ? out : null;
+}
+
+// Only upgrades still in the catalog — retired ids (upgrade-catalog.ts's
+// RETIRED_UPGRADE_REFUNDS) drop out of an old save.
+function upgradeEdits(v: unknown): AdminConfig["upgradeEdits"] {
+  const all = mapOf(v, (x): UpgradeEdit | null => {
+    if (!isObj(x)) return null;
+    const out: UpgradeEdit = { ...pickNumbers(x, ["cost", "stage"] as const) };
+    const build = pickNumbers(x.build, RESOURCE_IDS);
+    if (build) out.build = build;
+    return Object.keys(out).length > 0 ? out : null;
+  });
+  return Object.fromEntries(Object.entries(all).filter(([id]) => isUpgradeId(id)));
 }
 
 function toolTierEdit(v: unknown): Partial<ToolTier> | null {
@@ -272,7 +284,7 @@ function normalizeAdminConfig(parsed: Obj): AdminConfig {
       ...mapOf(parsed.stageTips, (x) => (Array.isArray(x) ? x.filter((s): s is string => typeof s === "string") : null)),
     },
     features: normalizeFeatures(parsed.features),
-    upgradeEdits: mapOf(parsed.upgradeEdits, (x) => pickNumbers(x, ["cost", "stage"] as const)),
+    upgradeEdits: upgradeEdits(parsed.upgradeEdits),
     mechanicOverrides: mapOf(parsed.mechanicOverrides, (x) => (isObj(x) ? numbers(x) : null)),
     engine: {
       mechanic: mapOf(engine.mechanic, (x) => (isObj(x) ? numbers(x) : null)),
@@ -419,17 +431,22 @@ export function resolvedFeatures(config: AdminConfig): FeaturesConfig {
   return { ...defaultFeatures(), ...config.features };
 }
 
-// The Upgrades shop's catalog (upgrade-catalog.ts) with any admin cost/stage
-// overrides applied on top — the live site and the admin panel's own
+// The Upgrades shop's catalog (upgrade-catalog.ts) with any admin cost/stage/
+// build overrides applied on top — the live site and the admin panel's own
 // Upgrades tab both read off this instead of the catalog's hardcoded
 // defaults directly, same pattern as resolvedMechanic below.
+function withEdit(u: UpgradeDef, edit: UpgradeEdit | undefined): UpgradeDef {
+  if (!edit) return u;
+  return { ...u, ...edit, build: { ...u.build, ...edit.build } };
+}
+
 export function resolvedUpgrades(config: AdminConfig): UpgradeDef[] {
-  return UPGRADES.map((u) => ({ ...u, ...config.upgradeEdits[u.id] }));
+  return UPGRADES.map((u) => withEdit(u, config.upgradeEdits[u.id]));
 }
 
 export function resolvedUpgrade(config: AdminConfig, id: UpgradeId): UpgradeDef | undefined {
   const base = UPGRADES.find((u) => u.id === id);
-  return base ? { ...base, ...config.upgradeEdits[id] } : undefined;
+  return base ? withEdit(base, config.upgradeEdits[id]) : undefined;
 }
 
 // A fresh instance of a module's mechanic class (its own defaults) with any

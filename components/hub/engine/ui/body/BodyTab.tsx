@@ -104,6 +104,9 @@ export default function BodyTab() {
   const { resources, resourceMeta, engineBuffs } = useAchievements();
   const [selected, setSelected] = useState<GridPartType | null>(null);
   const [hover, setHover] = useState<number | null>(null);
+  // The crank tile only turns while CrankButton is held (the preview below
+  // always assumes it's turning, for its counts and warnings).
+  const [cranking, setCranking] = useState(false);
   const layout = layoutFor(e.stage);
   const { w, h } = e.grid;
 
@@ -229,7 +232,7 @@ export default function BodyTab() {
                 part && !isHub ? "engine-cell-span" : "",
                 part?.broken ? "engine-cell-broken" : "",
                 part && willPop.has(part.uid) && !part.broken ? "engine-cell-danger" : "",
-                part && turning.has(part.uid) ? "engine-cell-turning" : "",
+                part && turning.has(part.uid) && (part.type !== "handCrank" || cranking) ? "engine-cell-turning" : "",
                 terrain === "core" && e.grid.clutch && (preview?.coreByCell[i] ?? 0) > 0 ? "engine-cell-turning" : "",
                 ghostSquares.has(i) ? "engine-cell-ghost" : "",
                 dropSquares.has(i) ? (dropValid ? "engine-cell-drop" : "engine-cell-drop-bad") : "",
@@ -336,7 +339,7 @@ export default function BodyTab() {
             {e.grid.clutch ? "Clutch engaged — re-engage" : "Engage the clutch"}
           </button>
 
-          {e.grid.cells.some((c) => c?.type === "handCrank") && <CrankButton />}
+          {e.grid.cells.some((c) => c?.type === "handCrank") && <CrankButton onHoldingChange={setCranking} />}
 
           <div className="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5 text-[0.7rem] text-slate-300">
             {e.grid.clutch && summary ? (

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useAchievements } from "./AchievementsProvider";
+import { DAY_NIGHT_STAGE } from "./day-night-cycle";
 import type { OutpostSettings as OutpostSettingsState } from "./hub-storage";
 
 function ToggleRow({
@@ -51,7 +52,9 @@ function ToggleRow({
 // achievement/tool editor. This one is for ordinary visitors, always
 // reachable right from the Outpost itself.
 export default function OutpostSettings() {
-  const { settings, updateSettings, survivalActive } = useAchievements();
+  const { settings, updateSettings, survivalActive, engine } = useAchievements();
+  // The cycle arrives with The Stump — before that there's nothing to switch.
+  const cycleReached = engine.stage >= DAY_NIGHT_STAGE;
   const [open, setOpen] = useState(false);
   const [bouncing, setBouncing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -121,23 +124,27 @@ export default function OutpostSettings() {
               checked={settings.reducedMotion}
               onChange={(v) => set({ reducedMotion: v })}
             />
-            <ToggleRow
-              label="Day/night cycle"
-              description={
-                survivalActive
-                  ? "Always on while Hardcore Spawn is: the gloom comes with the New Moon."
-                  : "A sun and moon cross the top of the site, forcing the theme to match."
-              }
-              checked={survivalActive || settings.dayNightCycleEnabled}
-              disabled={survivalActive}
-              onChange={(v) => set({ dayNightCycleEnabled: v })}
-            />
-            <ToggleRow
-              label="Let the theme button override it"
-              description="Allow manually switching light/dark even while the cycle is running."
-              checked={settings.themeOverrideAllowed}
-              onChange={(v) => set({ themeOverrideAllowed: v })}
-            />
+            {cycleReached && (
+              <>
+                <ToggleRow
+                  label="Day/night cycle"
+                  description={
+                    survivalActive
+                      ? "Always on while Hardcore Spawn is: the gloom comes with the New Moon."
+                      : "A sun and moon cross the top of the site, forcing the theme to match."
+                  }
+                  checked={survivalActive || settings.dayNightCycleEnabled}
+                  disabled={survivalActive}
+                  onChange={(v) => set({ dayNightCycleEnabled: v })}
+                />
+                <ToggleRow
+                  label="Let the theme button override it"
+                  description="Allow manually switching light/dark even while the cycle is running."
+                  checked={settings.themeOverrideAllowed}
+                  onChange={(v) => set({ themeOverrideAllowed: v })}
+                />
+              </>
+            )}
           </div>
           <Link
             href="/outpost-admin"

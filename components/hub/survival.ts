@@ -158,10 +158,13 @@ export function eat(s: SurvivalState, amount: number, t: Pick<SurvivalTuning, "m
   return { ...s, hunger: Math.min(t.maxHunger, s.hunger + amount) };
 }
 
-/** Hunting/Mining hit chance (0..1): better tools and daylight make it rarer. */
-export function activityHitChance(toolIndex: number, isNight: boolean, t: SurvivalTuning): number {
+/**
+ * Hunting/Mining hit chance (0..1): better tools and daylight make it rarer.
+ * `mult` scales the result for anything else watching your back (a fed wolf, camp.ts).
+ */
+export function activityHitChance(toolIndex: number, isNight: boolean, t: SurvivalTuning, mult = 1): number {
   const reduced = t.damageChancePct - Math.max(0, toolIndex - 1) * t.toolDamageReductionPct;
-  const pct = Math.max(t.minDamageChancePct, reduced) * (isNight ? t.nightDamageMult : 1);
+  const pct = Math.max(t.minDamageChancePct, reduced) * (isNight ? t.nightDamageMult : 1) * Math.max(0, mult);
   return Math.min(1, Math.max(0, pct / 100));
 }
 
@@ -170,9 +173,10 @@ export function rollActivityDamage(
   toolIndex: number,
   isNight: boolean,
   t: SurvivalTuning,
-  rand: () => number = Math.random
+  rand: () => number = Math.random,
+  mult = 1
 ): number {
-  if (rand() >= activityHitChance(toolIndex, isNight, t)) return 0;
+  if (rand() >= activityHitChance(toolIndex, isNight, t, mult)) return 0;
   const lo = Math.min(t.damageMin, t.damageMax);
   const hi = Math.max(t.damageMin, t.damageMax);
   return lo + Math.floor(rand() * (hi - lo + 1));

@@ -25,7 +25,7 @@ function richConfig(): AdminConfig {
   c.collectAmounts = { wood: 3, food: 2 };
   c.stageTips = { ...c.stageTips, 5: [] };
   c.features = { ...c.features, survivalEnabled: false, survivalStage: 5 };
-  c.upgradeEdits = { stars: { cost: 9 } };
+  c.upgradeEdits = { wolf: { cost: 9, build: { cookedFood: 1 } } };
   c.mechanicOverrides = { campfire: { decayMinutes: 30 } };
   c.engine = { mechanic: { economy: { baseRate: 2 } }, components: { hopper: { baseCost: 7 } } };
   return c;
@@ -71,6 +71,7 @@ describe("admin settings file", () => {
           { id: "ok", name: "Dupe", treeMiningMs: 1, huntingMs: 1 },
         ],
         engine: { components: { hopper: { baseCost: "1", rate: 2 } } },
+        upgradeEdits: { stars: { cost: 1 }, farm: { build: { wood: 2, gold: 5, stone: "x" } } },
       })
     )!;
     expect(imported.features.survivalEnabled).toBe(true);
@@ -81,5 +82,6 @@ describe("admin settings file", () => {
     expect(imported.collectAmounts).toEqual({ wood: 0, food: 1 });
     expect(imported.customToolTiers.map((t) => [t.id, t.miningMs])).toEqual([["ok", null]]);
     expect(imported.engine.components).toEqual({ hopper: { rate: 2 } });
+    expect(imported.upgradeEdits).toEqual({ farm: { build: { wood: 2 } } });
   });
 });

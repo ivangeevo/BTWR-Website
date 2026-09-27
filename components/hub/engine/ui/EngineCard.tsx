@@ -46,12 +46,12 @@ function writeSeen(tabs: Tab[]) {
 // Ponder → The Contraption → The Analytical Engine. At Day One this is just a
 // word puzzle; every stage adds one more thing. Its tabs sit under the
 // caption and appear as they unlock: Mind (the puzzle and the cipher
-// pages — home), then Logbook, Works and Body (the gear grid and its crank). Any tab but Mind
-// widens the card over the Outpost's middle column (the "Workshop"); going
-// back to Mind shrinks it again.
+// pages — home), then Logbook, Works and Body (the gear grid and its crank).
+// The card fills Basecamp's Engine view (HubSection.tsx) and stays the same
+// size on every tab, scrolling inside itself.
 export default function EngineCard() {
   const eng = useEngine();
-  const { e, cfg, title, store, workshopOpen, setWorkshopOpen, holdSky, fx, passive, takeOver } = eng;
+  const { e, cfg, title, store, holdSky, fx, passive, takeOver } = eng;
   const reduced = useReducedMotion();
   const corePU = useLive(store, (s) => s.corePU);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -71,14 +71,8 @@ export default function EngineCard() {
   const tabs = TAB_ORDER.filter((t) => e.stage >= TAB_STAGE[t]);
   // A tab can vanish (prestige takes the Engine back a stage): fall back to Mind.
   const current: Tab = tabs.includes(tab) ? tab : "mind";
-  const sizeClass = workshopOpen ? "" : e.stage >= 4 ? "outpost-card-lg" : "outpost-card-md";
   const stageDef = STAGES[e.stage];
   const frenzyOn = !!e.frenzy && new Date(e.frenzy.until).getTime() > Date.now();
-
-  // The card is wide on every tab but Mind.
-  useEffect(() => {
-    setWorkshopOpen(current !== "mind");
-  }, [current, setWorkshopOpen]);
 
   function setTab(t: Tab) {
     setTabState(t);
@@ -90,23 +84,31 @@ export default function EngineCard() {
   }
 
   return (
-    <div ref={rootRef} className={`outpost-panel engine-card relative rounded-xl p-5 ${sizeClass}`} data-dust={dust} data-stage={e.stage}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    // The header and tabs stay put; everything under them scrolls inside the
+    // card, so the ceremony and tutorial overlays (absolute on the card) always
+    // cover what's on screen.
+    <div
+      ref={rootRef}
+      className="outpost-panel engine-card relative flex flex-col rounded-xl p-5 lg:h-full"
+      data-dust={dust}
+      data-stage={e.stage}
+    >
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-[var(--outpost-accent)]">{title}</h3>
         <div className="flex items-center gap-1.5">
           {e.stage < 3 ? <InsightCounter compact /> : null}
           <span className="outpost-resource-chip">{stageDef.chapter}</span>
         </div>
       </div>
-      <p className="mt-1 text-xs leading-snug text-slate-400">{stageDef.caption}</p>
+      <p className="mt-1 shrink-0 text-xs leading-snug text-slate-400">{stageDef.caption}</p>
       {dust > 0 && (
-        <p className="mt-0.5 text-[0.65rem] italic text-slate-500">
+        <p className="mt-0.5 shrink-0 text-[0.65rem] italic text-slate-500">
           {dust >= 2 ? "Thick with dust. It's thinking slowly." : "A little dusty. It missed you."}
         </p>
       )}
 
       {tabs.length > 1 && (
-        <div className="mt-2 flex flex-wrap gap-1 border-b border-white/10 pb-1.5" role="tablist" aria-label={title} data-no-drag>
+        <div className="mt-2 flex shrink-0 flex-wrap gap-1 border-b border-white/10 pb-1.5" role="tablist" aria-label={title} data-no-drag>
           {tabs.map((t) => (
             <button
               key={t}
@@ -128,73 +130,76 @@ export default function EngineCard() {
         </div>
       )}
 
-      <WhileAwaySummary />
+      <div data-outpost-scroll className="outpost-card-inner-scroll -mx-5 -mb-5 px-5 pb-5">
+        <WhileAwaySummary />
 
-      {e.stage >= 3 && (
-        <div className="relative mt-2 flex items-center gap-3">
-          <EngineSvg stage={e.stage} size={e.stage >= 4 ? 64 : 52} spinning={!reduced && (corePU > 0 || e.stage < 4)} corePU={corePU} dust={dust} />
-          <div className="min-w-0 flex-1">
-            {/* Only the counter keeps clear of the frenzy badge in the corner; the Core line runs under it. */}
-            <div className={frenzyOn ? "pr-24" : undefined}>
-              <InsightCounter />
+        {e.stage >= 3 && (
+          <div className="relative mt-2 flex items-center gap-3">
+            <EngineSvg stage={e.stage} size={e.stage >= 4 ? 64 : 52} spinning={!reduced && (corePU > 0 || e.stage < 4)} corePU={corePU} dust={dust} />
+            <div className="min-w-0 flex-1">
+              {/* Only the counter keeps clear of the frenzy badge in the corner; the Core line runs under it. */}
+              <div className={frenzyOn ? "pr-24" : undefined}>
+                <InsightCounter />
+              </div>
+              {e.stage >= 4 && (
+                <p className="text-[0.65rem] text-slate-400">
+                  Power: <span className="text-white">{corePU} PU</span>
+                  {!e.grid.clutch && " · clutch disengaged"}
+                </p>
+              )}
             </div>
-            {e.stage >= 4 && (
-              <p className="text-[0.65rem] text-slate-400">
-                Power: <span className="text-white">{corePU} PU</span>
-                {!e.grid.clutch && " · clutch disengaged"}
-              </p>
+            {frenzyOn && (
+              <span className="absolute right-0 top-0 whitespace-nowrap text-[0.7rem] font-semibold text-[var(--outpost-accent)]">
+                Eureka frenzy ×{formatInsight(e.frenzy!.mult)}
+              </span>
             )}
-          </div>
-          {frenzyOn && (
-            <span className="absolute right-0 top-0 whitespace-nowrap text-[0.7rem] font-semibold text-[var(--outpost-accent)]">
-              Eureka frenzy ×{formatInsight(e.frenzy!.mult)}
-            </span>
-          )}
-        </div>
-      )}
-
-      <div className="mt-3" data-no-drag>
-        {current === "mind" && (
-          <div className="space-y-4">
-            <MindPuzzle />
-            {e.stage >= 3 && <CipherPanel />}
           </div>
         )}
-        {current === "logbook" && <LogbookTab />}
-        {current === "works" && <WorksTab />}
-        {current === "body" && (
-          <>
-            <BodyTab />
-            {e.stage >= 8 && (
-              <section className="mt-4 border-t border-white/10 pt-3">
-                <h4 className="text-[0.7rem] font-bold uppercase tracking-wider text-white/50">The Difference Engine</h4>
-                <div className="mt-1.5">
-                  <DifferenceEngine />
-                </div>
-              </section>
+
+        <div className="mt-3" data-no-drag>
+          {current === "mind" && (
+            // A readable width: the view is wide, the puzzle doesn't need to be.
+            <div className="mx-auto max-w-3xl space-y-4">
+              <MindPuzzle />
+              {e.stage >= 3 && <CipherPanel />}
+            </div>
+          )}
+          {current === "logbook" && <LogbookTab />}
+          {current === "works" && <WorksTab />}
+          {current === "body" && (
+            <>
+              <BodyTab />
+              {e.stage >= 8 && (
+                <section className="mt-4 border-t border-white/10 pt-3">
+                  <h4 className="text-[0.7rem] font-bold uppercase tracking-wider text-white/50">The Difference Engine</h4>
+                  <div className="mt-1.5">
+                    <DifferenceEngine />
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+        </div>
+
+        <StageGatePanel />
+
+        {/* A frenzy shows at the top right of the insight row above; only a
+            stage too early for that row (Eurekas can be set that early) puts it here. */}
+        {((e.stage >= 8 && fx.governsSky) || (frenzyOn && e.stage < 3)) && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {e.stage >= 8 && fx.governsSky && (
+              <button type="button" onClick={holdSky} className="text-xs text-[var(--outpost-accent)] hover:underline" data-no-drag>
+                Hold the sky
+              </button>
             )}
-          </>
+            {frenzyOn && e.stage < 3 && (
+              <span className="ml-auto text-[0.7rem] font-semibold text-[var(--outpost-accent)]">
+                Eureka frenzy ×{formatInsight(e.frenzy!.mult)}
+              </span>
+            )}
+          </div>
         )}
       </div>
-
-      <StageGatePanel />
-
-      {/* A frenzy shows at the top right of the insight row above; only a
-          stage too early for that row (Eurekas can be set that early) puts it here. */}
-      {((e.stage >= 8 && fx.governsSky) || (frenzyOn && e.stage < 3)) && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {e.stage >= 8 && fx.governsSky && (
-            <button type="button" onClick={holdSky} className="text-xs text-[var(--outpost-accent)] hover:underline" data-no-drag>
-              Hold the sky
-            </button>
-          )}
-          {frenzyOn && e.stage < 3 && (
-            <span className="ml-auto text-[0.7rem] font-semibold text-[var(--outpost-accent)]">
-              Eureka frenzy ×{formatInsight(e.frenzy!.mult)}
-            </span>
-          )}
-        </div>
-      )}
 
       {passive ? (
         <div className="engine-ceremony" role="status" data-no-drag>

@@ -5,11 +5,9 @@ import type { Mod, PackRelease } from "@/lib/mods";
 import { AchievementsProvider, useAchievements } from "./AchievementsProvider";
 import AccomplishmentsSection from "./AccomplishmentsSection";
 import AchievementToastStack from "./AchievementToastStack";
-import Campfire from "./Campfire";
-import CraftingCard from "./CraftingCard";
+import CampRail, { useCampRailShown } from "./CampRail";
 import DailyBriefing from "./DailyBriefing";
 import ExperiencePicker from "./ExperiencePicker";
-import Gathering from "./Gathering";
 import OutpostCorners from "./OutpostCorners";
 import OutpostSettings from "./OutpostSettings";
 import OutpostTabs, { OutpostTabPanel, useOutpostTabs } from "./OutpostTabs";
@@ -18,12 +16,11 @@ import Ponder from "./Ponder";
 import PrestigeBadge from "./PrestigeBadge";
 import GloomLayer from "./GloomLayer";
 import GuessTheMod from "./GuessTheMod";
-import ResourceToolStrip from "./ResourceToolStrip";
 import StageTip from "./StageTip";
 import StrandedPanel from "./StrandedPanel";
-import UpgradesPanel, { useUpgradesShown } from "./UpgradesPanel";
 import YourProgressSection from "./YourProgressSection";
-import { type ModuleId } from "./module-registry";
+import { MODULE_GROUP, type ModuleId } from "./module-registry";
+import { pendingTutorial } from "./engine/content/tutorials";
 import { EngineProvider, useEngine } from "./engine/ui/EngineProvider";
 import { EngineToasts, EurekaLayer } from "./engine/ui/overlays/EngineOverlays";
 import { OUTPOST_VERSION } from "./outpost-version";
@@ -34,11 +31,13 @@ import { useReducedMotion } from "./engine/ui/use-reduced-motion";
 // The Outpost, on its own page (/outpost) and exactly one screen tall.
 // The page never scrolls, each part scrolls inside itself.
 // - A slim top bar: title, the Basecamp/Progress/Achievements tabs, rank, settings.
-// - Basecamp is three columns. Left, "the cookie": the Engine (the Ponder
-//   card), with the stage tip above it. Its Workshop, when open, widens over
-//   the middle column. Middle: the activity cards, as a grid that scrolls in
-//   its own column, and any one of them can be expanded to fill it. Right,
-//   "the store": resources & tool, then the Upgrades shop.
+// - Basecamp is two parts. The main view, under the stage tip, switches
+//   between the Engine (the Ponder card, the same size on every one of its
+//   tabs) and the Notice Board (the daily reads and the quiz, as a card grid
+//   that scrolls in its own column; any card can be expanded to fill it).
+//   Beside it, the Camp rail (CampRail.tsx): Stats & Materials and the
+//   survival work — Campfire, Gathering, Crafting, Upgrades — always on
+//   screen whatever the main view shows.
 // - Progress and Achievements fill the space under the bar.
 // Below the lg breakpoint (a narrow desktop window) the columns stack and
 // the page scrolls normally instead; see .outpost-screen in globals.css.
@@ -52,20 +51,14 @@ function ModuleGate({ id, children }: { id: ModuleId; children: React.ReactNode 
   return <>{children}</>;
 }
 
-// Maps a middle-column module id to its actual card, with whatever props it
-// needs. The Engine ("ponder") has its own column, so it's never in here.
+// Maps a Notice Board module id to its actual card, with whatever props it
+// needs. The Engine and the Camp rail's cards have places of their own.
 function renderCard(id: ModuleId, mods: Mod[], packReleases: PackRelease[]): React.ReactNode {
   switch (id) {
     case "daily-briefing":
       return <DailyBriefing mods={mods} />;
-    case "campfire":
-      return <Campfire />;
-    case "gathering":
-      return <Gathering />;
     case "patch-notes":
       return <PatchNotes mods={mods} packReleases={packReleases} />;
-    case "crafting":
-      return <CraftingCard />;
     case "guess-the-mod":
       return <GuessTheMod mods={mods} />;
     default:
@@ -76,8 +69,7 @@ function renderCard(id: ModuleId, mods: Mod[], packReleases: PackRelease[]): Rea
 // Sits after the last card so a drag has somewhere to land for "move this
 // card to the very end". Occupies its own grid cell; only visible while a
 // card is being dragged. Hit-tested by use-card-reorder.ts via END_KEY.
-function DropzoneEnd({ reorder }: { reorder: CardReorder | null }) {
-  if (!reorder) return null;
+function DropzoneEnd({ reorder }: { reorder: CardReorder }) {
   const active = reorder.draggingId !== null;
   return (
     <div
@@ -193,9 +185,8 @@ function ExpandIcon({ expanded }: { expanded: boolean }) {
 const HANDLE_CLASS =
   "absolute top-1 z-20 flex h-5 w-5 items-center justify-center rounded text-xs transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--outpost-accent)]";
 
-// Each middle-column card's cell — carries data-module-id (Eureka sparks
-// land on cards by it) and the card's expand button. With the
-// "card-reorder" upgrade owned it also holds the move handle; the cell
+// Each Notice Board card's cell — carries data-module-id (Eureka sparks
+// land on cards by it), the card's expand button and its move handle; the cell
 // stays put as a dashed placeholder while its card is lifted out and
 // follows the pointer. An expanded card fills the column (the others stay
 // mounted, just hidden, so nothing loses its in-progress state).
@@ -208,18 +199,18 @@ function CardCell({
   children,
 }: {
   id: ModuleId;
-  reorder: CardReorder | null;
+  reorder: CardReorder;
   expanded: boolean;
   anyExpanded: boolean;
   onExpand: (id: ModuleId | null) => void;
   children: React.ReactNode;
 }) {
-  const dragging = reorder?.draggingId === id;
-  const settling = reorder?.settlingId === id;
-  const canMove = reorder && !anyExpanded;
+  const dragging = reorder.draggingId === id;
+  const settling = reorder.settlingId === id;
+  const canMove = !anyExpanded;
   return (
     <div
-      ref={reorder?.cellRef(id)}
+      ref={reorder.cellRef(id)}
       data-module-id={id}
       hidden={anyExpanded && !expanded}
       className={`relative rounded-xl ${expanded ? "outpost-card-expanded col-span-full" : ""} ${
@@ -227,7 +218,7 @@ function CardCell({
       }`}
     >
       <div
-        ref={reorder?.cardRef(id)}
+        ref={reorder.cardRef(id)}
         className={`relative rounded-xl transition-shadow duration-200 ${dragging || settling ? "outpost-card-lifted" : ""}`}
       >
         {children}
@@ -263,7 +254,7 @@ function CardCell({
   );
 }
 
-// The middle column: every revealed activity card, in the visitor's order.
+// The Notice Board: every revealed board card, in the visitor's order.
 function CardColumn({
   ids,
   mods,
@@ -273,12 +264,18 @@ function CardColumn({
   mods: Mod[];
   packReleases: PackRelease[];
 }) {
-  const { cardOrder, reorderCard, upgrades } = useAchievements();
-  const reorderEnabled = upgrades.purchased.includes("card-reorder");
+  const { cardOrder, reorderCard } = useAchievements();
   const reducedMotion = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const drag = useCardReorder({ order: cardOrder, commit: reorderCard, reducedMotion, scrollRef });
-  const reorder = reorderEnabled ? drag : null;
+  // Dragging works on the board's own cards; the move is saved into the one
+  // stored order (cards of other groups keep their places in it).
+  const boardOrder = cardOrder.filter((id) => MODULE_GROUP[id] === "board");
+  const commit = (from: number, to: number) => {
+    const fromFull = cardOrder.indexOf(boardOrder[from]);
+    const toFull = to >= boardOrder.length ? cardOrder.length : cardOrder.indexOf(boardOrder[to]);
+    reorderCard(fromFull, toFull);
+  };
+  const reorder = useCardReorder({ order: boardOrder, commit, reducedMotion, scrollRef });
   const [expanded, setExpanded] = useState<ModuleId | null>(null);
   const shown = new Set(ids);
   const expandedId = expanded && shown.has(expanded) ? expanded : null;
@@ -301,7 +298,7 @@ function CardColumn({
   return (
     <div ref={scrollRef} data-outpost-scroll className="outpost-col-scroll lg:h-full lg:overflow-y-auto">
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]">
-        {(reorder ? drag.displayOrder : cardOrder)
+        {reorder.displayOrder
           .filter((id) => shown.has(id))
           .map((id) => (
             <CardCell
@@ -321,62 +318,116 @@ function CardColumn({
   );
 }
 
+type MainViewId = "engine" | "board";
+
+// Which main view is showing, remembered per browser (a convenience only).
+const VIEW_KEY = "btwr:hub:main-view:v1";
+
+function readView(): MainViewId {
+  try {
+    return window.localStorage.getItem(VIEW_KEY) === "board" ? "board" : "engine";
+  } catch {
+    return "engine";
+  }
+}
+
+function writeView(view: MainViewId) {
+  try {
+    window.localStorage.setItem(VIEW_KEY, view);
+  } catch {
+    // Remembering the view is a nicety.
+  }
+}
+
+// The Engine / Notice Board switch over the main view.
+function ViewSwitch({ view, onChange }: { view: MainViewId; onChange: (v: MainViewId) => void }) {
+  const { title } = useEngine();
+  const options: { id: MainViewId; label: string }[] = [
+    { id: "engine", label: title },
+    { id: "board", label: "Notice Board" },
+  ];
+  return (
+    <div className="outpost-view-switch" role="tablist" aria-label="Basecamp">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          role="tab"
+          id={`outpost-view-${o.id}`}
+          aria-selected={view === o.id}
+          aria-controls={`outpost-view-panel-${o.id}`}
+          onClick={() => onChange(o.id)}
+          className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+            view === o.id ? "bg-[var(--outpost-accent-soft)] text-white" : "text-slate-400 hover:text-white"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Basecamp({ mods, packReleases }: { mods: Mod[]; packReleases: PackRelease[] }) {
   const { cardOrder, isModuleRevealed } = useAchievements();
-  const { workshopOpen } = useEngine();
-  const upgradesShown = useUpgradesShown();
-  const cardIds = cardOrder.filter((id) => id !== "ponder" && isModuleRevealed(id));
-  const hasMiddle = cardIds.length > 0;
-  const hasRight = isModuleRevealed("resource-tool-strip") || upgradesShown;
-  // The Engine's column is fixed-width beside the cards, and takes their
-  // room while its Workshop is open (or when there are no cards yet).
-  const wideEngine = workshopOpen || !hasMiddle;
+  const { e, ceremony } = useEngine();
+  const boardIds = cardOrder.filter((id) => MODULE_GROUP[id] === "board" && isModuleRevealed(id));
+  const hasBoard = boardIds.length > 0;
+  const hasRail = useCampRailShown();
+  const [pickedView, setPickedView] = useState<MainViewId>("engine");
+  useEffect(() => setPickedView(readView()), []);
+  const view: MainViewId = hasBoard ? pickedView : "engine";
 
-  const centred = !hasMiddle && !workshopOpen ? "mx-auto w-full max-w-2xl" : "";
+  function pickView(v: MainViewId) {
+    setPickedView(v);
+    writeView(v);
+  }
+
+  // A stage ceremony or a lesson points at the Engine: bring it up.
+  const engineCalling = !!ceremony || !!pendingTutorial(e);
+  useEffect(() => {
+    if (engineCalling) pickView("engine");
+  }, [engineCalling]);
+
+  // Day One: just the Engine, at a readable width in the middle.
+  const centred = !hasBoard && !hasRail ? "mx-auto w-full max-w-3xl" : "";
 
   return (
     <div className="flex flex-col gap-4 p-3 sm:p-4 lg:absolute lg:inset-0 lg:flex-row">
-      {/* The stage tip runs across the Engine's column and the cards' both,
-          as wide as it gets with the Workshop open, so it always shows in
-          full; the Engine and the cards start below it. */}
-      <div className="flex flex-col gap-3 lg:min-h-0 lg:min-w-0 lg:flex-1">
+      <div className={`flex flex-col gap-3 lg:min-h-0 lg:min-w-0 lg:flex-1 ${centred}`}>
         <ModuleGate id="stage-tip">
-          <div className={centred}>
-            <StageTip />
-          </div>
+          <StageTip />
         </ModuleGate>
         {/* Hardcore Spawn: only there while a respawn's trek home is underway. */}
-        <StrandedPanel className={centred} />
-        <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:flex-row">
+        <StrandedPanel />
+        {hasBoard && <ViewSwitch view={view} onChange={pickView} />}
+        {/* Both views stay mounted (the other just hidden), so neither loses
+            its in-progress state when you switch. */}
+        <div className="lg:min-h-0 lg:flex-1">
           <div
-            data-outpost-scroll
-            className={`outpost-engine-col flex flex-col gap-3 lg:h-full lg:overflow-y-auto ${
-              wideEngine ? "lg:min-w-0 lg:flex-1" : "lg:w-[22rem] lg:shrink-0 2xl:w-[26rem]"
-            }`}
+            id="outpost-view-panel-engine"
+            role={hasBoard ? "tabpanel" : undefined}
+            aria-labelledby={hasBoard ? "outpost-view-engine" : undefined}
+            data-module-id="ponder"
+            hidden={view !== "engine"}
+            className="lg:h-full"
           >
-            <div data-module-id="ponder" className={`flex flex-1 flex-col ${centred}`}>
-              <Ponder />
-            </div>
+            <Ponder />
           </div>
-          {hasMiddle && (
-            <div hidden={workshopOpen} className="lg:min-w-0 lg:flex-1">
-              <CardColumn ids={cardIds} mods={mods} packReleases={packReleases} />
+          {hasBoard && (
+            <div
+              id="outpost-view-panel-board"
+              role="tabpanel"
+              aria-labelledby="outpost-view-board"
+              hidden={view !== "board"}
+              className="lg:h-full"
+            >
+              <CardColumn ids={boardIds} mods={mods} packReleases={packReleases} />
             </div>
           )}
         </div>
       </div>
-      {hasRight && (
-        <aside
-          data-outpost-scroll
-          aria-label="Store"
-          className="flex flex-col gap-4 lg:h-full lg:w-[18rem] lg:shrink-0 lg:overflow-y-auto 2xl:w-[21rem]"
-        >
-          <ModuleGate id="resource-tool-strip">
-            <ResourceToolStrip />
-          </ModuleGate>
-          <UpgradesPanel />
-        </aside>
-      )}
+      {hasRail && <CampRail />}
     </div>
   );
 }

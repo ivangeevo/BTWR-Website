@@ -66,4 +66,30 @@ describe("normalizeState (shared by page load and import)", () => {
     expect("priorities" in s).toBe(false);
     expect("priorities" in raw).toBe(true);
   });
+
+  it("refunds upgrades the shop no longer sells, once", () => {
+    const raw = {
+      version: 1,
+      experience: { mode: "casual", chosenAt: "2026-09-01T00:00:00.000Z" },
+      upgrades: { skillPoints: 2, purchased: ["hunting", "stars", "day-night-cycle", "wolf"], cardOrder: null },
+    };
+    const s = normalizeState(raw)!;
+    expect(s.upgrades.purchased).toEqual(["wolf"]);
+    expect(s.upgrades.skillPoints).toBe(2 + 5 + 3 + 8);
+    expect(s.camp).toEqual(defaultState().camp);
+    // Loading the same stored save again gives the same result, not a second refund.
+    expect(normalizeState(raw)!.upgrades.skillPoints).toBe(18);
+    // A save that has already been migrated stays as it is.
+    expect(normalizeState(JSON.parse(JSON.stringify(s)))!.upgrades.skillPoints).toBe(18);
+  });
+
+  it("doesn't refund the Day/Night Cycle survival handed out for free", () => {
+    const s = normalizeState({
+      version: 1,
+      experience: { mode: "survival", chosenAt: "2026-09-01T00:00:00.000Z" },
+      upgrades: { skillPoints: 0, purchased: ["day-night-cycle", "mining"], cardOrder: null },
+    })!;
+    expect(s.upgrades.purchased).toEqual([]);
+    expect(s.upgrades.skillPoints).toBe(5);
+  });
 });

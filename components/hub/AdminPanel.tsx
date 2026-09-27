@@ -1414,13 +1414,13 @@ function FeaturesTab({ config, update }: { config: AdminConfig; update: Update }
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-400">
-        Whole mechanics, switched on/off. Day/Night Cycle, Stars, Hunting, and Mining live in the Upgrades
-        tab — each is its own shop entry with its own cost and Engine stage there.
+        Whole mechanics, switched on/off. The Upgrades shop&apos;s entries (the wolf, Fishing, Torches, the farm) have
+        their own costs and Engine stages in the Upgrades tab.
       </p>
 
       <FeatureRow
         title="Upgrades"
-        description="A Skill Points shop for small permanent capability unlocks — a badge in the Outpost header (top-left, next to Prestige) instead of a card. Individual upgrades keep their own stage (Upgrades tab)."
+        description="A shop that trades Skill Points plus a resource build cost for new things to do — the last section of Basecamp's Camp rail. Individual upgrades keep their own stage (Upgrades tab)."
         enabled={features.upgradesEnabled}
         onToggle={(v) => setFeature("upgradesEnabled", v)}
         tierId={String(features.upgradesStage)}
@@ -1449,16 +1449,27 @@ function FeaturesTab({ config, update }: { config: AdminConfig; update: Update }
 
 // The Skill Points shop's catalog (upgrade-catalog.ts) — one entry per
 // purchasable upgrade, grouped by the Engine stage it becomes buyable at.
-// Name/icon/description stay fixed in the catalog itself; cost and stage are
-// the two things worth tuning per-browser without touching code.
+// Name/icon/description stay fixed in the catalog itself; cost, build cost
+// and stage are the things worth tuning per-browser without touching code.
 function UpgradesTab({ config, update }: { config: AdminConfig; update: Update }) {
   const tiers = STAGE_LIST;
+  const meta = resolvedResourceMeta(config);
 
   function setUpgradeEdit(id: UpgradeId, patch: { cost?: number; stage?: number }) {
     update((prev) => ({
       ...prev,
       upgradeEdits: { ...prev.upgradeEdits, [id]: { ...prev.upgradeEdits[id], ...patch } },
     }));
+  }
+
+  function setBuildCost(id: UpgradeId, resourceId: ResourceId, amount: number) {
+    update((prev) => {
+      const edit = prev.upgradeEdits[id];
+      return {
+        ...prev,
+        upgradeEdits: { ...prev.upgradeEdits, [id]: { ...edit, build: { ...edit?.build, [resourceId]: amount } } },
+      };
+    });
   }
 
   const resolved = resolvedUpgrades(config);
@@ -1473,7 +1484,7 @@ function UpgradesTab({ config, update }: { config: AdminConfig; update: Update }
     <div>
       <p className="text-sm text-slate-400">
         Every purchasable upgrade in the header&apos;s Upgrades shop, grouped by the Engine stage it becomes buyable
-        at — set each one&apos;s Skill Point cost and move it to a different stage.
+        at — set each one&apos;s Skill Point and build costs and move it to a different stage.
       </p>
       <div className="mt-3 space-y-2">
         {tiers.map((t) => {
@@ -1508,6 +1519,18 @@ function UpgradesTab({ config, update }: { config: AdminConfig; update: Update }
                         />
                         SP
                       </label>
+                      {(Object.keys(u.build) as ResourceId[]).map((rid) => (
+                        <label key={rid} className="flex items-center gap-1 text-xs text-white/50" title={meta[rid].name}>
+                          <input
+                            type="number"
+                            min={0}
+                            value={u.build[rid] ?? 0}
+                            onChange={(e) => setBuildCost(u.id, rid, Math.max(0, Number(e.target.value) || 0))}
+                            className="w-14 rounded-md border border-white/15 bg-transparent px-2 py-1 text-xs font-semibold text-white"
+                          />
+                          <span aria-hidden="true">{meta[rid].icon}</span>
+                        </label>
+                      ))}
                       <div className="relative shrink-0">
                         <select
                           value={t.id}

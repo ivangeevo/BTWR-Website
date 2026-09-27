@@ -87,24 +87,53 @@ export function computeCyclePhase(startedAt: number, now: number = Date.now()): 
   };
 }
 
-// The cycle only runs "when the Outpost is active" (OutpostControlPanel's
-// enable switch) AND the visitor hasn't turned it off in the Outpost
-// settings dropdown AND the "Day/Night Cycle" upgrade has been purchased
-// (upgrade-catalog.ts — this is what lets a visitor unlock the day/night
-// cycle by spending Skill Points instead of it always being on) — all plain
-// localStorage reads, so this works from anywhere (ThemeToggle lives in the
-// site header, outside the Outpost's own React tree entirely).
+/** Which half-day of the cycle it is: even is a day, odd a night. */
+export function cycleSegmentIndex(startedAt: number, now: number = Date.now()): number {
+  return Math.floor(Math.max(0, now - startedAt) / SEGMENT_MS);
+}
+
+/** Which in-game day (a day and the night after it) of the cycle it is. */
+export function cycleDayIndex(startedAt: number, now: number = Date.now()): number {
+  return Math.floor(Math.max(0, now - startedAt) / FULL_CYCLE_MS);
+}
+
+// Dawn and dusk: the first and last stretch of the sun's arc.
+const TWILIGHT_EDGE = 0.15;
+
+export function isTwilight(phase: CyclePhase): boolean {
+  return phase.isDay && (phase.bodyProgress < TWILIGHT_EDGE || phase.bodyProgress >= 1 - TWILIGHT_EDGE);
+}
+
+/** Daylight (day segments, their twilight gap included) between two moments on the cycle's clock. */
+export function daylightMsBetween(startedAt: number, from: number, to: number): number {
+  const a = Math.max(0, from - startedAt);
+  const b = Math.max(0, to - startedAt);
+  if (b <= a) return 0;
+  // Daylight from the cycle's start up to elapsed t.
+  const upTo = (t: number) => Math.floor(t / FULL_CYCLE_MS) * SEGMENT_MS + Math.min(t % FULL_CYCLE_MS, SEGMENT_MS);
+  return upTo(b) - upTo(a);
+}
+
+// The cycle arrives with The Stump — the camp opening is when nights start
+// to matter — and from then on runs whenever the Outpost is active
+// (OutpostControlPanel's enable switch) and the visitor hasn't turned it off
+// in the Outpost settings dropdown. All plain localStorage reads, so this
+// works from anywhere (ThemeToggle lives in the site header, outside the
+// Outpost's own React tree entirely). Keep in sync with app/layout.tsx's
+// boot script.
+export const DAY_NIGHT_STAGE = 3;
+
 export function isDayNightCycleActive(): boolean {
   if (typeof window === "undefined") return false;
   try {
     const state = loadState();
     if (!state.enabled || isPhoneDevice()) return false;
+    if (state.engine.stage < DAY_NIGHT_STAGE) return false;
     // Survival's gloom runs on this clock, so while it's on the sky is too —
     // otherwise the page could look like midday while a New Moon night
     // darkens it (GloomLayer.tsx). The visitor's toggle can't hide it.
     if (state.experience.mode === "survival" && survivalForcesCycle(state.engine.stage)) return true;
-    if (!state.settings.dayNightCycleEnabled) return false;
-    return state.upgrades.purchased.includes("day-night-cycle");
+    return state.settings.dayNightCycleEnabled;
   } catch {
     return false;
   }
@@ -235,15 +264,6 @@ export function saveCycleStartedAt(startedAt: number) {
     window.localStorage.setItem(CYCLE_KEY, JSON.stringify({ startedAt }));
   } catch {
     // Same tolerance as loadCycleStartedAt.
-  }
-}
-
-export function areStarsEnabled(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return loadState().upgrades.purchased.includes("stars");
-  } catch {
-    return false;
   }
 }
 

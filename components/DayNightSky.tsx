@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  areStarsEnabled,
   computeCyclePhase,
   isDayNightCycleActive,
   isThemeOverrideAllowed,
@@ -115,7 +114,6 @@ export default function DayNightSky() {
   // across while fading back in, and normal easing resumes next tick.
   const [justRose, setJustRose] = useState(false);
   const [nowMs, setNowMs] = useState(0);
-  const [starsOn, setStarsOn] = useState(true);
   // The marker star's secret: while the Outpost's Engine is hunting its
   // keyword (Stage 7), the marker star can be clicked at night for a piece.
   const [starHunt, setStarHunt] = useState(false);
@@ -144,7 +142,6 @@ export default function DayNightSky() {
       prevBodyVisibleRef.current = nextPhase.bodyVisible;
       setPhase(nextPhase);
       setNowMs(now);
-      setStarsOn(areStarsEnabled());
       const pub = readEnginePublic();
       setStarHunt(!!pub?.keywordHunt && !pub.fragments.includes("frag-star"));
       const root = document.documentElement;
@@ -266,38 +263,36 @@ export default function DayNightSky() {
       style={skyStyle}
       aria-hidden="true"
     >
-      {starsOn && (
-        <div className="day-night-stars" style={{ opacity: starOpacity }}>
-          {STARS.map((star, i) =>
-            star.marker && starHunt && !phase.isDay ? (
-              <button
-                key={i}
-                type="button"
-                tabIndex={-1}
-                className="day-night-star day-night-star--marker"
-                style={{
-                  left: `${star.left}%`,
-                  top: `${star.top}%`,
-                  animationDelay: `${star.delay}s`,
-                  pointerEvents: "auto",
-                  cursor: "pointer",
-                  boxShadow: "0 0 10px 3px rgba(255, 210, 122, 0.9)",
-                }}
-                onClick={() => {
-                  pushInbox({ type: "keyFragment", data: { frag: "frag-star", via: "star" } });
-                  setStarHunt(false);
-                }}
-              />
-            ) : (
-              <span
-                key={i}
-                className={star.marker ? "day-night-star day-night-star--marker" : "day-night-star"}
-                style={{ left: `${star.left}%`, top: `${star.top}%`, animationDelay: `${star.delay}s` }}
-              />
-            )
-          )}
-        </div>
-      )}
+      <div className="day-night-stars" style={{ opacity: starOpacity }}>
+        {STARS.map((star, i) =>
+          star.marker && starHunt && !phase.isDay ? (
+            <button
+              key={i}
+              type="button"
+              tabIndex={-1}
+              className="day-night-star day-night-star--marker"
+              style={{
+                left: `${star.left}%`,
+                top: `${star.top}%`,
+                animationDelay: `${star.delay}s`,
+                pointerEvents: "auto",
+                cursor: "pointer",
+                boxShadow: "0 0 10px 3px rgba(255, 210, 122, 0.9)",
+              }}
+              onClick={() => {
+                pushInbox({ type: "keyFragment", data: { frag: "frag-star", via: "star" } });
+                setStarHunt(false);
+              }}
+            />
+          ) : (
+            <span
+              key={i}
+              className={star.marker ? "day-night-star day-night-star--marker" : "day-night-star"}
+              style={{ left: `${star.left}%`, top: `${star.top}%`, animationDelay: `${star.delay}s` }}
+            />
+          )
+        )}
+      </div>
       <div
         ref={bodyRef}
         className="day-night-body"

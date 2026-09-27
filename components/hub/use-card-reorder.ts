@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ModuleId } from "./module-registry";
 
-// Drag-to-reorder for the Outpost's card grid (the "card-reorder" upgrade).
+// Drag-to-reorder for the Outpost's card grid — always on.
 //
 // A card is picked up only by its handle (the small four-arrow move icon in its top-right
 // corner), instantly — no press-and-hold, and no way to start a drag from

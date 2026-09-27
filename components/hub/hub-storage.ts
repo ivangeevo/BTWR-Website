@@ -1,5 +1,6 @@
 import type { Mod } from "@/lib/mods";
 import { ACHIEVEMENTS_BY_ID, type AchievementId } from "./achievements-catalog";
+import { defaultCampState, normalizeCamp, type CampState } from "./camp";
 import { isPhoneDevice } from "./device";
 import { hashString } from "./engine/rng";
 import { defaultEngineState, normalizeEngineState } from "./engine/state";
@@ -9,6 +10,7 @@ import { DEFAULT_CARD_ORDER, type ModuleId } from "./module-registry";
 import type { ResourceState } from "./resources";
 import { defaultSurvivalState, type SurvivalState } from "./survival";
 import { SKINS_BY_ID, type SkinId, type Tier2TabId } from "./tier2";
+import { RETIRED_UPGRADE_REFUNDS } from "./upgrade-catalog";
 
 const STORAGE_KEY = "btwr:hub:v1";
 
@@ -99,10 +101,11 @@ export function normalizeCampfire(raw: Partial<CampfireState> | undefined): Camp
   return merged;
 }
 
-// The Outpost's meta-progression shop state (see upgrade-catalog.ts). cardOrder is
-// null until the visitor actually drags something (or before the
-// card-reorder upgrade even exists) — consumers fall back to
-// DEFAULT_CARD_ORDER, so this never needs a migration default beyond null.
+// The Outpost's meta-progression shop state (see upgrade-catalog.ts). cardOrder
+// (card dragging, always available) lives here too for history's sake: it
+// was an upgrade once. It's null until the visitor actually drags something
+// — consumers fall back to DEFAULT_CARD_ORDER, so this never needs a
+// migration default beyond null.
 // A single flat list — the main card grid is one modular grid now, not two
 // independently-ordered columns (see loadState's migration off the old
 // `{ left, right }` shape for visitors with a pre-existing save).
@@ -117,8 +120,9 @@ export type ToolState = {
   tier: string;
 };
 
-// Wood Gathering, Hunting, and Mining all share this single cooldown — see
-// mechanics.ts's GatheringMechanic.
+// Every Gathering activity shares one rest timer — see mechanics.ts's
+// GatheringMechanic. Cooking doesn't use it: its time is the Cook button's
+// own bar (Campfire.tsx), so neither ever waits on the other.
 export type ActivityState = {
   cooldownUntil: string | null;
 };
@@ -166,6 +170,8 @@ export type HubState = {
   engine: EngineState;
   /** Health, Hunger, Gloom, and Hardcore Spawn — see survival.ts. Reset by prestige. */
   survival: SurvivalState;
+  /** The Upgrades shop's capabilities out at camp: the wolf, torches, the farm — see camp.ts. Reset by prestige. */
+  camp: CampState;
 };
 
 export function defaultState(): HubState {
@@ -198,6 +204,7 @@ export function defaultState(): HubState {
     upgrades: { skillPoints: 0, purchased: [], cardOrder: null },
     engine: defaultEngineState(),
     survival: defaultSurvivalState(),
+    camp: defaultCampState(),
     tier2: {
       xp: 0,
       prestigeCount: 0,
@@ -244,6 +251,24 @@ export function loadState(): HubState {
   } catch {
     return defaultState();
   }
+}
+
+/**
+ * Takes upgrades the shop no longer sells out of a save and gives back the
+ * Skill Points they cost (upgrade-catalog.ts's RETIRED_UPGRADE_REFUNDS).
+ * Survival handed out the Day/Night Cycle for free, so that one's only
+ * refunded to a Casual (or undecided) save. Computed from the raw save every
+ * load, so it can never refund twice.
+ */
+export function retireUpgrades(upgrades: UpgradesState, mode: ExperienceMode | null): UpgradesState {
+  let refund = 0;
+  const purchased = upgrades.purchased.filter((id) => {
+    if (!(id in RETIRED_UPGRADE_REFUNDS)) return true;
+    if (!(id === "day-night-cycle" && mode === "survival")) refund += RETIRED_UPGRADE_REFUNDS[id];
+    return false;
+  });
+  if (purchased.length === upgrades.purchased.length) return upgrades;
+  return { ...upgrades, skillPoints: upgrades.skillPoints + refund, purchased };
 }
 
 /**
@@ -297,6 +322,18 @@ export function normalizeState(raw: unknown): HubState | null {
       ...parsed.survival,
       acc: { ...base.survival.acc, ...parsed.survival?.acc },
     };
+    const experience = normalizeExperience(parsed.experience);
+    const upgrades = retireUpgrades(
+      {
+        ...base.upgrades,
+        ...parsed.upgrades,
+        purchased: Array.isArray(parsed.upgrades?.purchased)
+          ? parsed.upgrades.purchased.filter((id: unknown): id is string => typeof id === "string")
+          : base.upgrades.purchased,
+        cardOrder,
+      },
+      experience.mode
+    );
     // A save can't hold a dead visitor (death respawns on the spot), but
     // guard anyway so a hand-edited or imported save never starts at 0.
     if (!(survival.health > 0)) survival.health = 1;
@@ -307,7 +344,7 @@ export function normalizeState(raw: unknown): HubState | null {
       quiz: { ...base.quiz, ...parsed.quiz },
       modOfDay: { ...base.modOfDay, ...parsed.modOfDay },
       visits: { ...base.visits, ...parsed.visits },
-      experience: normalizeExperience(parsed.experience),
+      experience,
       campfire: normalizeCampfire(parsed.campfire),
       resources: { ...base.resources, ...parsed.resources },
       tools: { ...base.tools, ...parsed.tools },
@@ -318,7 +355,8 @@ export function normalizeState(raw: unknown): HubState | null {
         ...parsed.legacy,
         perks: { ...base.legacy.perks, ...parsed.legacy?.perks },
       },
-      upgrades: { ...base.upgrades, ...parsed.upgrades, cardOrder },
+      upgrades,
+      camp: normalizeCamp(parsed.camp),
       engine: normalizeEngineState(parsed.engine),
       survival,
       tier2,

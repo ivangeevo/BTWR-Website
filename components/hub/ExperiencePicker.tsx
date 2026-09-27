@@ -34,7 +34,7 @@ const OPTIONS: Option[] = [
     points: [
       "No health or hunger. Nothing out there can hurt you.",
       "Nights are just nights: no gloom.",
-      "The day/night cycle stays an optional upgrade.",
+      "The day/night cycle runs, but you can switch it off in the Outpost settings.",
       "The Engine, crafting, cooking, and achievements all work the same (except Hardcore Spawn's own).",
     ],
   },

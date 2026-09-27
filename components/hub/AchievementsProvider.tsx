@@ -46,12 +46,26 @@ import {
 import { buildSaveFile, parseSaveFile } from "./save-file";
 import {
   computeCyclePhase,
+  cycleDayIndex,
+  cycleSegmentIndex,
+  daylightMsBetween,
   gloomDarkness,
   isGloomNight,
+  isTwilight,
   loadCycleStartedAt,
   saveCycleStartedAt,
   skipToMorning,
 } from "./day-night-cycle";
+import {
+  defaultCampState,
+  farmGrowth,
+  feedWolf as feedWolfState,
+  isTorchLit,
+  isWolfFed,
+  lightTorch,
+  rollFish,
+  type CampState,
+} from "./camp";
 import {
   applyDamage,
   completeTrekIfDone,
@@ -208,11 +222,23 @@ type AchievementsContextValue = {
   eatCookedFood: () => boolean;
   resources: HubState["resources"];
   tools: HubState["tools"];
+  /** Gathering's shared rest timer (Wood, Hunting, Mining, Fishing, harvesting). */
   activityCooldownUntil: string | null;
   completeWoodGathering: () => void;
   completeHunting: () => void;
   completeMining: () => Partial<ResourceState>;
+  /** Fishing (an Upgrades-shop capability): returns the Food caught, 0 if it couldn't run. */
+  completeFishing: () => number;
   craftTool: (tier: string) => boolean;
+  /** The Upgrades shop's capabilities out at camp — the wolf, torches, the farm (camp.ts). */
+  camp: CampState;
+  /** Spends one Cooked Food on the wolf. False if not owned, nothing to feed it, or it's already fed that far. */
+  feedWolf: () => boolean;
+  /** Crafts one Torch (Wood + Coal). False if not owned, unaffordable, or stranded. */
+  craftTorch: () => boolean;
+  plantFarm: () => boolean;
+  /** Harvests a ripe crop for Food (shares the gathering rest timer). False if nothing's ripe. */
+  harvestFarm: () => boolean;
   /** The Engine stage that reveals a card (default + admin override). */
   moduleStage: (id: ModuleId) => number;
   /** False when the card is switched off in /outpost-admin (never shown at all). */
@@ -263,10 +289,10 @@ type AchievementsContextValue = {
   buyLegacyPerk: (id: PerkId) => boolean;
   /** Skill Points balance + owned upgrade ids + any custom card order — see upgrade-catalog.ts. */
   upgrades: HubState["upgrades"];
-  /** Resolved (catalog defaults + admin cost/tier overrides) Upgrades-shop entries — Upgrades tab in /outpost-admin. */
+  /** Resolved (catalog defaults + admin cost/stage/build overrides) Upgrades-shop entries — Upgrades tab in /outpost-admin. */
   upgradeCatalog: UpgradeDef[];
   buyUpgrade: (id: UpgradeId) => boolean;
-  /** Moves a card to a new position in the single main-grid order, persisted — only meaningful once "card-reorder" is owned. */
+  /** Moves a card to a new position in the single main-grid order, persisted. */
   reorderCard: (from: number, to: number) => void;
   /** Resolved (custom order, else the default) card id order for the main grid. */
   cardOrder: ModuleId[];
@@ -591,6 +617,10 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // reasoning as the other refs. Its fractional tick accumulators live here
   // between saves; only whole-point changes get persisted.
   const survivalRef = useRef<SurvivalState>(defaultState().survival);
+  // The wolf, torches and farm plot (camp.ts) — read and written
+  // synchronously by the survival tick and the capability mutators, same
+  // reasoning as the other refs.
+  const campRef = useRef<CampState>(defaultCampState());
   // The visitor's pick on The Stump's experience screen — survival only
   // ever runs for "survival". Read synchronously by survivalOn().
   const experienceRef = useRef<ExperienceMode | null>(null);
@@ -962,6 +992,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     upgradesRef.current = imported.upgrades;
     settingsRef.current = imported.settings;
     survivalRef.current = imported.survival;
+    campRef.current = imported.camp;
     experienceRef.current = imported.experience.mode;
     liveEngine.current = imported.engine;
     patchSwitchCountRef.current = imported.tier2.patchNotesModeSwitchCount;
@@ -1061,6 +1092,22 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       return next;
     });
   }, []);
+  // Persists campRef and resourcesRef (plus an optional Recent Activity line).
+  const commitCamp = useCallback((logText?: string) => {
+    setState((prev) => {
+      const activityLog = logText
+        ? [{ ts: new Date().toISOString(), text: logText }, ...prev.tier2.activityLog].slice(0, ACTIVITY_LOG_MAX)
+        : prev.tier2.activityLog;
+      const next: HubState = {
+        ...prev,
+        camp: campRef.current,
+        resources: resourcesRef.current,
+        tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + (logText ? 1 : 0) },
+      };
+      saveState(next);
+      return next;
+    });
+  }, []);
   // Hardcore Spawn: respawn somewhere far off, stranded until the trek home
   // finishes, and the clock skips to morning (BTW resets the time on respawn).
   const die = useCallback(
@@ -1073,19 +1120,39 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     },
     [commitSurvival, survivalMech]
   );
-  // Every Gathering run costs a little hunger; Hunting and Mining can also
-  // hurt (rarer with better tools, likelier at night).
+  // Every Gathering run costs a little hunger (Fishing excepted); Hunting
+  // and Mining can also hurt (rarer with better tools, likelier at night —
+  // unless a torch is burning — and rarer on a hunt with a fed wolf).
   const afterActivity = useCallback(
-    (kind: "wood" | "hunting" | "mining") => {
-      if (!survivalOn()) return;
+    (kind: "wood" | "hunting" | "mining" | "fishing") => {
+      if (!survivalOn() || kind === "fishing") return;
       const mech = survivalMech();
       const hungerCost = kind === "wood" ? mech.woodHunger : kind === "hunting" ? mech.huntingHunger : mech.miningHunger;
       survivalRef.current = spendHunger(survivalRef.current, hungerCost);
       let logText: string | undefined;
       if (kind !== "wood") {
         const toolIndex = Math.max(0, resolvedToolOrder(adminConfigRef.current).indexOf(toolsRef.current.tier));
-        const night = readEngineDebug().forceNight ?? !computeCyclePhase(loadCycleStartedAt()).isDay;
-        const damage = rollActivityDamage(toolIndex, night, mech);
+        const anchor = loadCycleStartedAt();
+        const nowMs = Date.now();
+        let night = readEngineDebug().forceNight ?? !computeCyclePhase(anchor, nowMs).isDay;
+        if (night && upgradesRef.current.purchased.includes("torches")) {
+          const lit = lightTorch(campRef.current, cycleSegmentIndex(anchor, nowMs));
+          if (lit) {
+            if (lit !== campRef.current) {
+              campRef.current = lit;
+              commitCamp("Lit a torch for the night");
+            }
+            night = false;
+          }
+        }
+        const wolfWatching =
+          kind === "hunting" &&
+          upgradesRef.current.purchased.includes("wolf") &&
+          isWolfFed(campRef.current, cycleDayIndex(anchor, nowMs));
+        const hitMult = wolfWatching
+          ? resolvedMechanic<UpgradesMechanic>(adminConfigRef.current, "upgrades").wolfHitPct / 100
+          : 1;
+        const damage = rollActivityDamage(toolIndex, night, mech, Math.random, hitMult);
         if (damage > 0) {
           survivalRef.current = applyDamage(survivalRef.current, damage);
           logText = `Took a hit ${kind === "hunting" ? "while hunting" : "in the mine"} (−${formatHalves(damage)} ♥)`;
@@ -1098,7 +1165,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       }
       commitSurvival(logText);
     },
-    [commitSurvival, die, survivalMech, survivalOn]
+    [commitCamp, commitSurvival, die, survivalMech, survivalOn]
   );
 
   // The fire goes wherever you do — tending, relighting, and cooking all
@@ -1162,8 +1229,10 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
   // Only succeeds while the fire's real (decay-aware) stage is Medium — the
   // one stage that's ever actually cooked anything, per the campfire's own
-  // long-standing flavor text (campfire-stage.ts). Shares the same rest
-  // timer as Wood Gathering/Hunting/Mining so it can't be spammed back-to-back.
+  // long-standing flavor text (campfire-stage.ts). Called when the Cook
+  // button's bar (CampfireMechanic.cookMs) finishes — the time spent cooking
+  // is the pacing, separate from Gathering's rest timer — so the fire's
+  // stage is checked again here, at the end.
   const completeCooking = useCallback((): boolean => {
     if (!campfireRef.current.built) return false;
     const campfireMechanic = resolvedMechanic<CampfireMechanic>(adminConfigRef.current, "campfire");
@@ -1175,9 +1244,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     resourcesRef.current = resources;
     // Every meal counts toward the Engine's stage gates.
     updateEngine((e) => ({ ...e, counters: { ...e.counters, mealsCooked: e.counters.mealsCooked + 1 } }), "soon");
-    const gatheringMechanic = resolvedMechanic<GatheringMechanic>(adminConfigRef.current, "gathering");
-    const cooldownMs = effectiveCooldownMs(gatheringMechanic.activityCooldownMs, legacyRef.current.perks);
-    const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
     setState((prev) => {
       const activityLog = [
         { ts: new Date().toISOString(), text: "Cooked a meal over the fire" },
@@ -1186,7 +1252,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       const next: HubState = {
         ...prev,
         resources,
-        activity: { cooldownUntil },
         tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
       };
       saveState(next);
@@ -1237,7 +1302,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // new resource totals synchronously off resourcesRef (so the ref and the
   // persisted state never disagree), sets the shared cooldown, and logs a
   // Recent Activity line.
-  const applyResourceGain = useCallback((gain: Partial<ResourceState>, logText: string) => {
+  const applyResourceGain = useCallback((gain: Partial<ResourceState>, logText: string, extra?: Partial<HubState>) => {
     const resources = { ...resourcesRef.current };
     for (const [id, amount] of Object.entries(gain) as [ResourceId, number][]) {
       resources[id] = (resources[id] ?? 0) + amount;
@@ -1253,8 +1318,9 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       ].slice(0, ACTIVITY_LOG_MAX);
       const next: HubState = {
         ...prev,
+        ...extra,
         resources,
-        activity: { cooldownUntil },
+        activity: { ...prev.activity, cooldownUntil },
         tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
       };
       saveState(next);
@@ -1275,13 +1341,85 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     afterActivity("wood");
   }, [afterActivity, applyResourceGain, currentEngineBuffs, updateEngine]);
 
+  // A fed wolf (camp.ts) brings a little extra home.
   const completeHunting = useCallback(() => {
     const { food } = resolvedCollectAmounts(adminConfigRef.current);
-    const amount = food + collectBonus(legacyRef.current.perks);
+    const wolf =
+      upgradesRef.current.purchased.includes("wolf") &&
+      isWolfFed(campRef.current, cycleDayIndex(loadCycleStartedAt()));
+    const wolfFood = wolf ? resolvedMechanic<UpgradesMechanic>(adminConfigRef.current, "upgrades").wolfHuntFood : 0;
+    const amount = food + collectBonus(legacyRef.current.perks) + wolfFood;
     const meta = resolvedResourceMeta(adminConfigRef.current);
-    applyResourceGain({ food: amount }, `Hunting: +${amount} ${meta.food.name}`);
+    applyResourceGain({ food: amount }, `Hunting: +${amount} ${meta.food.name}${wolf ? " (Wolf)" : ""}`);
     afterActivity("hunting");
   }, [afterActivity, applyResourceGain]);
+
+  // Slow and safe: no hunger, no hits (afterActivity), and the fish bite
+  // best at dawn and dusk on the cycle.
+  const completeFishing = useCallback((): number => {
+    if (!upgradesRef.current.purchased.includes("fishing")) return 0;
+    const mech = resolvedMechanic<UpgradesMechanic>(adminConfigRef.current, "upgrades");
+    const twilight = isTwilight(computeCyclePhase(loadCycleStartedAt()));
+    const amount =
+      rollFish(mech.fishFoodMin, mech.fishFoodMax, twilight, mech.fishTwilightBonus) + collectBonus(legacyRef.current.perks);
+    const meta = resolvedResourceMeta(adminConfigRef.current);
+    applyResourceGain({ food: amount }, `Fishing: +${amount} ${meta.food.name}${twilight ? " (the fish were biting)" : ""}`);
+    afterActivity("fishing");
+    return amount;
+  }, [afterActivity, applyResourceGain]);
+
+  // --- The Upgrades shop's capabilities out at camp (camp.ts) ---
+  // Feeding the wolf is like eating: it never waits on the rest timer, and
+  // the food comes along on a trek home.
+  const feedWolf = useCallback((): boolean => {
+    if (!upgradesRef.current.purchased.includes("wolf")) return false;
+    if ((resourcesRef.current.cookedFood ?? 0) < 1) return false;
+    const mech = resolvedMechanic<UpgradesMechanic>(adminConfigRef.current, "upgrades");
+    const fed = feedWolfState(campRef.current, cycleDayIndex(loadCycleStartedAt()), mech.wolfFedDays);
+    if (!fed) return false;
+    resourcesRef.current = { ...resourcesRef.current, cookedFood: resourcesRef.current.cookedFood - 1 };
+    campRef.current = fed;
+    commitCamp("Fed the wolf");
+    return true;
+  }, [commitCamp]);
+
+  const craftTorch = useCallback((): boolean => {
+    if (strandedNow() || !upgradesRef.current.purchased.includes("torches")) return false;
+    const mech = resolvedMechanic<UpgradesMechanic>(adminConfigRef.current, "upgrades");
+    const cost = (
+      [
+        ["wood", mech.torchWood],
+        ["coal", mech.torchCoal],
+      ] as [ResourceId, number][]
+    ).filter(([, n]) => n > 0);
+    if (!cost.every(([id, n]) => (resourcesRef.current[id] ?? 0) >= n)) return false;
+    const resources = { ...resourcesRef.current };
+    for (const [id, n] of cost) resources[id] -= n;
+    resourcesRef.current = resources;
+    campRef.current = { ...campRef.current, torches: campRef.current.torches + 1 };
+    commitCamp("Crafted a Torch");
+    return true;
+  }, [commitCamp, strandedNow]);
+
+  const plantFarm = useCallback((): boolean => {
+    if (!upgradesRef.current.purchased.includes("farm") || campRef.current.farm.plantedAt !== null) return false;
+    campRef.current = { ...campRef.current, farm: { plantedAt: new Date().toISOString() } };
+    commitCamp("Planted a crop");
+    return true;
+  }, [commitCamp]);
+
+  const harvestFarm = useCallback((): boolean => {
+    const plantedAt = campRef.current.farm.plantedAt;
+    if (!upgradesRef.current.purchased.includes("farm") || plantedAt === null) return false;
+    const mech = resolvedMechanic<UpgradesMechanic>(adminConfigRef.current, "upgrades");
+    const daylight = daylightMsBetween(loadCycleStartedAt(), new Date(plantedAt).getTime(), Date.now());
+    if ((farmGrowth(daylight, mech.farmGrowDaylightMin) ?? 0) < 1) return false;
+    const amount = mech.farmHarvestFood + collectBonus(legacyRef.current.perks);
+    campRef.current = { ...campRef.current, farm: { plantedAt: null } };
+    const meta = resolvedResourceMeta(adminConfigRef.current);
+    applyResourceGain({ food: amount }, `Harvest: +${amount} ${meta.food.name}`, { camp: campRef.current });
+    return true;
+  }, [applyResourceGain]);
 
   // Resource bridge for the Engine: spending (parts, commissions, feeding the
   // crank) and granting (Eureka/commission rewards), without the gathering
@@ -1507,6 +1645,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       gloomDeaths: prevSurvival.gloomDeaths,
       treksCompleted: prevSurvival.treksCompleted,
     };
+    // The wolf, torches and crops go with the loop; the know-how stays.
+    campRef.current = defaultCampState();
 
     setState((prev) => {
       const activityLog = [
@@ -1520,6 +1660,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         activity: { cooldownUntil: null },
         legacy: legacyRef.current,
         survival: survivalRef.current,
+        camp: campRef.current,
         engine: liveEngine.current,
         tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
       };
@@ -1529,12 +1670,21 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     return true;
   }, []);
 
+  // Skill Points buy the know-how, resources build the thing — so, like any
+  // other build, it waits for camp.
   const buyUpgrade = useCallback((id: UpgradeId): boolean => {
     const def = resolvedUpgrade(adminConfigRef.current, id);
     if (!def) return false;
     if (upgradesRef.current.purchased.includes(id)) return false;
+    if (def.survivalOnly && experienceRef.current !== "survival") return false;
     if (liveEngine.current.stage < def.stage) return false;
     if (upgradesRef.current.skillPoints < def.cost) return false;
+    if (strandedNow()) return false;
+    const build = (Object.entries(def.build) as [ResourceId, number][]).filter(([, n]) => n > 0);
+    if (!build.every(([rid, n]) => (resourcesRef.current[rid] ?? 0) >= n)) return false;
+    const resources = { ...resourcesRef.current };
+    for (const [rid, n] of build) resources[rid] -= n;
+    resourcesRef.current = resources;
 
     const upgrades = {
       ...upgradesRef.current,
@@ -1550,18 +1700,16 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       const next: HubState = {
         ...prev,
         upgrades,
+        resources,
         tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
       };
       saveState(next);
       return next;
     });
     return true;
-  }, []);
+  }, [strandedNow]);
 
-  // Only meaningful once "card-reorder" is owned — the components that call
-  // this (HubSection's DraggableSlot) only attach drag handlers at all when
-  // that's true, so this doesn't separately re-check ownership. Single flat
-  // list now that the main grid is one modular grid (see module-registry.ts's
+  // Single flat list now that the main grid is one modular grid (see module-registry.ts's
   // DEFAULT_CARD_ORDER) — a plain splice-out/splice-in, same "move to
   // position `to`, shifting everything between" semantics regardless of
   // where in the grid `to` lands.
@@ -1642,6 +1790,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     settingsRef.current = next.settings;
     liveEngine.current = next.engine;
     survivalRef.current = next.survival;
+    campRef.current = next.camp;
     experienceRef.current = next.experience.mode;
     const loadedAdminConfig = loadAdminConfig();
     adminConfigRef.current = loadedAdminConfig;
@@ -1760,8 +1909,8 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   // Survival's heartbeat. Ticks once a second, but only counts time while
   // this tab is actually visible — nothing drains while the Outpost is
   // closed or in the background, so a visitor can never come back dead.
-  // Also runs the trek-home check, the gloom darkness, and the one-time
-  // grant of the Day/Night Cycle upgrade (gloom needs its nights).
+  // Also runs the trek-home check and the gloom darkness, and lights a
+  // torch (camp.ts) when the gloom would otherwise reach the visitor.
   useEffect(() => {
     if (!mounted) return;
     let lastMs = Date.now();
@@ -1795,26 +1944,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         return;
       }
 
-      if (!upgradesRef.current.purchased.includes("day-night-cycle")) {
-        upgradesRef.current = {
-          ...upgradesRef.current,
-          purchased: [...upgradesRef.current.purchased, "day-night-cycle"],
-        };
-        setState((prev) => {
-          const activityLog = [
-            { ts: new Date().toISOString(), text: "Nights matter now: the day/night cycle turns on its own" },
-            ...prev.tier2.activityLog,
-          ].slice(0, ACTIVITY_LOG_MAX);
-          const next = {
-            ...prev,
-            upgrades: upgradesRef.current,
-            tier2: { ...prev.tier2, activityLog, totalEventsLogged: prev.tier2.totalEventsLogged + 1 },
-          };
-          saveState(next);
-          return next;
-        });
-      }
-
       if (debug.killNow) {
         die("starvation");
         return;
@@ -1827,10 +1956,22 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       const gloom = isGloomNight(phase);
       setGloomForced(debug.forceGloom === true);
       // Only a lit fire keeps the gloom off — wherever you are, since the
-      // Campfire goes with you. No fire crafted yet means no shelter at all.
-      const sheltered =
+      // Campfire goes with you. No fire crafted yet means no shelter at all,
+      // unless there's a torch to light for the night.
+      const fireLit =
         campfireRef.current.built &&
         currentCampfireStage(campfireRef.current, campfireDecayMinutes(), new Date(nowMs)) > 0;
+      const segment = cycleSegmentIndex(loadCycleStartedAt(), nowMs);
+      let torchLit = isTorchLit(campRef.current, segment);
+      if (gloom && !fireLit && !torchLit && upgradesRef.current.purchased.includes("torches")) {
+        const lit = lightTorch(campRef.current, segment);
+        if (lit) {
+          campRef.current = lit;
+          torchLit = true;
+          commitCamp("Lit a torch against the gloom");
+        }
+      }
+      const sheltered = fireLit || torchLit;
       const shown = sheltered ? 0 : Math.round(gloomDarkness(phase) * 100) / 100;
       setGloomLevel(shown);
       setGloomNight(gloom);
@@ -1847,7 +1988,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     }
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [mounted, campfireDecayMinutes, commitSurvival, die, survivalMech, survivalOn]);
+  }, [mounted, campfireDecayMinutes, commitCamp, commitSurvival, die, survivalMech, survivalOn]);
 
   // The expansion's check engine — re-evaluates every numeric/custom rule
   // (and the Ledger Entries rank table) after each state change. unlock()
@@ -2018,7 +2159,13 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
     completeWoodGathering: completeWoodGathering,
     completeHunting,
     completeMining,
+    completeFishing,
     craftTool,
+    camp: state.camp,
+    feedWolf,
+    craftTorch,
+    plantFarm,
+    harvestFarm,
     moduleStage,
     isModuleEnabled,
     isModuleRevealed,

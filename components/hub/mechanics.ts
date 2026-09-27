@@ -31,6 +31,8 @@ export class CampfireMechanic {
   relightWoodCost = 3;
   /** Wood spent crafting the Campfire itself, in the 2×2 Player Crafting grid. */
   craftWoodCost = 4;
+  /** How long one cook takes, in ms (the Cook button's bar). Separate from Gathering's rest timer. */
+  cookMs = 10_000;
 
   static readonly configFields: MechanicConfigField[] = [
     {
@@ -75,6 +77,15 @@ export class CampfireMechanic {
       max: 50,
       step: 1,
       suffix: "wood",
+    },
+    {
+      key: "cookMs",
+      label: "Cooking time",
+      description: "How long one cook takes. Separate from Gathering's rest timer.",
+      min: 1000,
+      max: 120_000,
+      step: 1000,
+      suffix: "ms",
     },
     {
       key: "craftWoodCost",
@@ -122,9 +133,28 @@ export class PrestigeMechanic {
   ];
 }
 
+// The Upgrades shop's own points, plus the tunables behind each capability
+// it sells (upgrade-catalog.ts, camp.ts).
 export class UpgradesMechanic {
   /** Skill Points earned per achievement unlocked. */
   skillPointsPerAchievement = 1;
+  /** In-game days (a day and its night) one meal keeps the wolf fed. */
+  wolfFedDays = 2;
+  /** Extra Food per Hunting trip while the wolf is fed. */
+  wolfHuntFood = 1;
+  /** Hunting hit chance while the wolf is fed, as a percent of the usual. */
+  wolfHitPct = 50;
+  /** How long one Fishing run takes, in ms. */
+  fishingMs = 12_000;
+  fishFoodMin = 1;
+  fishFoodMax = 2;
+  /** Extra Food per Fishing run at dawn or dusk. */
+  fishTwilightBonus = 1;
+  torchWood = 1;
+  torchCoal = 1;
+  /** Real minutes of in-game daylight a crop needs to ripen. */
+  farmGrowDaylightMin = 10;
+  farmHarvestFood = 6;
 
   static readonly configFields: MechanicConfigField[] = [
     {
@@ -136,6 +166,17 @@ export class UpgradesMechanic {
       step: 1,
       suffix: "SP",
     },
+    { key: "wolfFedDays", label: "Wolf: days per meal", description: "In-game days one Cooked Food keeps the wolf fed.", min: 1, max: 20, step: 1, suffix: "days" },
+    { key: "wolfHuntFood", label: "Wolf: extra Food", description: "Extra Food per Hunting trip while the wolf is fed.", min: 0, max: 20, step: 1 },
+    { key: "wolfHitPct", label: "Wolf: hunt hit chance", description: "Hunting hit chance while the wolf is fed, as a share of the usual.", min: 0, max: 100, step: 5, suffix: "%" },
+    { key: "fishingMs", label: "Fishing: run length", min: 1000, max: 120_000, step: 1000, suffix: "ms" },
+    { key: "fishFoodMin", label: "Fishing: Food (min)", min: 0, max: 20, step: 1 },
+    { key: "fishFoodMax", label: "Fishing: Food (max)", min: 0, max: 20, step: 1 },
+    { key: "fishTwilightBonus", label: "Fishing: dawn/dusk bonus", description: "Extra Food per run at dawn or dusk.", min: 0, max: 20, step: 1 },
+    { key: "torchWood", label: "Torch: Wood cost", min: 0, max: 20, step: 1 },
+    { key: "torchCoal", label: "Torch: Coal cost", min: 0, max: 20, step: 1 },
+    { key: "farmGrowDaylightMin", label: "Farm: growing time", description: "Real minutes of in-game daylight a crop needs to ripen.", min: 1, max: 240, step: 1, suffix: "min" },
+    { key: "farmHarvestFood", label: "Farm: harvest", description: "Food from one harvest.", min: 1, max: 100, step: 1 },
   ];
 }
 

@@ -65,17 +65,17 @@ export const metadata: Metadata = {
 // DayNightSky's CSS can reserve its height before React even mounts,
 // avoiding a layout shift when it pops in.
 //
-// Also duplicates the "Day/Night Cycle" Upgrades-shop gate (purchased ids
-// live in hub.upgrades.purchased) — a visitor who hasn't bought that
-// upgrade yet needs this to agree before hydration too, or the boot script
-// would briefly assume the cycle's running when AchievementsProvider (which
-// reads the same purchased list) is about to say otherwise.
+// Also duplicates the cycle's own gate (it arrives with the Engine's Stage 3,
+// The Stump) — a visitor who isn't there yet needs this to agree before
+// hydration too, or the boot script would briefly assume the cycle's running
+// when AchievementsProvider is about to say otherwise.
 const themeBootScript = `
 (function () {
   try {
     var hubRaw = localStorage.getItem("btwr:hub:v1");
     var hub = hubRaw ? JSON.parse(hubRaw) : null;
-    var purchased = (hub && hub.upgrades && hub.upgrades.purchased) || [];
+    // DAY_NIGHT_STAGE in day-night-cycle.ts.
+    var cycleReached = !!(hub && hub.engine && hub.engine.stage >= 3);
     // Desktop-only Outpost — keep in sync with components/hub/device.ts.
     var phone = window.matchMedia("(hover: none) and (pointer: coarse)").matches
       || /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle|BlackBerry|Opera Mini|IEMobile/i.test(navigator.userAgent);
@@ -87,8 +87,8 @@ const themeBootScript = `
     var survivalOn = features.survivalEnabled !== false
       && !!(hub && hub.experience && hub.experience.mode === "survival")
       && !!(hub && hub.engine && hub.engine.stage >= survivalStage);
-    var cycleActive = !phone && !!(hub && hub.enabled) && (survivalOn
-      || (!!(hub.settings && hub.settings.dayNightCycleEnabled) && purchased.indexOf("day-night-cycle") !== -1));
+    var cycleActive = !phone && !!(hub && hub.enabled) && cycleReached && (survivalOn
+      || !!(hub.settings && hub.settings.dayNightCycleEnabled));
     var overrideAllowed = !!(hub && hub.settings && hub.settings.themeOverrideAllowed);
     document.documentElement.setAttribute("data-daynight-active", String(cycleActive));
 
@@ -99,7 +99,9 @@ const themeBootScript = `
       if (cycleRaw && typeof JSON.parse(cycleRaw).startedAt === "number") {
         startedAt = JSON.parse(cycleRaw).startedAt;
       } else {
-        startedAt = Date.now();
+        // A fresh cycle opens on a Full Moon morning: 4 full cycles (FULL_CYCLE_MS,
+        // 612000) back — freshCycleStartedAt in day-night-cycle.ts.
+        startedAt = Date.now() - 4 * 612000;
         localStorage.setItem("btwr:hub:cycle:v1", JSON.stringify({ startedAt: startedAt }));
       }
       var elapsed = Math.max(0, Date.now() - startedAt);

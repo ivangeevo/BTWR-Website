@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useAchievements } from "./AchievementsProvider";
+import { isTorchLit } from "./camp";
+import { cycleSegmentIndex, loadCycleStartedAt } from "./day-night-cycle";
 import {
   CRAFTING_GRIDS,
   findToolTier,
+  nextToolTier,
   TOOL_ORDER,
   type CraftingGrid,
   type ResourceId,
@@ -192,8 +195,85 @@ function CompassRow() {
   );
 }
 
+// The Torches upgrade's craft (camp.ts): a stack that lights itself one a
+// night, when the gloom or a night-time hunt or dig calls for one.
+function TorchRow() {
+  const { camp, resources, resourceMeta, mechanics, craftTorch, mounted } = useAchievements();
+  const { torchWood, torchCoal } = mechanics.upgrades;
+  const [segment, setSegment] = useState<number | null>(null);
+  const cost: [ResourceId, number][] = (
+    [
+      ["wood", torchWood],
+      ["coal", torchCoal],
+    ] as [ResourceId, number][]
+  ).filter(([, n]) => n > 0);
+  const canAfford = cost.every(([id, n]) => (resources[id] ?? 0) >= n);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const read = () => setSegment(cycleSegmentIndex(loadCycleStartedAt()));
+    read();
+    const id = window.setInterval(read, 2_000);
+    return () => window.clearInterval(id);
+  }, [mounted]);
+
+  const burning = segment !== null && isTorchLit(camp, segment);
+
+  return (
+    <div className="mt-1.5 flex items-center justify-between gap-2 rounded-md bg-white/5 px-1.5 py-0.5 text-[10px]">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span aria-hidden="true">{"\u{1F526}"}</span>
+        <span className="font-semibold text-white">Torch ×{camp.torches}</span>
+        <span className="text-white/40">
+          {burning ? "one's burning tonight" : cost.map(([id, n]) => `${resourceMeta[id].icon} ${n}`).join(" ")}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={() => craftTorch()}
+        disabled={!canAfford}
+        title="A torch lights itself at night when you need one"
+        className={`shrink-0 rounded-md border px-1.5 py-px text-[10px] font-semibold transition-colors ${
+          canAfford
+            ? "border-[var(--outpost-accent)] text-[var(--outpost-accent)] hover:bg-[var(--outpost-accent-soft)]"
+            : "border-white/15 text-white/30"
+        }`}
+      >
+        Craft
+      </button>
+    </div>
+  );
+}
+
+// Crafting's line in its folded Camp rail header (CampRail.tsx): what can be
+// made right now, so a ready craft isn't missed while the section's folded.
+export function CraftingStatus() {
+  const { xpInfo, tools, toolTiersList, resources, craftCostFor, campfire, mechanics, stranded, mounted } =
+    useAchievements();
+  if (!mounted) return null;
+  if (stranded) return <span>Far from camp</span>;
+  const affordable = (cost: Partial<Record<ResourceId, number>>) =>
+    (Object.entries(cost) as [ResourceId, number][]).every(([id, n]) => (resources[id] ?? 0) >= n);
+  const ready: string[] = [];
+  if (!campfire.built && xpInfo.level >= CRAFTING_GRIDS[0].unlockLevel && affordable({ wood: mechanics.campfire.craftWoodCost })) {
+    ready.push("Campfire");
+  }
+  const next = nextToolTier(tools.tier, toolTiersList.map((t) => t.id));
+  // Past Netherite, admin-added tiers all go in the Soulforge (see below).
+  const grid = next
+    ? CRAFTING_GRIDS.find((g) => g.crafts.includes(next as (typeof TOOL_ORDER)[number])) ??
+      CRAFTING_GRIDS[CRAFTING_GRIDS.length - 1]
+    : null;
+  if (next && grid && xpInfo.level >= grid.unlockLevel && affordable(craftCostFor(next))) {
+    ready.push(findToolTier(toolTiersList, next).name);
+  }
+  if (ready.length === 0) return <span>{findToolTier(toolTiersList, tools.tier).name}</span>;
+  return <span className="text-[var(--outpost-accent)]">{ready.join(", ")} ready to craft</span>;
+}
+
+// Lives in the Camp rail (CampRail.tsx), which supplies its panel and title.
 export default function CraftingCard() {
-  const { xpInfo, tools, toolTiersList, survivalActive, stranded } = useAchievements();
+  const { xpInfo, tools, toolTiersList, survivalActive, stranded, upgrades } = useAchievements();
   // Admin-added tiers beyond Netherite have nowhere hand-authored to live,
   // so they default into the Soulforge grid (the pack's "advanced/late-game"
   // slot already).
@@ -215,11 +295,8 @@ export default function CraftingCard() {
   const activeGrid = unlockedGrids.find((g) => g.id === activeGridId) ?? unlockedGrids[unlockedGrids.length - 1];
 
   return (
-    <div className="outpost-panel outpost-card-md rounded-xl p-4">
-      <h3 className="font-heading text-sm font-bold uppercase tracking-wider text-[var(--outpost-accent)]">
-        Crafting
-      </h3>
-      <p className="mt-1 text-xs leading-snug text-slate-400">
+    <div>
+      <p className="text-xs leading-snug text-slate-400">
         Spend collected resources to craft a better tool — current:{" "}
         {findToolTier(toolTiersList, tools.tier).name}.
       </p>
@@ -258,6 +335,7 @@ export default function CraftingCard() {
         </>
       )}
       {survivalActive && <CompassRow />}
+      {survivalActive && upgrades.purchased.includes("torches") && <TorchRow />}
       {stranded && <FarFromCamp />}
     </div>
   );

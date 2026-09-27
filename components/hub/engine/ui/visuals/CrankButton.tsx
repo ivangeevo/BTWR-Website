@@ -15,8 +15,9 @@ type Floater = { id: number; text: string };
 // and every few turns yields Stone, Wood or ore. A crank also next to
 // another power source is overloaded and breaks on the first turn. Feeding
 // it a Cooked Food turns it twice as fast for a while (BTW's hand crank
-// costs hunger).
-export default function CrankButton() {
+// costs hunger). onHoldingChange lets the grid turn the crank tile only
+// while this is held.
+export default function CrankButton({ onHoldingChange }: { onHoldingChange?: (holding: boolean) => void }) {
   const { e, cfg, fx, crankRev, feedCrank, toast } = useEngine();
   const { resources } = useAchievements();
   const [holding, setHolding] = useState(false);
@@ -33,6 +34,12 @@ export default function CrankButton() {
   useEffect(() => {
     if (!canTurn) setHolding(false);
   }, [canTurn]);
+
+  useEffect(() => {
+    onHoldingChange?.(holding);
+  }, [holding, onHoldingChange]);
+  // Taken off the grid mid-turn: the tile stops too.
+  useEffect(() => () => onHoldingChange?.(false), [onHoldingChange]);
 
   useEffect(() => {
     if (!holding) {

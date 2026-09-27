@@ -87,11 +87,6 @@ type EngineCtx = {
   gate: GateResult | null;
   knownParts: GridPartType[];
   liveCtx: () => LiveCtx;
-  /** The inline full-width Workshop (Mind / Body / Works / Logbook). */
-  workshopOpen: boolean;
-  setWorkshopOpen: (open: boolean) => void;
-  /** Whether the card spans both grid columns. */
-  wide: boolean;
   /** Another browser tab is running the Engine; this one is hands-off. */
   passive: boolean;
   takeOver: () => void;
@@ -166,7 +161,6 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
   const [ceremony, setCeremony] = useState<CeremonyView | null>(null);
   const [toasts, setToasts] = useState<EngineToast[]>([]);
   const [envTick, setEnvTick] = useState(0);
-  const [workshopOpen, setWorkshopOpen] = useState(false);
   // Another tab is running the Engine — this one stays hands-off (no clock,
   // no offline accrual) until the visitor chooses to run it here instead.
   const tabIdRef = useRef("");
@@ -1286,9 +1280,6 @@ export function EngineProvider({ mods, children }: { mods: Mod[]; children: Reac
     gate,
     knownParts,
     liveCtx,
-    workshopOpen,
-    setWorkshopOpen,
-    wide: workshopOpen || e.stage >= 4,
     passive,
     takeOver,
     ceremony,

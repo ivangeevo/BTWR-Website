@@ -19,6 +19,11 @@ export const RESOURCE_META: Record<ResourceId, { name: string; icon: string }> =
   cookedFood: { name: "Cooked Food", icon: "\u{1F372}" },
 };
 
+// Hunting (and with it the Campfire's cooking) opens with the camp at The
+// Stump — the Engine stage where hunger starts to matter. Mining opens with
+// the first tool that can dig (ToolTier.miningMs below).
+export const HUNTING_STAGE = 3;
+
 // Cooking (see Campfire.tsx) only works while the fire is at the Medium
 // stage — same rule the campfire's own flavor text has described since
 // before this mechanic existed (see campfire-stage.ts's captions). Cook
