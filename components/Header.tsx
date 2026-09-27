@@ -18,9 +18,10 @@ const baseLinks = [
   { href: "/roadmap", label: "Roadmap", hidden: !enableRoadmap },
   { href: "/mods", label: "Mods" },
   { href: "/community", label: "Community" },
+  { href: "/support", label: "Support" },
 ].filter((link) => !link.hidden);
 
-// The Outpost's own page joins the menu, after Community, once it's been
+// The Outpost's own page joins the end of the menu once it's been
 // switched on from the Community page (and only on desktop, see device.ts).
 const outpostLink = { href: "/outpost", label: "Outpost" };
 

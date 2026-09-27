@@ -1,0 +1,46 @@
+// An external link card, or a dashed "Coming soon" placeholder while its
+// link (see lib/site-config.ts) is still null.
+export default function LinkCard({
+  title,
+  description,
+  href,
+  icon,
+}: {
+  title: string;
+  description: string;
+  href: string | null;
+  icon: React.ReactNode;
+}) {
+  if (!href) {
+    return (
+      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-4 opacity-70 dark:border-slate-600 dark:bg-slate-800/50">
+        <h3 className="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-300">
+          <span className="h-5 w-5 shrink-0">{icon}</span>
+          {title}
+        </h3>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          {description}
+        </p>
+        <p className="mt-2 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+          Coming soon — link not added yet
+        </p>
+      </div>
+    );
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="card-glow block rounded-lg border border-chrome-dark px-5 py-4 hover:bg-chrome-light dark:border-chrome dark:hover:bg-slate-800"
+    >
+      <h3 className="flex items-center gap-2 font-semibold text-chrome-dark dark:text-chrome">
+        <span className="h-5 w-5 shrink-0">{icon}</span>
+        {title}
+      </h3>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+        {description}
+      </p>
+    </a>
+  );
+}

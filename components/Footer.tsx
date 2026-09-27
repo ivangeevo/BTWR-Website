@@ -54,6 +54,22 @@ export default function Footer() {
         <p className="text-xs text-chrome-dark/70 dark:text-chrome/70">
           &copy; {new Date().getFullYear()} {siteName}
         </p>
+        <p className="text-xs text-chrome-dark/70 dark:text-chrome/70">
+          Based on Better Than Wolves by FlowerChild, licensed under{" "}
+          <a
+            href="https://creativecommons.org/licenses/by/4.0/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline transition-colors hover:text-glow"
+          >
+            CC BY 4.0
+          </a>
+          . Modified and remade for modern Minecraft.
+        </p>
+        <p className="text-xs text-chrome-dark/70 dark:text-chrome/70">
+          Not an official Minecraft product. Not approved by or associated with
+          Mojang or Microsoft.
+        </p>
       </div>
     </footer>
   );

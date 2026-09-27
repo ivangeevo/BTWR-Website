@@ -10,3 +10,8 @@ export const discordInviteUrl: string | null =
   "https://discord.com/invite/PxECJTzGfh";
 
 export const githubRepoUrl: string | null = "https://github.com/BTWR-Team";
+
+// Support page (/support) links — null shows a "Coming soon" card.
+export const kofiUrl: string | null = "https://ko-fi.com/btwremastered";
+// A personal Revolut.me link, e.g. https://revolut.me/<name>
+export const revolutUrl: string | null = "https://revolut.me/ivangeevo";
